@@ -1,3 +1,16 @@
+// General purpose extensions to database/sql
+//
+// sqlx is intended to seamlessly wrap database/sql and provide some convenience
+// methods which range from basic common error handling techniques to complex
+// reflect-base Scan extensions.  You should be able to integrate sqlx into your
+// current codebase by replacing:
+//
+//		import "database/sql"
+//
+// with:
+//
+// 		import sql "github.com/jmoiron/sqlx"
+//
 package sqlx
 
 import (

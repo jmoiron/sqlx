@@ -2,14 +2,9 @@
 //
 // sqlx is intended to seamlessly wrap database/sql and provide some convenience
 // methods which range from basic common error handling techniques to complex
-// reflect-base Scan extensions.  You should be able to integrate sqlx into your
-// current codebase by replacing:
-//
-//		import "database/sql"
-//
-// with:
-//
-// 		import sql "github.com/jmoiron/sqlx"
+// reflect-base Scan extensions.  Replacing `sql.Open` with `sqlx.Open` should
+// provide access to most of the features within sqlx while not requiring the
+// change of any existing code.
 //
 package sqlx
 

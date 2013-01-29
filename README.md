@@ -10,6 +10,7 @@ package main
 
 import (
     _ "github.com/bmizerany/pq"
+    "database/sql"
     "github.com/jmoiron/sqlx"
 )
 

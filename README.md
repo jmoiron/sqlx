@@ -4,7 +4,8 @@ sqlx is a set of extensions upon go's basic `database/sql` module.
 
 ## usage
 
-```golang
+```go
+
 package main
 
 import (

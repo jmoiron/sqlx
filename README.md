@@ -16,27 +16,27 @@ import (
 
 var schema = `
 CREATE TABLE person (
-	first_name text,
-	last_name text,
-	email text
+    first_name text,
+    last_name text,
+    email text
 );
 
 CREATE TABLE place (
-	country text,
-	city text NULL,
-	telcode integer
+    country text,
+    city text NULL,
+    telcode integer
 )`
 
 type Person struct {
-	FirstName string `db:"first_name"`
-	LastName  string `db:"last_name"`
-	Email     string
+    FirstName string `db:"first_name"`
+    LastName  string `db:"last_name"`
+    Email     string
 }
 
 type Place struct {
-	Country string
-	City    sql.NullString
-	TelCode int
+    Country string
+    City    sql.NullString
+    TelCode int
 }
 
 func main() {
@@ -65,8 +65,8 @@ func main() {
     // sqlx.Person{FirstName:"John", LastName:"Doe", Email:"johndoeDNE@gmail.net"}
 
     // if you have null fields and use SELECT *, you must use sql.Null* in your struct
-		places, err = db.Select(Place{}, "SELECT * FROM place ORDER BY telcode ASC")
-		usa, singsing, honkers = places[0].(Place), places[1].(Place), places[2].(Place)
+    places, err = db.Select(Place{}, "SELECT * FROM place ORDER BY telcode ASC")
+    usa, singsing, honkers = places[0].(Place), places[1].(Place), places[2].(Place)
     
     fmt.Printf("%#v\n%#v\n%#v\n", usa, singsing, honkers)
     // sqlx.Place{Country:"United States", City:sql.NullString{String:"New York", Valid:true}, TelCode:1}

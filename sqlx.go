@@ -26,11 +26,6 @@ type Rows struct {
 	values  []interface{}
 }
 
-type Stmt struct{ sql.Stmt }
-
-// An sqlx wrapper around database/sql's Tx with extra functionality
-type Tx struct{ sql.Tx }
-
 // An interface for something which can Execute sql queries (Tx, DB)
 type Querier interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
@@ -39,6 +34,11 @@ type Querier interface {
 // An interface for something which can Execute sql commands (Tx, DB)
 type Execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+// An interface for something which can Prepare sql statements (Tx, DB)
+type Preparer interface {
+	Prepare(query string) (*sql.Stmt, error)
 }
 
 // An sqlx wrapper around database/sql's DB with extra functionality
@@ -82,14 +82,126 @@ func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 	return &Rows{Rows: *r}, err
 }
 
+// Execv ("verbose") runs Execv using this database.
+func (db *DB) Execv(query string, args ...interface{}) (sql.Result, error) {
+	return Execv(db, query, args...)
+}
+
+// Execl ("log") runs Execl using this database.
+func (db *DB) Execl(query string, args ...interface{}) sql.Result {
+	return Execl(db, query, args...)
+}
+
+// Execf ("fatal") runs Execf using this database.
+func (db *DB) Execf(query string, args ...interface{}) sql.Result {
+	return Execf(db, query, args...)
+}
+
+// Execp ("panic") runs Execp using this database.
+func (db *DB) Execp(query string, args ...interface{}) sql.Result {
+	return Execp(db, query, args...)
+}
+
+func (db *DB) Preparex(query string) (*Stmt, error) {
+	return Preparex(db, query)
+}
+
+// An sqlx wrapper around database/sql's Tx with extra functionality
+type Tx struct{ sql.Tx }
+
+// Call LoadFile using this transaction to issue the Exec.
+func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
+	return LoadFile(tx, path)
+}
+
 // Call Select using this transaction to issue the Query.
 func (tx *Tx) Select(typ interface{}, query string, args ...interface{}) ([]interface{}, error) {
 	return Select(tx, typ, query, args...)
 }
 
-// Call LoadFile using this transaction to issue the Exec.
-func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
-	return LoadFile(tx, path)
+// Execv ("verbose") runs Execv using this transaction.
+func (tx *Tx) Execv(query string, args ...interface{}) (sql.Result, error) {
+	return Execv(tx, query, args...)
+}
+
+// Execl ("log") runs Execl using this transaction.
+func (tx *Tx) Execl(query string, args ...interface{}) sql.Result {
+	return Execl(tx, query, args...)
+}
+
+// Execf ("fatal") runs Execf using this transaction.
+func (tx *Tx) Execf(query string, args ...interface{}) sql.Result {
+	return Execf(tx, query, args...)
+}
+
+// Execp ("panic") runs Execp using this transaction.
+func (tx *Tx) Execp(query string, args ...interface{}) sql.Result {
+	return Execp(tx, query, args...)
+}
+
+func (tx *Tx) Preparex(query string) (*Stmt, error) {
+	st, err := tx.Tx.Prepare(query)
+	return &Stmt{*st}, err
+}
+
+// Returns a transaction prepared statement given the provided statement,
+// which can be either an sql.Stmt or an sqlx.Stmt
+func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
+	var st sql.Stmt
+	var s *sql.Stmt
+	switch stmt.(type) {
+	case sql.Stmt:
+		st = stmt.(sql.Stmt)
+	case Stmt:
+		st = stmt.(Stmt).Stmt
+	}
+	s = tx.Stmt(&st)
+	return &Stmt{*s}
+}
+
+// An sqlx wrapper around database/sql's Stmt with extra functionality
+type Stmt struct{ sql.Stmt }
+
+// this unexposed wrapper lets you use a Stmt as a Querier & Execer
+type qStmt struct{ Stmt }
+
+func (q *qStmt) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return q.Stmt.Query(args...)
+}
+
+func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
+	return q.Stmt.Exec(args...)
+}
+
+// Call Select using this statement to issue the Query.
+func (s *Stmt) Select(typ interface{}, args ...interface{}) ([]interface{}, error) {
+	return Select(&qStmt{*s}, typ, "", args...)
+}
+
+// Execv ("verbose") runs Execv using this statement.  Note that the query is
+// not recoverable once a statement has been prepared, so the query portion
+// will be blank.
+func (s *Stmt) Execv(args ...interface{}) (sql.Result, error) {
+	return Execv(&qStmt{*s}, "", args...)
+}
+
+// Execl ("log") runs Execl using this statement.  Note that the query is
+// not recoverable once a statement has been prepared, so the query portion
+// will be blank.
+func (s *Stmt) Execl(args ...interface{}) sql.Result {
+	return Execl(&qStmt{*s}, "", args...)
+}
+
+// Execf ("fatal") runs Execf using this statement.  Note that the query is
+// not recoverable once a statement has been prepared, so the query portion
+// will be blank.
+func (s *Stmt) Execf(args ...interface{}) sql.Result {
+	return Execf(&qStmt{*s}, "", args...)
+}
+
+// Execp ("panic") runs Execp using this statement.
+func (s *Stmt) Execp(args ...interface{}) sql.Result {
+	return Execp(&qStmt{*s}, "", args...)
 }
 
 // Like sql.Rows.Scan, but scans a single Row into a single Struct.  Use this
@@ -134,6 +246,27 @@ func (r *Rows) StructScan(typ interface{}) (interface{}, error) {
 	r.Scan(r.values...)
 
 	return v.Interface(), nil
+}
+
+// Connect to a database and panic on error.  Similar to sql.Open, but attempts
+// a simple `SELECT 1` statement to ensure that the connection is made and successful.
+func MustConnect(driverName, dataSourceName string) *DB {
+	db, err := Open(driverName, dataSourceName)
+	if err != nil {
+		panic(err)
+	}
+	_, err = db.Query("SELECT 1")
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+// Preparex prepares a statement given a Preparer (Tx, DB), returning an sqlx
+// wrapped *Stmt.
+func Preparex(p Preparer, query string) (*Stmt, error) {
+	s, err := p.Prepare(query)
+	return &Stmt{*s}, err
 }
 
 // Select uses a Querier (*DB or *Tx, by default), issues the query w/ args
@@ -242,6 +375,8 @@ func getFieldmap(t reflect.Type) (base reflect.Type, fm fieldmap, err error) {
 	fm, ok := fieldmapCache[base]
 	if ok {
 		return base, fm, nil
+	} else {
+		fm = fieldmap{}
 	}
 
 	var f reflect.StructField

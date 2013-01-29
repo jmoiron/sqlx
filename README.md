@@ -61,17 +61,17 @@ func main() {
     jason, john := people[0].(Person), people[1].(Person)
 
     fmt.Printf("%#v\n%#v", jason, john)
-    // sqlx.Person{FirstName:"Jason", LastName:"Moiron", Email:"jmoiron@jmoiron.net"}
-    // sqlx.Person{FirstName:"John", LastName:"Doe", Email:"johndoeDNE@gmail.net"}
+    // Person{FirstName:"Jason", LastName:"Moiron", Email:"jmoiron@jmoiron.net"}
+    // Person{FirstName:"John", LastName:"Doe", Email:"johndoeDNE@gmail.net"}
 
     // if you have null fields and use SELECT *, you must use sql.Null* in your struct
     places, err = db.Select(Place{}, "SELECT * FROM place ORDER BY telcode ASC")
     usa, singsing, honkers = places[0].(Place), places[1].(Place), places[2].(Place)
     
     fmt.Printf("%#v\n%#v\n%#v\n", usa, singsing, honkers)
-    // sqlx.Place{Country:"United States", City:sql.NullString{String:"New York", Valid:true}, TelCode:1}
-    // sqlx.Place{Country:"Singapore", City:sql.NullString{String:"", Valid:false}, TelCode:65}
-    // sqlx.Place{Country:"Hong Kong", City:sql.NullString{String:"", Valid:false}, TelCode:852}
+    // Place{Country:"United States", City:sql.NullString{String:"New York", Valid:true}, TelCode:1}
+    // Place{Country:"Singapore", City:sql.NullString{String:"", Valid:false}, TelCode:65}
+    // Place{Country:"Hong Kong", City:sql.NullString{String:"", Valid:false}, TelCode:852}
 
 }
 

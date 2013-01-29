@@ -122,7 +122,6 @@ func TestUsage(t *testing.T) {
 		}
 
 		jason, john := people[0].(Person), people[1].(Person)
-
 		if jason.FirstName != "Jason" {
 			t.Errorf("Expecting FirstName of Jason, got %s", jason.FirstName)
 		}
@@ -136,23 +135,31 @@ func TestUsage(t *testing.T) {
 			t.Errorf("John Doe's person record not what expected:  Got %v\n", john)
 		}
 
-		places, err := db.Select(Place{}, "SELECT * FROM place ORDER BY telcode ASC")
+		places, err := db.Select(Place{}, "SELECT telcode FROM place ORDER BY telcode ASC")
 		usa, singsing, honkers := places[0].(Place), places[1].(Place), places[2].(Place)
 
 		if usa.TelCode != 1 || honkers.TelCode != 852 || singsing.TelCode != 65 {
 			t.Errorf("Expected integer telcodes to work, got %#v", places)
 		}
 
-		stmt, err := db.Preparex("SELECT country, telcode FROM place WHERE telcode > $1")
+		// if you have null fields and use SELECT *, you must use sql.Null* in your struct
+		places, err = db.Select(Place{}, "SELECT * FROM place ORDER BY telcode ASC")
+		usa, singsing, honkers = places[0].(Place), places[1].(Place), places[2].(Place)
+
+		if usa.TelCode != 1 || honkers.TelCode != 852 || singsing.TelCode != 65 {
+			t.Errorf("Expected integer telcodes to work, got %#v", places)
+		}
+
+		stmt, err := db.Preparex("SELECT country, telcode FROM place WHERE telcode > $1 ORDER BY telcode ASC")
 		if err != nil {
 			t.Error(err)
 		}
 
-		places, err = stmt.Select("10")
+		places, err = stmt.Select(Place{}, 10)
 		if len(places) != 2 {
 			t.Error("Expected 2 places, got 0.")
-			fmt.Printf("%#v", places)
 		}
+		singsing, honkers = places[0].(Place), places[1].(Place)
 
 	}
 

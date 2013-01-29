@@ -160,6 +160,8 @@ func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
 }
 
 // An sqlx wrapper around database/sql's Stmt with extra functionality
+// Although a Stmt's interface differs from Tx and DB's, internally,
+// a wrapper is used to satisfy the Querier & Execer interfaces.
 type Stmt struct{ sql.Stmt }
 
 // this unexposed wrapper lets you use a Stmt as a Querier & Execer

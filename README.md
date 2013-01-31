@@ -59,16 +59,22 @@ func main() {
     tx.Commit()
 
     // Query the database, storing results in a []Person (wrapped in []interface{})
-    people, _ := db.Select(Person{}, "SELECT * FROM person ORDER BY first_name ASC")
-    jason, john := people[0].(Person), people[1].(Person)
+    people := []Person{}
+    db.Select(&people, "SELECT * FROM person ORDER BY first_name ASC")
+    jason, john := people[0], people[1]
 
     fmt.Printf("%#v\n%#v", jason, john)
     // Person{FirstName:"Jason", LastName:"Moiron", Email:"jmoiron@jmoiron.net"}
     // Person{FirstName:"John", LastName:"Doe", Email:"johndoeDNE@gmail.net"}
 
     // if you have null fields and use SELECT *, you must use sql.Null* in your struct
-    places, err = db.Select(Place{}, "SELECT * FROM place ORDER BY telcode ASC")
-    usa, singsing, honkers = places[0].(Place), places[1].(Place), places[2].(Place)
+    places := []Place{}
+    err := db.Select(&places, "SELECT * FROM place ORDER BY telcode ASC")
+    if err != nil {
+        fmt.Printf(err)
+        return
+    }
+    usa, singsing, honkers = places[0], places[1], places[2]
     
     fmt.Printf("%#v\n%#v\n%#v\n", usa, singsing, honkers)
     // Place{Country:"United States", City:sql.NullString{String:"New York", Valid:true}, TelCode:1}

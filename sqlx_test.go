@@ -116,12 +116,14 @@ func TestUsage(t *testing.T) {
 		tx.Execl("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Singapore", "65")
 		tx.Commit()
 
-		people, err := db.Select(Person{}, "SELECT * FROM person ORDER BY first_name ASC")
+		people := []Person{}
+
+		err := db.Select(&people, "SELECT * FROM person ORDER BY first_name ASC")
 		if err != nil {
 			t.Fatalf("Could not select from people")
 		}
 
-		jason, john := people[0].(Person), people[1].(Person)
+		jason, john := people[0], people[1]
 		if jason.FirstName != "Jason" {
 			t.Errorf("Expecting FirstName of Jason, got %s", jason.FirstName)
 		}
@@ -135,16 +137,19 @@ func TestUsage(t *testing.T) {
 			t.Errorf("John Doe's person record not what expected:  Got %v\n", john)
 		}
 
-		places, err := db.Select(Place{}, "SELECT telcode FROM place ORDER BY telcode ASC")
-		usa, singsing, honkers := places[0].(Place), places[1].(Place), places[2].(Place)
+		places := []*Place{}
+
+		err = db.Select(&places, "SELECT telcode FROM place ORDER BY telcode ASC")
+		usa, singsing, honkers := places[0], places[1], places[2]
 
 		if usa.TelCode != 1 || honkers.TelCode != 852 || singsing.TelCode != 65 {
 			t.Errorf("Expected integer telcodes to work, got %#v", places)
 		}
 
 		// if you have null fields and use SELECT *, you must use sql.Null* in your struct
-		places, err = db.Select(Place{}, "SELECT * FROM place ORDER BY telcode ASC")
-		usa, singsing, honkers = places[0].(Place), places[1].(Place), places[2].(Place)
+		places = []*Place{}
+		err = db.Select(&places, "SELECT * FROM place ORDER BY telcode ASC")
+		usa, singsing, honkers = places[0], places[1], places[2]
 
 		if usa.TelCode != 1 || honkers.TelCode != 852 || singsing.TelCode != 65 {
 			t.Errorf("Expected integer telcodes to work, got %#v", places)
@@ -155,11 +160,15 @@ func TestUsage(t *testing.T) {
 			t.Error(err)
 		}
 
-		places, err = stmt.Select(Place{}, 10)
+		places = []*Place{}
+		err = stmt.Select(&places, 10)
 		if len(places) != 2 {
 			t.Error("Expected 2 places, got 0.")
 		}
-		singsing, honkers = places[0].(Place), places[1].(Place)
+		if err != nil {
+			t.Fatal(err)
+		}
+		singsing, honkers = places[0], places[1]
 
 	}
 

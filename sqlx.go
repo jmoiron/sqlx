@@ -51,8 +51,8 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 }
 
 // Call Select using this db to issue the query.
-func (db *DB) Select(typ interface{}, query string, args ...interface{}) ([]interface{}, error) {
-	return Select(db, typ, query, args...)
+func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
+	return Select(db, dest, query, args...)
 }
 
 // Call LoadFile using this db to issue the Exec.
@@ -115,8 +115,8 @@ func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
 }
 
 // Call Select using this transaction to issue the Query.
-func (tx *Tx) Select(typ interface{}, query string, args ...interface{}) ([]interface{}, error) {
-	return Select(tx, typ, query, args...)
+func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error {
+	return Select(tx, dest, query, args...)
 }
 
 // Execv ("verbose") runs Execv using this transaction.
@@ -176,8 +176,8 @@ func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
 }
 
 // Call Select using this statement to issue the Query.
-func (s *Stmt) Select(typ interface{}, args ...interface{}) ([]interface{}, error) {
-	return Select(&qStmt{*s}, typ, "", args...)
+func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
+	return Select(&qStmt{*s}, dest, "", args...)
 }
 
 // Execv ("verbose") runs Execv using this statement.  Note that the query is
@@ -212,12 +212,18 @@ func (s *Stmt) Execp(args ...interface{}) sql.Result {
 // column positions to fields to avoid that overhead per scan, which means it
 // is not safe to run StructScan on the same Rows instance with different
 // struct types.
-func (r *Rows) StructScan(typ interface{}) (interface{}, error) {
+func (r *Rows) StructScan(dest interface{}) (interface{}, error) {
 	var v reflect.Value
 	if !r.started {
-		v = reflect.ValueOf(typ)
-		base, fm, err := getFieldmap(v.Type())
-
+		v = reflect.ValueOf(dest)
+		base, err := baseStructType(v.Type())
+		if err != nil {
+			return nil, err
+		}
+		fm, err := getFieldmap(base)
+		if err != nil {
+			return nil, err
+		}
 		columns, err := r.Columns()
 		if err != nil {
 			return nil, err
@@ -273,12 +279,12 @@ func Preparex(p Preparer, query string) (*Stmt, error) {
 
 // Select uses a Querier (*DB or *Tx, by default), issues the query w/ args
 // via that Querier, and returns the results as a slice of typs.
-func Select(q Querier, typ interface{}, query string, args ...interface{}) ([]interface{}, error) {
+func Select(q Querier, dest interface{}, query string, args ...interface{}) error {
 	rows, err := q.Query(query, args...)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return StructScan(rows, typ)
+	return StructScan(rows, dest)
 }
 
 // LoadFile exec's every statement in a file (as a single call to Exec).
@@ -352,6 +358,21 @@ type fieldmap map[string]int
 // A cache of fieldmaps for reflect Types
 var fieldmapCache = map[reflect.Type]fieldmap{}
 
+// Return the underlying slice's type, or an error if the type is
+// not a slice or a pointer to a slice.
+func baseSliceType(t reflect.Type) (reflect.Type, error) {
+check:
+	switch t.Kind() {
+	case reflect.Ptr:
+		t = t.Elem()
+		goto check
+	case reflect.Slice:
+	default:
+		return nil, errors.New("Destination must be a slice.")
+	}
+	return t, nil
+}
+
 // Return a reflect.Type's base struct type, or an error if it is not a struct
 // or pointer to a struct.
 func baseStructType(t reflect.Type) (reflect.Type, error) {
@@ -367,23 +388,19 @@ check:
 	return t, nil
 }
 
-// Create a fieldmap for a given type and return its base type and fieldmap (or error)
-func getFieldmap(t reflect.Type) (base reflect.Type, fm fieldmap, err error) {
-	base, err = baseStructType(t)
-	if err != nil {
-		return base, fieldmap{}, err
-	}
+// Create a fieldmap for a given type and return its fieldmap (or error)
+func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	// if we have a fieldmap cached, return it
-	fm, ok := fieldmapCache[base]
+	fm, ok := fieldmapCache[t]
 	if ok {
-		return base, fm, nil
+		return fm, nil
 	} else {
 		fm = fieldmap{}
 	}
 
 	var f reflect.StructField
 	var name string
-	for i := 0; i < base.NumField(); i++ {
+	for i := 0; i < t.NumField(); i++ {
 		f = t.Field(i)
 		name = strings.ToLower(f.Name)
 		if tag := f.Tag.Get("db"); tag != "" {
@@ -391,36 +408,55 @@ func getFieldmap(t reflect.Type) (base reflect.Type, fm fieldmap, err error) {
 		}
 		fm[name] = i
 	}
-	fieldmapCache[base] = fm
-	return base, fm, nil
+	fieldmapCache[t] = fm
+	return fm, nil
 }
 
-// Fully scan a sql.Rows result into a slice of "typ" typed structs.
+// Fully scan a sql.Rows result into the dest slice.
 //
 // StructScan can incompletely fill a struct, and will also work with
 // any values order returned by the sql driver.
 // StructScan will scan in the entire rows result, so if you need to iterate
 // one at a time (to reduce memory usage, eg) avoid it.
-func StructScan(rows *sql.Rows, typ interface{}) ([]interface{}, error) {
+func StructScan(rows *sql.Rows, dest interface{}) error {
 	var v, vp reflect.Value
-	var ok bool
-	v = reflect.ValueOf(typ)
-	base, fm, err := getFieldmap(v.Type())
+	var ok, isPtr bool
+
+	value := reflect.ValueOf(dest)
+	if value.Kind() != reflect.Ptr {
+		return errors.New("Must pass a pointer, not a value, to StructScan destination.")
+	}
+
+	direct := reflect.Indirect(value)
+
+	slice, err := baseSliceType(value.Type())
+	if err != nil {
+		return err
+	}
+	isPtr = slice.Elem().Kind() == reflect.Ptr
+	base, err := baseStructType(slice.Elem())
+	if err != nil {
+		return err
+	}
+
+	fm, err := getFieldmap(base)
+	if err != nil {
+		return err
+	}
 
 	columns, err := rows.Columns()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var num int
-	slice := make([]interface{}, 0)
 	fields := make([]int, len(columns))
 
 	for i, name := range columns {
 		// find that name in the struct
 		num, ok = fm[name]
 		if !ok {
-			return nil, errors.New("Could not find name " + name + " in interface.")
+			return errors.New("Could not find name " + name + " in interface.")
 		}
 		fields[i] = num
 	}
@@ -436,8 +472,12 @@ func StructScan(rows *sql.Rows, typ interface{}) ([]interface{}, error) {
 		}
 		// scan into the struct field pointers and append to our results
 		rows.Scan(values...)
-		slice = append(slice, v.Interface())
+		if isPtr {
+			direct.Set(reflect.Append(direct, vp))
+		} else {
+			direct.Set(reflect.Append(direct, v))
+		}
 	}
 
-	return slice, nil
+	return nil
 }

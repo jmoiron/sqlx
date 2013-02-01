@@ -169,6 +169,21 @@ func TestUsage(t *testing.T) {
 			t.Fatal(err)
 		}
 		singsing, honkers = places[0], places[1]
+		if singsing.TelCode != 65 || honkers.TelCode != 852 {
+			t.Errorf("Expected the right telcodes, got %#v", places)
+		}
+
+		rows, err := db.Queryx("SELECT * FROM place")
+		if err != nil {
+			t.Fatal(err)
+		}
+		place := Place{}
+		for rows.Next() {
+			err = rows.StructScan(&place)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
 
 	}
 

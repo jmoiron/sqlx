@@ -212,21 +212,23 @@ func (s *Stmt) Execp(args ...interface{}) sql.Result {
 // column positions to fields to avoid that overhead per scan, which means it
 // is not safe to run StructScan on the same Rows instance with different
 // struct types.
-func (r *Rows) StructScan(dest interface{}) (interface{}, error) {
+func (r *Rows) StructScan(dest interface{}) error {
 	var v reflect.Value
+	v = reflect.ValueOf(dest)
+	if v.Kind() != reflect.Ptr {
+		return errors.New("Must pass a pointer, not a value, to StructScan destination.")
+	}
+	base := reflect.Indirect(v)
+	// see if we have a cached fieldmap
 	if !r.started {
-		v = reflect.ValueOf(dest)
-		base, err := baseStructType(v.Type())
+
+		fm, err := getFieldmap(base.Type())
 		if err != nil {
-			return nil, err
-		}
-		fm, err := getFieldmap(base)
-		if err != nil {
-			return nil, err
+			return err
 		}
 		columns, err := r.Columns()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		var ok bool
@@ -239,21 +241,17 @@ func (r *Rows) StructScan(dest interface{}) (interface{}, error) {
 			// find that name in the struct
 			num, ok = fm[name]
 			if !ok {
-				return nil, errors.New("Could not find name " + name + " in interface.")
+				return errors.New("Could not find name " + name + " in interface.")
 			}
 			r.fields[i] = num
 		}
 		r.started = true
-		r.base = base
 	}
-
-	v = reflect.Indirect(reflect.New(r.base))
 	for i, field := range r.fields {
-		r.values[i] = v.Field(field).Addr().Interface()
+		r.values[i] = base.Field(field).Addr().Interface()
 	}
 	r.Scan(r.values...)
-
-	return v.Interface(), nil
+	return nil
 }
 
 // Connect to a database and panic on error.  Similar to sql.Open, but attempts

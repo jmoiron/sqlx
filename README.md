@@ -81,6 +81,17 @@ func main() {
     // Place{Country:"Singapore", City:sql.NullString{String:"", Valid:false}, TelCode:65}
     // Place{Country:"Hong Kong", City:sql.NullString{String:"", Valid:false}, TelCode:852}
 
+    // Loop through rows using only one struct
+    place := Place{}
+    rows, err := db.Queryx("SELECT * FROM place")
+    for rows.Next() {
+        rows.StructScan(&place)
+        fmt.Printf("%#v\n", place)
+    }
+    // Place{Country:"United States", City:sql.NullString{String:"New York", Valid:true}, TelCode:1}
+    // Place{Country:"Hong Kong", City:sql.NullString{String:"", Valid:false}, TelCode:852}
+    // Place{Country:"Singapore", City:sql.NullString{String:"", Valid:false}, TelCode:65}
+
 }
 
 ```

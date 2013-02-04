@@ -285,6 +285,25 @@ func Select(q Querier, dest interface{}, query string, args ...interface{}) erro
 	return StructScan(rows, dest)
 }
 
+// Selectv ("verbose") runs Select on its arguments and uses log.Println to print
+// the query and the error in the event of an error.
+func Selectv(q Querier, dest interface{}, query string, args ...interface{}) error {
+	err := Select(q, dest, query, args...)
+	if err != nil {
+		log.Println(query, err)
+	}
+	return err
+}
+
+// Selectf ("fatal") runs Select on its arguments and uses log.Fatal to print
+// the query and the error in the event of an error.
+func Selectf(q Querier, dest interface{}, query string, args ...interface{}) {
+	err := Select(q, dest, query, args...)
+	if err != nil {
+		log.Fatal(query, err)
+	}
+}
+
 // LoadFile exec's every statement in a file (as a single call to Exec).
 // LoadFile returns a nil pointer and error if an error is encountered since
 // errors can be encountered locating or reading the file, before a Result is

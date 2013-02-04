@@ -468,8 +468,12 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 		for i, field := range fields {
 			values[i] = v.Field(field).Addr().Interface()
 		}
+
 		// scan into the struct field pointers and append to our results
-		rows.Scan(values...)
+		err = rows.Scan(values...)
+		if err != nil {
+			return err
+		}
 		if isPtr {
 			direct.Set(reflect.Append(direct, vp))
 		} else {

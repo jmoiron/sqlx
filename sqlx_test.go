@@ -23,13 +23,13 @@ func init() {
 }
 
 func PostgresConnect() {
+	var username string
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("Could not connect to postgres db, try `createdb sqlxtest`, disabling PG tests:\n    %v", r)
 			TestPostgres = false
 		}
 	}()
-	var username string
 	u, err := user.Current()
 	if err != nil {
 		fmt.Printf("Could not find current user username, trying 'test' instead.")

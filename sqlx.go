@@ -378,11 +378,10 @@ var fieldmapCache = map[reflect.Type]fieldmap{}
 // Return the underlying slice's type, or an error if the type is
 // not a slice or a pointer to a slice.
 func baseSliceType(t reflect.Type) (reflect.Type, error) {
-check:
 	switch t.Kind() {
 	case reflect.Ptr:
 		t = t.Elem()
-		goto check
+		fallthrough
 	case reflect.Slice:
 	default:
 		return nil, errors.New("Destination must be a slice.")
@@ -393,11 +392,10 @@ check:
 // Return a reflect.Type's base struct type, or an error if it is not a struct
 // or pointer to a struct.
 func baseStructType(t reflect.Type) (reflect.Type, error) {
-check:
 	switch t.Kind() {
 	case reflect.Ptr:
 		t = t.Elem()
-		goto check
+		fallthrough
 	case reflect.Struct:
 	default:
 		return nil, errors.New("Destination must be a struct type.")

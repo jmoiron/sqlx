@@ -1,16 +1,9 @@
-// General purpose extensions to database/sql
-//
-// sqlx is intended to seamlessly wrap database/sql and provide some convenience
-// methods which range from basic common error handling techniques to complex
-// reflect-base Scan extensions.  Replacing `sql.Open` with `sqlx.Open` should
-// provide access to most of the features within sqlx while not changing the
-// interface used by any existing code.
-//
 package sqlx
 
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -102,6 +95,12 @@ func (db *DB) Execp(query string, args ...interface{}) sql.Result {
 	return Execp(db, query, args...)
 }
 
+// MustExec ("panic") runs MustExec using this database.
+func (db *DB) MustExec(query string, args ...interface{}) sql.Result {
+	return MustExec(db, query, args...)
+}
+
+// Preparex returns an sqlx.Stmt instead of a sql.Stmt
 func (db *DB) Preparex(query string) (*Stmt, error) {
 	return Preparex(db, query)
 }
@@ -117,6 +116,16 @@ func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
 // Call Select using this transaction to issue the Query.
 func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(tx, dest, query, args...)
+}
+
+// Call Select using this transaction to issue the Query.
+func (tx *Tx) Selectv(dest interface{}, query string, args ...interface{}) error {
+	return Selectv(tx, dest, query, args...)
+}
+
+// Call Selectf using this transaction to issue the Query.
+func (tx *Tx) Selectf(dest interface{}, query string, args ...interface{}) {
+	Selectf(tx, dest, query, args...)
 }
 
 // Execv ("verbose") runs Execv using this transaction.
@@ -137,6 +146,11 @@ func (tx *Tx) Execf(query string, args ...interface{}) sql.Result {
 // Execp ("panic") runs Execp using this transaction.
 func (tx *Tx) Execp(query string, args ...interface{}) sql.Result {
 	return Execp(tx, query, args...)
+}
+
+// MustExec ("panic") runs MustExec using this transaction.
+func (tx *Tx) MustExec(query string, args ...interface{}) sql.Result {
+	return MustExec(tx, query, args...)
 }
 
 func (tx *Tx) Preparex(query string) (*Stmt, error) {
@@ -180,6 +194,16 @@ func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 	return Select(&qStmt{*s}, dest, "", args...)
 }
 
+// Call Selectv using this statement to issue the Query.
+func (s *Stmt) Selectv(dest interface{}, args ...interface{}) error {
+	return Selectv(&qStmt{*s}, dest, "", args...)
+}
+
+// Call Selectf using this statement to issue the Query.
+func (s *Stmt) Selectf(dest interface{}, args ...interface{}) {
+	Selectf(&qStmt{*s}, dest, "", args...)
+}
+
 // Execv ("verbose") runs Execv using this statement.  Note that the query is
 // not recoverable once a statement has been prepared, so the query portion
 // will be blank.
@@ -204,6 +228,11 @@ func (s *Stmt) Execf(args ...interface{}) sql.Result {
 // Execp ("panic") runs Execp using this statement.
 func (s *Stmt) Execp(args ...interface{}) sql.Result {
 	return Execp(&qStmt{*s}, "", args...)
+}
+
+// MustExec ("panic") runs MustExec using this statement.
+func (s *Stmt) MustExec(args ...interface{}) sql.Result {
+	return MustExec(&qStmt{*s}, "", args...)
 }
 
 // Like sql.Rows.Scan, but scans a single Row into a single Struct.  Use this
@@ -309,7 +338,7 @@ func Selectf(q Querier, dest interface{}, query string, args ...interface{}) {
 // errors can be encountered locating or reading the file, before a Result is
 // created. LoadFile reads the entire file into memory, so it is not suitable
 // for loading large data dumps, but can be useful for initializing database
-// schemas or loading indexes. 
+// schemas or loading indexes.
 func LoadFile(e Execer, path string) (*sql.Result, error) {
 	realpath, err := filepath.Abs(path)
 	if err != nil {
@@ -362,6 +391,16 @@ func Execf(e Execer, query string, args ...interface{}) sql.Result {
 // Execp ("panic") runs Exec on the query and args and panics on error.  Since
 // the panic interrupts the control flow, errors are not returned to the caller.
 func Execp(e Execer, query string, args ...interface{}) sql.Result {
+	res, err := e.Exec(query, args...)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+// MustExec ("panic") runs Exec on the query and args and panics on error.  Since
+// the panic interrupts the control flow, errors are not returned to the caller.
+func MustExec(e Execer, query string, args ...interface{}) sql.Result {
 	res, err := e.Exec(query, args...)
 	if err != nil {
 		panic(err)
@@ -471,7 +510,8 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 		// find that name in the struct
 		num, ok = fm[name]
 		if !ok {
-			return errors.New("Could not find name " + name + " in interface.")
+			fmt.Println(fm)
+			return errors.New("Could not find name " + name + " in interface")
 		}
 		fields[i] = num
 	}

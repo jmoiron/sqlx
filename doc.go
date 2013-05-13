@@ -11,11 +11,11 @@
 //
 // The addition of a mnemonic set of "Exec" functions:
 //
-//		Execv - log.Println errors, return (rows, err)
-//		Execl - log.Println errors, return only rows
-//		Execp - panic(err) on error
-//		Execf - log.Fatal(err) on error
-//      MustExec - same as Execp
+//	Execv - log.Println errors, return (rows, err)
+//	Execl - log.Println errors, return only rows
+//	Execp - panic(err) on error
+//	Execf - log.Fatal(err) on error
+// 	MustExec - same as Execp
 //
 // The addition of a "StructScan" function, which takes an the result from a
 // query and a struct slice and automatically scans each row as a struct.
@@ -27,5 +27,4 @@
 //
 // Panicing variants of Connect and Begin: MustConnect, MustBegin.
 //
-
 package sqlx

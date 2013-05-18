@@ -290,7 +290,7 @@ func MustConnect(driverName, dataSourceName string) *DB {
 	if err != nil {
 		panic(err)
 	}
-	_, err = db.Query("SELECT 1")
+	err = db.Ping()
 	if err != nil {
 		panic(err)
 	}

@@ -20,7 +20,7 @@ type Rows struct {
 }
 
 // An interface for something which can Execute sql queries (Tx, DB)
-type Querier interface {
+type Queryer interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 }
 
@@ -175,10 +175,10 @@ func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
 
 // An sqlx wrapper around database/sql's Stmt with extra functionality
 // Although a Stmt's interface differs from Tx and DB's, internally,
-// a wrapper is used to satisfy the Querier & Execer interfaces.
+// a wrapper is used to satisfy the Queryer & Execer interfaces.
 type Stmt struct{ sql.Stmt }
 
-// this unexposed wrapper lets you use a Stmt as a Querier & Execer
+// this unexposed wrapper lets you use a Stmt as a Queryer & Execer
 type qStmt struct{ Stmt }
 
 func (q *qStmt) Query(query string, args ...interface{}) (*sql.Rows, error) {
@@ -304,9 +304,9 @@ func Preparex(p Preparer, query string) (*Stmt, error) {
 	return &Stmt{*s}, err
 }
 
-// Select uses a Querier (*DB or *Tx, by default), issues the query w/ args
-// via that Querier, and returns the results as a slice of typs.
-func Select(q Querier, dest interface{}, query string, args ...interface{}) error {
+// Select uses a Queryer (*DB or *Tx, by default), issues the query w/ args
+// via that Queryer, and returns the results as a slice of typs.
+func Select(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	rows, err := q.Query(query, args...)
 	if err != nil {
 		return err
@@ -316,7 +316,7 @@ func Select(q Querier, dest interface{}, query string, args ...interface{}) erro
 
 // Selectv ("verbose") runs Select on its arguments and uses log.Println to print
 // the query and the error in the event of an error.
-func Selectv(q Querier, dest interface{}, query string, args ...interface{}) error {
+func Selectv(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	err := Select(q, dest, query, args...)
 	if err != nil {
 		log.Println(query, err)
@@ -326,7 +326,7 @@ func Selectv(q Querier, dest interface{}, query string, args ...interface{}) err
 
 // Selectf ("fatal") runs Select on its arguments and uses log.Fatal to print
 // the query and the error in the event of an error.
-func Selectf(q Querier, dest interface{}, query string, args ...interface{}) {
+func Selectf(q Queryer, dest interface{}, query string, args ...interface{}) {
 	err := Select(q, dest, query, args...)
 	if err != nil {
 		log.Fatal(query, err)

@@ -311,6 +311,9 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	if err != nil {
 		return err
 	}
+	// StructScan will exhaust the rows here, which we are never returning to
+	// the caller, so we have to close it
+	defer rows.Close()
 	return StructScan(rows, dest)
 }
 

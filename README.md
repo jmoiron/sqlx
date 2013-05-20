@@ -11,7 +11,7 @@ Read the [documentation](http://godoc.org/github.com/jmoiron/sqlx) for usage.  B
 package main
 
 import (
-    _ "github.com/bmizerany/pq"
+    _ "github.com/lib/pq"
     "database/sql"
     "github.com/jmoiron/sqlx"
 )

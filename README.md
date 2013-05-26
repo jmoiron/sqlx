@@ -2,6 +2,13 @@
 
 sqlx is a set of extensions upon go's basic `database/sql` module.
 
+Major additional concepts are:
+
+* `StructScan`, which scans a row into a struct
+* `Get` and `Select`, which execute QueryRow and Query and return results as structs via `StructScan`
+* `Execf`, `Execp` (also `MustExec`), and `Execl` mnemonics for log.Fatal, panic(), and fmt.Println handling of
+  (db|tx|stmt).Exec() errors 
+
 ## usage
 
 Read the [documentation](http://godoc.org/github.com/jmoiron/sqlx) for usage.  Below is an example which shows some common use cases for sqlx.
@@ -66,6 +73,12 @@ func main() {
     fmt.Printf("%#v\n%#v", jason, john)
     // Person{FirstName:"Jason", LastName:"Moiron", Email:"jmoiron@jmoiron.net"}
     // Person{FirstName:"John", LastName:"Doe", Email:"johndoeDNE@gmail.net"}
+
+    // You can also get a single result, a la QueryRow
+    jason = Person{}
+    err = db.Get(&jason, "SELECT * FROM person WHERE first_name=$1", "Jason")
+    fmt.Printf("%#v\n", jason)
+    // Person{FirstName:"Jason", LastName:"Moiron", Email:"jmoiron@jmoiron.net"}
 
     // if you have null fields and use SELECT *, you must use sql.Null* in your struct
     places := []Place{}

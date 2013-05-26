@@ -19,12 +19,17 @@ type Rows struct {
 	values  []interface{}
 }
 
-// An interface for something which can Execute sql queries (Tx, DB)
+type Row struct {
+	rows sql.Rows
+	err  error
+}
+
+// An interface for something which can Execute sql queries (Tx, DB, Stmt)
 type Queryer interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 }
 
-// An interface for something which can Execute sql commands (Tx, DB)
+// An interface for something which can Execute sql commands (Tx, DB, Stmt)
 type Execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
@@ -32,6 +37,50 @@ type Execer interface {
 // An interface for something which can Prepare sql statements (Tx, DB)
 type Preparer interface {
 	Prepare(query string) (*sql.Stmt, error)
+}
+
+// Same implementation as database/sql.Row.Scan
+func (r *Row) Scan(dest ...interface{}) error {
+	if r.err != nil {
+		return r.err
+	}
+
+	// TODO(bradfitz): for now we need to defensively clone all
+	// []byte that the driver returned (not permitting
+	// *RawBytes in Rows.Scan), since we're about to close
+	// the Rows in our defer, when we return from this function.
+	// the contract with the driver.Next(...) interface is that it
+	// can return slices into read-only temporary memory that's
+	// only valid until the next Scan/Close.  But the TODO is that
+	// for a lot of drivers, this copy will be unnecessary.  We
+	// should provide an optional interface for drivers to
+	// implement to say, "don't worry, the []bytes that I return
+	// from Next will not be modified again." (for instance, if
+	// they were obtained from the network anyway) But for now we
+	// don't care.
+	for _, dp := range dest {
+		if _, ok := dp.(*sql.RawBytes); ok {
+			return errors.New("sql: RawBytes isn't allowed on Row.Scan")
+		}
+	}
+
+	defer r.rows.Close()
+	if !r.rows.Next() {
+		return sql.ErrNoRows
+	}
+	err := r.rows.Scan(dest...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Row) Columns() ([]string, error) {
+	if r.err != nil {
+		return []string{}, r.err
+	}
+	return r.rows.Columns()
 }
 
 // An sqlx wrapper around database/sql's DB with extra functionality
@@ -46,6 +95,11 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 // Call Select using this db to issue the query.
 func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(db, dest, query, args...)
+}
+
+// Call Get using this db to issue the query.
+func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
+	return Get(db, dest, query, args...)
 }
 
 // Call LoadFile using this db to issue the Exec.
@@ -73,6 +127,12 @@ func (db *DB) Beginx() (*Tx, error) {
 func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 	r, err := db.DB.Query(query, args...)
 	return &Rows{Rows: *r}, err
+}
+
+// QueryRowx is the same as QueryRow, but returns an *sqlx.Row instead of *sql.Row
+func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
+	r, err := db.DB.Query(query, args...)
+	return &Row{rows: *r, err: err}
 }
 
 // Execv ("verbose") runs Execv using this database.
@@ -116,6 +176,21 @@ func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
 // Call Select using this transaction to issue the Query.
 func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(tx, dest, query, args...)
+}
+
+func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
+	r, err := tx.Tx.Query(query, args...)
+	return &Rows{Rows: *r}, err
+}
+
+func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
+	r, err := tx.Tx.Query(query, args...)
+	return &Row{rows: *r, err: err}
+}
+
+// Call Get using this transaction to issue the query.
+func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
+	return Get(tx, dest, query, args...)
 }
 
 // Call Select using this transaction to issue the Query.
@@ -185,6 +260,11 @@ func (q *qStmt) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return q.Stmt.Query(args...)
 }
 
+func (q *qStmt) QueryRowx(query string, args ...interface{}) *Row {
+	r, err := q.Stmt.Query(args...)
+	return &Row{rows: *r, err: err}
+}
+
 func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
 	return q.Stmt.Exec(args...)
 }
@@ -192,6 +272,11 @@ func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
 // Call Select using this statement to issue the Query.
 func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 	return Select(&qStmt{*s}, dest, "", args...)
+}
+
+// Call Get using this statement to issue the query.
+func (s *Stmt) Get(dest interface{}, query string, args ...interface{}) error {
+	return Get(&qStmt{*s}, dest, query, args...)
 }
 
 // Call Selectv using this statement to issue the Query.
@@ -305,7 +390,7 @@ func Preparex(p Preparer, query string) (*Stmt, error) {
 }
 
 // Select uses a Queryer (*DB or *Tx, by default), issues the query w/ args
-// via that Queryer, and returns the results as a slice of typs.
+// via that Queryer, and sets the dest slice using rows.StructScan
 func Select(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	rows, err := q.Query(query, args...)
 	if err != nil {
@@ -315,6 +400,14 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	// the caller, so we have to close it
 	defer rows.Close()
 	return StructScan(rows, dest)
+}
+
+// Get uses a queryer (*DB, *Tx, or *qStmt by default), issues a QueryRow w/ args
+// via that Queryer and sets the dest interface using row.StructScan
+func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
+	rows, err := q.Query(query, args...)
+	r := &Row{rows: *rows, err: err}
+	return r.StructScan(dest)
 }
 
 // Selectv ("verbose") runs Select on its arguments and uses log.Println to print
@@ -419,7 +512,7 @@ var fieldmapCache = map[reflect.Type]fieldmap{}
 
 // Return the underlying slice's type, or an error if the type is
 // not a slice or a pointer to a slice.
-func baseSliceType(t reflect.Type) (reflect.Type, error) {
+func BaseSliceType(t reflect.Type) (reflect.Type, error) {
 	switch t.Kind() {
 	case reflect.Ptr:
 		t = t.Elem()
@@ -433,7 +526,7 @@ func baseSliceType(t reflect.Type) (reflect.Type, error) {
 
 // Return a reflect.Type's base struct type, or an error if it is not a struct
 // or pointer to a struct.
-func baseStructType(t reflect.Type) (reflect.Type, error) {
+func BaseStructType(t reflect.Type) (reflect.Type, error) {
 	switch t.Kind() {
 	case reflect.Ptr:
 		t = t.Elem()
@@ -469,6 +562,55 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	return fm, nil
 }
 
+func (r *Row) StructScan(dest interface{}) error {
+	var v, vp reflect.Value
+	v = reflect.ValueOf(dest)
+	if v.Kind() != reflect.Ptr {
+		return errors.New("Must pass a pointer, not a value, to StructScan destination.")
+	}
+
+	direct := reflect.Indirect(v)
+	base, err := BaseStructType(direct.Type())
+	if err != nil {
+		return err
+	}
+
+	fm, err := getFieldmap(base)
+	if err != nil {
+		return err
+	}
+
+	columns, err := r.Columns()
+	if err != nil {
+		return err
+	}
+
+	var num int
+	var ok bool
+
+	fields := make([]int, len(columns))
+
+	for i, name := range columns {
+		// find that name in the struct
+		num, ok = fm[name]
+		if !ok {
+			fmt.Println(fm)
+			return errors.New("Could not find name " + name + " in interface")
+		}
+		fields[i] = num
+	}
+
+	values := make([]interface{}, len(columns))
+	// create a new struct type (which returns PtrTo) and indirect it
+	vp = reflect.Indirect(v)
+	for i, field := range fields {
+		values[i] = vp.Field(field).Addr().Interface()
+	}
+
+	// scan into the struct field pointers and append to our results
+	return r.Scan(values...)
+}
+
 // Fully scan a sql.Rows result into the dest slice.
 //
 // StructScan can incompletely fill a struct, and will also work with
@@ -486,12 +628,12 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 
 	direct := reflect.Indirect(value)
 
-	slice, err := baseSliceType(value.Type())
+	slice, err := BaseSliceType(value.Type())
 	if err != nil {
 		return err
 	}
 	isPtr = slice.Elem().Kind() == reflect.Ptr
-	base, err := baseStructType(slice.Elem())
+	base, err := BaseStructType(slice.Elem())
 	if err != nil {
 		return err
 	}

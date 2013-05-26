@@ -562,8 +562,33 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	return fm, nil
 }
 
+// Return the numeric fields corresponding to the columns
+func getFields(fm fieldmap, columns []string) ([]int, error) {
+	var num int
+	var ok bool
+	fields := make([]int, len(columns))
+	for i, name := range columns {
+		// find that name in the struct
+		num, ok = fm[name]
+		if !ok {
+			fmt.Println(fm)
+			return fields, errors.New("Could not find name " + name + " in interface")
+		}
+		fields[i] = num
+	}
+	return fields, nil
+}
+
+// Return a slice of values representing the columns
+// These values are actually pointers into the addresses of struct fields
+func setValues(fields []int, vptr reflect.Value, values []interface{}) {
+	for i, field := range fields {
+		values[i] = vptr.Field(field).Addr().Interface()
+	}
+}
+
 func (r *Row) StructScan(dest interface{}) error {
-	var v, vp reflect.Value
+	var v reflect.Value
 	v = reflect.ValueOf(dest)
 	if v.Kind() != reflect.Ptr {
 		return errors.New("Must pass a pointer, not a value, to StructScan destination.")
@@ -585,28 +610,14 @@ func (r *Row) StructScan(dest interface{}) error {
 		return err
 	}
 
-	var num int
-	var ok bool
-
-	fields := make([]int, len(columns))
-
-	for i, name := range columns {
-		// find that name in the struct
-		num, ok = fm[name]
-		if !ok {
-			fmt.Println(fm)
-			return errors.New("Could not find name " + name + " in interface")
-		}
-		fields[i] = num
+	fields, err := getFields(fm, columns)
+	if err != nil {
+		return err
 	}
 
 	values := make([]interface{}, len(columns))
 	// create a new struct type (which returns PtrTo) and indirect it
-	vp = reflect.Indirect(v)
-	for i, field := range fields {
-		values[i] = vp.Field(field).Addr().Interface()
-	}
-
+	setValues(fields, reflect.Indirect(v), values)
 	// scan into the struct field pointers and append to our results
 	return r.Scan(values...)
 }
@@ -619,7 +630,7 @@ func (r *Row) StructScan(dest interface{}) error {
 // one at a time (to reduce memory usage, eg) avoid it.
 func StructScan(rows *sql.Rows, dest interface{}) error {
 	var v, vp reflect.Value
-	var ok, isPtr bool
+	var isPtr bool
 
 	value := reflect.ValueOf(dest)
 	if value.Kind() != reflect.Ptr {
@@ -648,28 +659,18 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 		return err
 	}
 
-	var num int
-	fields := make([]int, len(columns))
-
-	for i, name := range columns {
-		// find that name in the struct
-		num, ok = fm[name]
-		if !ok {
-			fmt.Println(fm)
-			return errors.New("Could not find name " + name + " in interface")
-		}
-		fields[i] = num
+	fields, err := getFields(fm, columns)
+	if err != nil {
+		return err
 	}
-
 	// this will hold interfaces which are pointers to each field in the struct
 	values := make([]interface{}, len(columns))
 	for rows.Next() {
 		// create a new struct type (which returns PtrTo) and indirect it
 		vp = reflect.New(base)
 		v = reflect.Indirect(vp)
-		for i, field := range fields {
-			values[i] = v.Field(field).Addr().Interface()
-		}
+
+		setValues(fields, v, values)
 
 		// scan into the struct field pointers and append to our results
 		err = rows.Scan(values...)

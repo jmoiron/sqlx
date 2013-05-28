@@ -147,6 +147,14 @@ func TestUsage(t *testing.T) {
 			t.Errorf("Expecting to get back Jason, but got %v\n", jason.FirstName)
 		}
 
+		err = db.Get(&jason, "SELECT * FROM person WHERE first_name=$1", "Foobar")
+		if err == nil {
+			t.Errorf("Expecting an error, got nil\n")
+		}
+		if err != sql.ErrNoRows {
+			t.Errorf("Expected sql.ErrNoRows, got %v\n", err)
+		}
+
 		places := []*Place{}
 
 		err = db.Select(&places, "SELECT telcode FROM place ORDER BY telcode ASC")

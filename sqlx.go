@@ -27,6 +27,7 @@ type Row struct {
 // An interface for something which can Execute sql queries (Tx, DB, Stmt)
 type Queryer interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowx(query string, args ...interface{}) *Row
 }
 
 // An interface for something which can Execute sql commands (Tx, DB, Stmt)
@@ -405,8 +406,7 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 // Get uses a queryer (*DB, *Tx, or *qStmt by default), issues a QueryRow w/ args
 // via that Queryer and sets the dest interface using row.StructScan
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
-	rows, err := q.Query(query, args...)
-	r := &Row{rows: *rows, err: err}
+	r := q.QueryRowx(query, args...)
 	return r.StructScan(dest)
 }
 

@@ -1,5 +1,7 @@
 #sqlx
 
+[![Build Status](https://drone.io/github.com/jmoiron/sqlx/status.png)](https://drone.io/github.com/jmoiron/sqlx/latest)
+
 sqlx is a set of extensions upon go's basic `database/sql` module.
 
 Major additional concepts are:

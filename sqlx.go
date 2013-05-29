@@ -370,17 +370,23 @@ func (r *Rows) StructScan(dest interface{}) error {
 }
 
 // Connect to a database and panic on error.  Similar to sql.Open, but attempts
-// a simple `SELECT 1` statement to ensure that the connection is made and successful.
+// a simple db.Ping() against the db to see if it was successful
 func MustConnect(driverName, dataSourceName string) *DB {
-	db, err := Open(driverName, dataSourceName)
-	if err != nil {
-		panic(err)
-	}
-	err = db.Ping()
+	db, err := Connect(driverName, dataSourceName)
 	if err != nil {
 		panic(err)
 	}
 	return db
+}
+
+// Connect to a database and verify with a ping.
+func Connect(driverName, dataSourceName string) (*DB, error) {
+	db, err := Open(driverName, dataSourceName)
+	if err != nil {
+		return db, err
+	}
+	err = db.Ping()
+	return db, err
 }
 
 // Preparex prepares a statement given a Preparer (Tx, DB), returning an sqlx
@@ -435,6 +441,8 @@ func Selectf(q Queryer, dest interface{}, query string, args ...interface{}) {
 // created. LoadFile reads the entire file into memory, so it is not suitable
 // for loading large data dumps, but can be useful for initializing database
 // schemas or loading indexes.
+// FIXME: this does not really work with multi-statement files for mattn/go-sqlite3
+// or the go-mysql-driver/mysql drivers;  pq seems to be an exception here.
 func LoadFile(e Execer, path string) (*sql.Result, error) {
 	realpath, err := filepath.Abs(path)
 	if err != nil {
@@ -581,6 +589,8 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 
 // Return a slice of values representing the columns
 // These values are actually pointers into the addresses of struct fields
+// The values interface must be initialized to the length of fields, ie
+// make([]interface{}, len(fields)).
 func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 	for i, field := range fields {
 		values[i] = vptr.Field(field).Addr().Interface()

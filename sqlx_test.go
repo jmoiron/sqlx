@@ -3,6 +3,7 @@ package sqlx
 import (
 	"database/sql"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 	"os"
@@ -13,24 +14,23 @@ import (
 
 var TestPostgres = true
 var TestSqlite = true
+var TestMysql = true
 
 var sldb *DB
 var pgdb *DB
+var mysqldb *DB
 var active = []*DB{}
 
 func init() {
 	PostgresConnect()
 	SqliteConnect()
+	MysqlConnect()
 }
 
 func PostgresConnect() {
 	var username string
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Could not connect to postgres db, try `createdb sqlxtest`, disabling PG tests:\n    %v", r)
-			TestPostgres = false
-		}
-	}()
+	var err error
+
 	username = os.Getenv("SQLX_PGUSER")
 	if len(username) == 0 {
 		u, err := user.Current()
@@ -42,23 +42,50 @@ func PostgresConnect() {
 		}
 
 	}
-	pgdb = MustConnect("postgres", "user="+username+" dbname=sqlxtest sslmode=disable")
+	pgdb, err = Connect("postgres", "user="+username+" dbname=sqlxtest sslmode=disable")
+	if err != nil {
+		fmt.Printf("Could not connect to postgres, try `createdb sqlxtext`, disabling PG tests:\n	%v\n", err)
+		TestPostgres = false
+	}
 }
 
 func SqliteConnect() {
 	var path string
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Could not create sqlite3 db in %s:\n	%v", path, r)
-			TestSqlite = false
-		}
-	}()
+	var err error
 
 	path = os.Getenv("SQLX_SQLITE_PATH")
 	if len(path) == 0 {
 		path = "/tmp/sqlxtest.db"
 	}
-	sldb = MustConnect("sqlite3", path)
+	sldb, err = Connect("sqlite3", path)
+	if err != nil {
+		fmt.Printf("Could not create sqlite3 db in %s:\n	%v", path, err)
+		TestSqlite = false
+	}
+}
+
+func MysqlConnect() {
+	var username, dbname, password string
+	var err error
+
+	username = os.Getenv("SQLX_MYSQLUSER")
+	password = os.Getenv("SQLX_MYSQLPASS")
+	dbname = "sqlxtest"
+
+	if len(username) == 0 {
+		u, err := user.Current()
+		if err != nil {
+			fmt.Printf("Could not find current user username, trying 'test' instead.")
+			username = "test"
+		} else {
+			username = u.Username
+		}
+	}
+	mysqldb, err = Connect("mysql", fmt.Sprintf("%s:%s@/%s", username, password, dbname))
+	if err != nil {
+		fmt.Printf("Could not connect to mysql db, try `mysql -e 'create database sqlxtest'`, disabling MySQL tests:\n    %v", err)
+		TestMysql = false
+	}
 }
 
 var schema = `
@@ -101,10 +128,21 @@ func MultiExec(e Execer, query string) {
 	}
 }
 
+func tr(query, dialect string) string {
+	if dialect != "postgres" {
+		return query
+	}
+	for i, j := 0, strings.Index(query, "?"); j >= 0; i++ {
+		query = strings.Replace(query, "?", fmt.Sprintf("$%d", i+1), 1)
+		j = strings.Index(query, "?")
+	}
+	return query
+}
+
 func TestUsage(t *testing.T) {
 	RunTest := func(db *DB, t *testing.T, dbtype string) {
 		defer func(dbtype string) {
-			if dbtype == "sqlite" {
+			if dbtype != "postgres" {
 				MultiExec(db, drop)
 			} else {
 				db.Execf(drop)
@@ -112,18 +150,18 @@ func TestUsage(t *testing.T) {
 		}(dbtype)
 
 		// pq will execute multi-query statements, but sqlite3 won't!
-		if dbtype == "sqlite" {
+		if dbtype != "postgres" {
 			MultiExec(db, schema)
 		} else {
 			db.Execf(schema)
 		}
 
 		tx := db.MustBegin()
-		tx.Execl("INSERT INTO person (first_name, last_name, email) VALUES ($1, $2, $3)", "Jason", "Moiron", "jmoiron@jmoiron.net")
-		tx.Execl("INSERT INTO person (first_name, last_name, email) VALUES ($1, $2, $3)", "John", "Doe", "johndoeDNE@gmail.net")
-		tx.Execl("INSERT INTO place (country, city, telcode) VALUES ($1, $2, $3)", "United States", "New York", "1")
-		tx.Execl("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Hong Kong", "852")
-		tx.Execl("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Singapore", "65")
+		tx.Execl(tr("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)", dbtype), "Jason", "Moiron", "jmoiron@jmoiron.net")
+		tx.Execl(tr("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)", dbtype), "John", "Doe", "johndoeDNE@gmail.net")
+		tx.Execl(tr("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)", dbtype), "United States", "New York", "1")
+		tx.Execl(tr("INSERT INTO place (country, telcode) VALUES (?, ?)", dbtype), "Hong Kong", "852")
+		tx.Execl(tr("INSERT INTO place (country, telcode) VALUES (?, ?)", dbtype), "Singapore", "65")
 		tx.Commit()
 
 		people := []Person{}
@@ -148,7 +186,7 @@ func TestUsage(t *testing.T) {
 		}
 
 		jason = Person{}
-		err = db.Get(&jason, "SELECT * FROM person WHERE first_name=$1", "Jason")
+		err = db.Get(&jason, tr("SELECT * FROM person WHERE first_name=?", dbtype), "Jason")
 
 		if err != nil {
 			t.Errorf("Expecting no error, got %v\n", err)
@@ -157,7 +195,7 @@ func TestUsage(t *testing.T) {
 			t.Errorf("Expecting to get back Jason, but got %v\n", jason.FirstName)
 		}
 
-		err = db.Get(&jason, "SELECT * FROM person WHERE first_name=$1", "Foobar")
+		err = db.Get(&jason, tr("SELECT * FROM person WHERE first_name=?", dbtype), "Foobar")
 		if err == nil {
 			t.Errorf("Expecting an error, got nil\n")
 		}
@@ -183,7 +221,7 @@ func TestUsage(t *testing.T) {
 			t.Errorf("Expected integer telcodes to work, got %#v", places)
 		}
 
-		stmt, err := db.Preparex("SELECT country, telcode FROM place WHERE telcode > $1 ORDER BY telcode ASC")
+		stmt, err := db.Preparex(tr("SELECT country, telcode FROM place WHERE telcode > ? ORDER BY telcode ASC", dbtype))
 		if err != nil {
 			t.Error(err)
 		}
@@ -220,5 +258,8 @@ func TestUsage(t *testing.T) {
 	}
 	if TestSqlite {
 		RunTest(sldb, t, "sqlite")
+	}
+	if TestMysql {
+		RunTest(mysqldb, t, "mysql")
 	}
 }

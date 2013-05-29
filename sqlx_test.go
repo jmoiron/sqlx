@@ -5,6 +5,7 @@ import (
 	"fmt"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
+	"os"
 	"os/user"
 	"strings"
 	"testing"
@@ -30,25 +31,34 @@ func PostgresConnect() {
 			TestPostgres = false
 		}
 	}()
-	u, err := user.Current()
-	if err != nil {
-		fmt.Printf("Could not find current user username, trying 'test' instead.")
-		username = "test"
-	} else {
-		username = u.Username
+	username = os.Getenv("SQLX_PGUSER")
+	if len(username) == 0 {
+		u, err := user.Current()
+		if err != nil {
+			fmt.Printf("Could not find current user username, trying 'test' instead.")
+			username = "test"
+		} else {
+			username = u.Username
+		}
+
 	}
 	pgdb = MustConnect("postgres", "user="+username+" dbname=sqlxtest sslmode=disable")
 }
 
 func SqliteConnect() {
+	var path string
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("Could not create sqlite3 db in /tmp/sqlxtest.db:\n	%v", r)
+			fmt.Printf("Could not create sqlite3 db in %s:\n	%v", path, r)
 			TestSqlite = false
 		}
 	}()
 
-	sldb = MustConnect("sqlite3", "/tmp/sqlxtest.db")
+	path = os.Getenv("SQLX_SQLITE_PATH")
+	if len(path) == 0 {
+		path = "/tmp/sqlxtest.db"
+	}
+	sldb = MustConnect("sqlite3", path)
 }
 
 var schema = `

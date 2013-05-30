@@ -1,3 +1,18 @@
+// The following environment variables, if set, will be used:
+//
+//  Sqlite:
+//		* SQLX_SQLITEPATH
+//
+//  Postgres:
+//		* SQLX_PGUSER
+//		* SQLX_PGPASS
+//
+//	MySQL:
+//		* SQLX_MYSQLUSER
+//		* SQLX_MYSQLPASS
+//
+//  To disable testing against any of these databases, set one of:
+//		* SQLX_NOPG, SQLX_NOMYSQL, SQLX_NOSQLITE
 package sqlx
 
 import (
@@ -28,10 +43,19 @@ func init() {
 }
 
 func PostgresConnect() {
-	var username string
+
+	if len(os.Getenv("SQLX_NOPG")) > 0 {
+		TestPostgres = false
+		fmt.Printf("Skipping Postgres tests, SQLX_NOPG set.\n")
+		return
+	}
+
+	var username, password string
 	var err error
 
 	username = os.Getenv("SQLX_PGUSER")
+	password = os.Getenv("SQLX_PGPASS")
+
 	if len(username) == 0 {
 		u, err := user.Current()
 		if err != nil {
@@ -42,7 +66,13 @@ func PostgresConnect() {
 		}
 
 	}
-	pgdb, err = Connect("postgres", "user="+username+" dbname=sqlxtest sslmode=disable")
+
+	dsn := fmt.Sprintf("user=%s dbname=sqlxtest sslmode=disable", username)
+	if len(password) > 0 {
+		dsn = fmt.Sprintf("user=%s password=%s dbname=sqlxtest sslmode=disable", username, password)
+	}
+
+	pgdb, err = Connect("postgres", dsn)
 	if err != nil {
 		fmt.Printf("Could not connect to postgres, try `createdb sqlxtext`, disabling PG tests:\n	%v\n", err)
 		TestPostgres = false
@@ -50,6 +80,13 @@ func PostgresConnect() {
 }
 
 func SqliteConnect() {
+
+	if len(os.Getenv("SQLX_NOSQLITE")) > 0 {
+		TestSqlite = false
+		fmt.Printf("Skipping sqlite tests, SQLX_NOSQLITE set.\n")
+		return
+	}
+
 	var path string
 	var err error
 
@@ -57,6 +94,7 @@ func SqliteConnect() {
 	if len(path) == 0 {
 		path = "/tmp/sqlxtest.db"
 	}
+
 	sldb, err = Connect("sqlite3", path)
 	if err != nil {
 		fmt.Printf("Could not create sqlite3 db in %s:\n	%v", path, err)
@@ -65,6 +103,12 @@ func SqliteConnect() {
 }
 
 func MysqlConnect() {
+
+	if len(os.Getenv("SQLX_NOMYSQL")) > 0 {
+		TestSqlite = false
+		fmt.Printf("Skipping mysql tests, SQLX_NOMYSQL set.\n")
+		return
+	}
 	var username, dbname, password string
 	var err error
 

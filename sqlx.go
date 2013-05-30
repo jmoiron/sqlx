@@ -69,12 +69,7 @@ func (r *Row) Scan(dest ...interface{}) error {
 	if !r.rows.Next() {
 		return sql.ErrNoRows
 	}
-	err := r.rows.Scan(dest...)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.rows.Scan(dest...)
 }
 
 func (r *Row) Columns() ([]string, error) {

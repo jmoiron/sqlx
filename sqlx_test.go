@@ -307,3 +307,76 @@ func TestUsage(t *testing.T) {
 		RunTest(mysqldb, t, "mysql")
 	}
 }
+
+func TestRebind(t *testing.T) {
+	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
+
+	s1 := rebind(DOLLAR, q1)
+	s2 := rebind(DOLLAR, q2)
+
+	if s1 != `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)` {
+		t.Errorf("q1 failed")
+	}
+
+	if s2 != `INSERT INTO foo (a, b, c) VALUES ($1, $2, "foo"), ("Hi", $3, $4)` {
+		t.Errorf("q2 failed")
+	}
+}
+
+func TestBindMap(t *testing.T) {
+	// Test that it works..
+	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`
+	am := map[string]interface{}{
+		"name":  "Jason Moiron",
+		"age":   30,
+		"first": "Jason",
+		"last":  "Moiron",
+	}
+
+	bq, args, _ := bindMap(q1, am)
+	expect := `INSERT INTO foo (a, b, c, d) VALUES (?, ?, ?, ?)`
+	if bq != expect {
+		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
+	}
+
+	if args[0].(string) != "Jason Moiron" {
+		t.Errorf("Expected `Jason Moiron`, got %v\n", args[0])
+	}
+
+	if args[1].(int) != 30 {
+		t.Errorf("Expected 30, got %v\n", args[1])
+	}
+
+	if args[2].(string) != "Jason" {
+		t.Errorf("Expected Jason, got %v\n", args[2])
+	}
+
+	if args[3].(string) != "Moiron" {
+		t.Errorf("Expected Moiron, got %v\n", args[3])
+	}
+}
+
+func BenchmarkRebind(b *testing.B) {
+	b.StopTimer()
+	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		rebind(DOLLAR, q1)
+		rebind(DOLLAR, q2)
+	}
+}
+
+func BenchmarkRebindBuffer(b *testing.B) {
+	b.StopTimer()
+	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		rebindBuff(DOLLAR, q1)
+		rebindBuff(DOLLAR, q2)
+	}
+}

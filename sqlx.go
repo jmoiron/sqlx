@@ -35,6 +35,12 @@ type Execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
+type dbext interface {
+	Queryer
+	Execer
+	DriverName() string
+}
+
 // An interface for something which can Prepare sql statements (Tx, DB)
 type Preparer interface {
 	Prepare(query string) (*sql.Stmt, error)
@@ -80,12 +86,19 @@ func (r *Row) Columns() ([]string, error) {
 }
 
 // An sqlx wrapper around database/sql's DB with extra functionality
-type DB struct{ sql.DB }
+type DB struct {
+	sql.DB
+	driverName string
+}
+
+func (db *DB) DriverName() string {
+	return db.driverName
+}
 
 // Same as database/sql's Open, but returns an *sqlx.DB instead.
 func Open(driverName, dataSourceName string) (*DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
-	return &DB{*db}, err
+	return &DB{*db, driverName}, err
 }
 
 // Call Select using this db to issue the query.
@@ -116,7 +129,7 @@ func (db *DB) MustBegin() *Tx {
 // Beginx is the same as Begin, but returns an *sqlx.Tx instead of an *sql.Tx
 func (db *DB) Beginx() (*Tx, error) {
 	tx, err := db.DB.Begin()
-	return &Tx{*tx}, err
+	return &Tx{*tx, db.driverName}, err
 }
 
 // Queryx is the same as Query, but returns an *sqlx.Rows instead of *sql.Rows
@@ -162,7 +175,14 @@ func (db *DB) Preparex(query string) (*Stmt, error) {
 }
 
 // An sqlx wrapper around database/sql's Tx with extra functionality
-type Tx struct{ sql.Tx }
+type Tx struct {
+	sql.Tx
+	driverName string
+}
+
+func (tx *Tx) DriverName() string {
+	return tx.driverName
+}
 
 // Call LoadFile using this transaction to issue the Exec.
 func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
@@ -691,3 +711,16 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 
 	return nil
 }
+
+/*
+
+func compileNamedQuery(driverName, query string, args map[string]interface{}) (string, []interface{}, error) {
+	return "", []interface{}{}, nil
+}
+
+// Issue a NamedQuery against a queryer.
+func NamedQuery(db *dbext, query string, args map[string]interface{}) (*sql.Rows, error) {
+	qs, a, err := compileNamedQuery(query, args)
+	return nil, nil
+}
+*/

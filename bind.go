@@ -13,7 +13,8 @@ const (
 	DOLLAR
 )
 
-func bindType(driverName string) int {
+// Return the bindtype for a given database given a drivername
+func BindType(driverName string) int {
 	switch driverName {
 	case "postgres":
 		return DOLLAR
@@ -25,8 +26,9 @@ func bindType(driverName string) int {
 	return UNKNOWN
 }
 
-func rebind(bindType int, query string) string {
-	if bindType == QUESTION {
+// Rebind a query from the default bindtype (QUESTION) to the target bindtype
+func Rebind(bindType int, query string) string {
+	if bindType != DOLLAR {
 		return query
 	}
 
@@ -49,38 +51,69 @@ func rebind(bindType int, query string) string {
 	return string(rqb)
 }
 
-// Bind named parameters to a query string and list of arguments, in order.
-// If the
-func bindMap(query string, args map[string]interface{}) (string, []interface{}, error) {
+// Bind a named parameter query with a map of arguments to a regular positional
+// bindvar query and return arguments for the new query in a slice.
+func BindMap(bindType int, query string, args map[string]interface{}) (string, []interface{}, error) {
 	arglist := make([]interface{}, 0, 5)
 	// In all likelihood, the rebound query will be shorter
 	qb := []byte(query)
 	rebound := make([]byte, 0, len(qb))
 
 	var name []byte
-	inName := false
+	var sname string
+	var val interface{}
+	var ok, inName bool
+	var err error
+	var last, j int
+
+	inName = false
+	last = len(qb) - 1
+	j = 1
 
 	for i, b := range qb {
 		if b == ':' {
 			if inName {
-				err := errors.New("Unexpected `:` while reading named param at " + strconv.Itoa(i))
+				err = errors.New("Unexpected `:` while reading named param at " + strconv.Itoa(i))
 				return "", arglist, err
 			}
 			inName = true
 			name = []byte{}
-		} else if inName && unicode.IsLetter(rune(b)) {
+		} else if inName && unicode.IsLetter(rune(b)) && i != last {
+			// append the rune to the name if we are in a name and not on the last rune
 			name = append(name, b)
 		} else if inName {
 			inName = false
-			sname := string(name)
-			val, ok := args[sname]
+			// if this is the final rune of the string and it is part of the name, then
+			// make sure to add it to the name
+			if i == last && unicode.IsLetter(rune(b)) {
+				name = append(name, b)
+			}
+			sname = string(name)
+			val, ok = args[sname]
 			if !ok {
-				err := errors.New("Could not find name `" + sname + "` in args")
+				err = errors.New("Could not find name `" + sname + "` in args")
 				return "", arglist, err
 			}
+			// the name has been found and is complete, add to arglist and insert the
+			// proper bindvar for the bindType
 			arglist = append(arglist, val)
-			rebound = append(rebound, '?')
-			rebound = append(rebound, b)
+			switch bindType {
+			case QUESTION, UNKNOWN:
+				rebound = append(rebound, '?')
+			case DOLLAR:
+				rebound = append(rebound, '$')
+				for _, b := range strconv.Itoa(j) {
+					rebound = append(rebound, byte(b))
+				}
+				j++
+			}
+			// add this rune to string unless if it is not last or if it
+			// is last but is not a letter
+			if i != last {
+				rebound = append(rebound, b)
+			} else if !unicode.IsLetter(rune(b)) {
+				rebound = append(rebound, b)
+			}
 		} else {
 			rebound = append(rebound, b)
 		}
@@ -89,7 +122,7 @@ func bindMap(query string, args map[string]interface{}) (string, []interface{}, 
 }
 
 func rebindBuff(bindType int, query string) string {
-	if bindType == QUESTION {
+	if bindType != DOLLAR {
 		return query
 	}
 
@@ -98,7 +131,8 @@ func rebindBuff(bindType int, query string) string {
 	j := 1
 	for _, r := range query {
 		if r == '?' {
-			rqb.WriteString("$" + strconv.Itoa(j))
+			rqb.WriteRune('$')
+			rqb.WriteString(strconv.Itoa(j))
 			j++
 		} else {
 			rqb.WriteRune(r)

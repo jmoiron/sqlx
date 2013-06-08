@@ -163,24 +163,13 @@ type Place struct {
 }
 
 func MultiExec(e Execer, query string) {
-	stmts := strings.Split(query, ";")
+	stmts := strings.Split(query, ";\n")
 	if len(strings.Trim(stmts[len(stmts)-1], " \n\t\r")) == 0 {
 		stmts = stmts[:len(stmts)-1]
 	}
 	for _, s := range stmts {
 		e.Exec(s)
 	}
-}
-
-func tr(query, dialect string) string {
-	if dialect != "postgres" {
-		return query
-	}
-	for i, j := 0, strings.Index(query, "?"); j >= 0; i++ {
-		query = strings.Replace(query, "?", fmt.Sprintf("$%d", i+1), 1)
-		j = strings.Index(query, "?")
-	}
-	return query
 }
 
 func TestUsage(t *testing.T) {
@@ -201,11 +190,11 @@ func TestUsage(t *testing.T) {
 		}
 
 		tx := db.MustBegin()
-		tx.Execl(tr("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)", dbtype), "Jason", "Moiron", "jmoiron@jmoiron.net")
-		tx.Execl(tr("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)", dbtype), "John", "Doe", "johndoeDNE@gmail.net")
-		tx.Execl(tr("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)", dbtype), "United States", "New York", "1")
-		tx.Execl(tr("INSERT INTO place (country, telcode) VALUES (?, ?)", dbtype), "Hong Kong", "852")
-		tx.Execl(tr("INSERT INTO place (country, telcode) VALUES (?, ?)", dbtype), "Singapore", "65")
+		tx.Execl(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "Jason", "Moiron", "jmoiron@jmoiron.net")
+		tx.Execl(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "John", "Doe", "johndoeDNE@gmail.net")
+		tx.Execl(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
+		tx.Execl(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
+		tx.Execl(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
 		tx.Commit()
 
 		people := []Person{}
@@ -230,7 +219,7 @@ func TestUsage(t *testing.T) {
 		}
 
 		jason = Person{}
-		err = db.Get(&jason, tr("SELECT * FROM person WHERE first_name=?", dbtype), "Jason")
+		err = db.Get(&jason, db.Rebind("SELECT * FROM person WHERE first_name=?"), "Jason")
 
 		if err != nil {
 			t.Errorf("Expecting no error, got %v\n", err)
@@ -239,7 +228,7 @@ func TestUsage(t *testing.T) {
 			t.Errorf("Expecting to get back Jason, but got %v\n", jason.FirstName)
 		}
 
-		err = db.Get(&jason, tr("SELECT * FROM person WHERE first_name=?", dbtype), "Foobar")
+		err = db.Get(&jason, db.Rebind("SELECT * FROM person WHERE first_name=?"), "Foobar")
 		if err == nil {
 			t.Errorf("Expecting an error, got nil\n")
 		}
@@ -265,7 +254,7 @@ func TestUsage(t *testing.T) {
 			t.Errorf("Expected integer telcodes to work, got %#v", places)
 		}
 
-		stmt, err := db.Preparex(tr("SELECT country, telcode FROM place WHERE telcode > ? ORDER BY telcode ASC", dbtype))
+		stmt, err := db.Preparex(db.Rebind("SELECT country, telcode FROM place WHERE telcode > ? ORDER BY telcode ASC"))
 		if err != nil {
 			t.Error(err)
 		}
@@ -295,6 +284,36 @@ func TestUsage(t *testing.T) {
 			}
 		}
 
+		// test advanced querying
+		_, err = db.NamedExec("INSERT INTO person (first_name, last_name, email) VALUES (:first, :last, :email)", map[string]interface{}{
+			"first": "Bin",
+			"last":  "Smuth",
+			"email": "bensmith@allblacks.nz",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// ensure that if the named param happens right at the end it still works
+		rows, err = db.NamedQuery("SELECT * FROM person WHERE first_name=:first", map[string]interface{}{"first": "Bin"})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ben := &Person{}
+		for rows.Next() {
+			err = rows.StructScan(ben)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ben.FirstName != "Bin" {
+				t.Fatal("Expected first name of `Bin`, got " + ben.FirstName)
+			}
+			if ben.LastName != "Smuth" {
+				t.Fatal("Expected first name of `Smuth`, got " + ben.LastName)
+			}
+		}
+
 	}
 
 	if TestPostgres {
@@ -309,13 +328,13 @@ func TestUsage(t *testing.T) {
 }
 
 func TestRebind(t *testing.T) {
-	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
 
-	s1 := rebind(DOLLAR, q1)
-	s2 := rebind(DOLLAR, q2)
+	s1 := Rebind(DOLLAR, q1)
+	s2 := Rebind(DOLLAR, q2)
 
-	if s1 != `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)` {
+	if s1 != `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)` {
 		t.Errorf("q1 failed")
 	}
 
@@ -334,7 +353,7 @@ func TestBindMap(t *testing.T) {
 		"last":  "Moiron",
 	}
 
-	bq, args, _ := bindMap(q1, am)
+	bq, args, _ := BindMap(QUESTION, q1, am)
 	expect := `INSERT INTO foo (a, b, c, d) VALUES (?, ?, ?, ?)`
 	if bq != expect {
 		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
@@ -357,6 +376,22 @@ func TestBindMap(t *testing.T) {
 	}
 }
 
+func BenchmarkBindMap(b *testing.B) {
+	b.StopTimer()
+	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`
+	am := map[string]interface{}{
+		"name":  "Jason Moiron",
+		"age":   30,
+		"first": "Jason",
+		"last":  "Moiron",
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		BindMap(DOLLAR, q1, am)
+		//bindMap(QUESTION, q1, am)
+	}
+}
+
 func BenchmarkRebind(b *testing.B) {
 	b.StopTimer()
 	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -364,8 +399,8 @@ func BenchmarkRebind(b *testing.B) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		rebind(DOLLAR, q1)
-		rebind(DOLLAR, q2)
+		Rebind(DOLLAR, q1)
+		Rebind(DOLLAR, q2)
 	}
 }
 

@@ -2,18 +2,25 @@
 
 [![Build Status](https://drone.io/github.com/jmoiron/sqlx/status.png)](https://drone.io/github.com/jmoiron/sqlx/latest)
 
-sqlx is a set of extensions upon go's basic `database/sql` module.
+sqlx is a set of extensions upon go's basic `database/sql` module.  They are all
+optional and SQLX versions of sql.DB, sql.Tx, sql.Stmt, etc all leave the underlying
+interfaces untouched, so sqlx.DB.Query will behave exactly the same as sql.DB.Query,
+etc.
 
 Major additional concepts are:
 
-* `StructScan`, which scans a row into a struct
-* `Get` and `Select`, which execute QueryRow and Query and return results as structs via `StructScan`
-* `Execf`, `Execp` (also `MustExec`), and `Execl` mnemonics for log.Fatal, panic(), and fmt.Println handling of
-  (db|tx|stmt).Exec() errors 
+* `NamedQuery` and `NamedExec`, which take named bindvars and an argument map
+* `StructScan`, which automatically scans an `sqlx.Row` or `sqlx.Rows` into a struct
+* `Get` and `Select`, which use QueryRow and Query to return results as structs via `StructScan`
+* `Execf`, `Execp` (also `MustExec`), and `Execl` mnemonics for log.Fatal, panic(), and fmt.Println
+   handling of Exec errors.
 
 ## usage
 
-Read the [documentation](http://godoc.org/github.com/jmoiron/sqlx) for usage.  Below is an example which shows some common use cases for sqlx.
+Read the [documentation](http://godoc.org/github.com/jmoiron/sqlx) for detailed API docs,
+and check [sqlx_test.go](https://github.com/jmoiron/sqlx/blob/master/sqlx_test.go) for more usage.  
+
+Below is an example which shows some common use cases for sqlx.
 
 ```go
 
@@ -106,6 +113,18 @@ func main() {
     // Place{Country:"United States", City:sql.NullString{String:"New York", Valid:true}, TelCode:1}
     // Place{Country:"Hong Kong", City:sql.NullString{String:"", Valid:false}, TelCode:852}
     // Place{Country:"Singapore", City:sql.NullString{String:"", Valid:false}, TelCode:65}
+
+    // Named queries, using `:name` as the bindvar.  Automatic bindvar support
+    // which takes into account the dbtype based on the driverName on sqlx.Open/Connect
+    _, err = db.NamedExec(`INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)`, 
+        map[string]interface{}{
+            "first": "Bin",
+            "last": "Smuth",
+            "email": "bensmith@allblacks.nz",
+    })
+
+    // Selects Mr. Smith from the database
+    rows, err := db.NamedQuery(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Bin"})
 
 }
 

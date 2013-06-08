@@ -27,6 +27,7 @@ type Row struct {
 // An interface for something which can Execute sql queries (Tx, DB, Stmt)
 type Queryer interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
+	Queryx(query string, args ...interface{}) (*Rows, error)
 	QueryRowx(query string, args ...interface{}) *Row
 }
 
@@ -35,10 +36,12 @@ type Execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
-type dbext interface {
+type Binder interface {
+	DriverName() string
+	Rebind(string) string
+	BindMap(string, map[string]interface{}) (string, []interface{}, error)
 	Queryer
 	Execer
-	DriverName() string
 }
 
 // An interface for something which can Prepare sql statements (Tx, DB)
@@ -91,6 +94,7 @@ type DB struct {
 	driverName string
 }
 
+// Returns the driverName of the db's connection
 func (db *DB) DriverName() string {
 	return db.driverName
 }
@@ -99,6 +103,30 @@ func (db *DB) DriverName() string {
 func Open(driverName, dataSourceName string) (*DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	return &DB{*db, driverName}, err
+}
+
+// Rebind a query's bindvars for the current db connection.  Default bindvars
+// are quesiton marks `?`, but this will replace with other bindvar types
+// depending on the driverName.  Provided as a convenience for testing queries
+// across multiple databases.
+func (db *DB) Rebind(query string) string {
+	return Rebind(BindType(db.driverName), query)
+}
+
+// Binds a named query to a new query using positional bindvars and a slice
+// of args corresponding to those positions.
+func (db *DB) BindMap(query string, argmap map[string]interface{}) (string, []interface{}, error) {
+	return BindMap(BindType(db.driverName), query, argmap)
+}
+
+// Issue a named query using this DB.
+func (db *DB) NamedQuery(query string, argmap map[string]interface{}) (*Rows, error) {
+	return NamedQuery(db, query, argmap)
+}
+
+// Exec a named query using this DB.
+func (db *DB) NamedExec(query string, argmap map[string]interface{}) (sql.Result, error) {
+	return NamedExec(db, query, argmap)
 }
 
 // Call Select using this db to issue the query.
@@ -184,6 +212,26 @@ func (tx *Tx) DriverName() string {
 	return tx.driverName
 }
 
+// Rebind a query using this transaction's db driver type.
+func (tx *Tx) Rebind(query string) string {
+	return Rebind(BindType(tx.driverName), query)
+}
+
+// Bind a named query using this transaction's db driver type.
+func (tx *Tx) BindMap(query string, argmap map[string]interface{}) (string, []interface{}, error) {
+	return BindMap(BindType(tx.driverName), query, argmap)
+}
+
+// Issue a named query using thi stransaction.
+func (tx *Tx) NamedQuery(query string, argmap map[string]interface{}) (*Rows, error) {
+	return NamedQuery(tx, query, argmap)
+}
+
+// Exec a named query using this Tx.
+func (tx *Tx) NamedExec(query string, argmap map[string]interface{}) (sql.Result, error) {
+	return NamedExec(tx, query, argmap)
+}
+
 // Call LoadFile using this transaction to issue the Exec.
 func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
 	return LoadFile(tx, path)
@@ -245,8 +293,7 @@ func (tx *Tx) MustExec(query string, args ...interface{}) sql.Result {
 }
 
 func (tx *Tx) Preparex(query string) (*Stmt, error) {
-	st, err := tx.Tx.Prepare(query)
-	return &Stmt{*st}, err
+	return Preparex(tx, query)
 }
 
 // Returns a transaction prepared statement given the provided statement,
@@ -274,6 +321,11 @@ type qStmt struct{ Stmt }
 
 func (q *qStmt) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return q.Stmt.Query(args...)
+}
+
+func (q *qStmt) Queryx(query string, args ...interface{}) (*Rows, error) {
+	r, err := q.Stmt.Query(args...)
+	return &Rows{Rows: *r}, err
 }
 
 func (q *qStmt) QueryRowx(query string, args ...interface{}) *Row {
@@ -712,15 +764,22 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 	return nil
 }
 
-/*
-
-func compileNamedQuery(driverName, query string, args map[string]interface{}) (string, []interface{}, error) {
-	return "", []interface{}{}, nil
+// Issue a named query.  Runs BindMap to get a query executable by the driver
+// and then runs Queryx on the result.  May return an error from the binding
+// or from the query execution itself.  Usable on any `Binder`, which are sqlx.DB,
+// sqlx.Tx.
+func NamedQuery(b Binder, query string, argmap map[string]interface{}) (*Rows, error) {
+	q, args, err := b.BindMap(query, argmap)
+	if err != nil {
+		return nil, err
+	}
+	return b.Queryx(q, args...)
 }
 
-// Issue a NamedQuery against a queryer.
-func NamedQuery(db *dbext, query string, args map[string]interface{}) (*sql.Rows, error) {
-	qs, a, err := compileNamedQuery(query, args)
-	return nil, nil
+func NamedExec(b Binder, query string, argmap map[string]interface{}) (sql.Result, error) {
+	q, args, err := b.BindMap(query, argmap)
+	if err != nil {
+		return nil, err
+	}
+	return b.Exec(q, args...)
 }
-*/

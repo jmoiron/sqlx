@@ -36,10 +36,17 @@ type Execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
+// An interface for something which can bind queries (Tx, DB)
 type Binder interface {
 	DriverName() string
 	Rebind(string) string
 	BindMap(string, map[string]interface{}) (string, []interface{}, error)
+	BindStruct(string, interface{}) (string, []interface{}, error)
+}
+
+// A union interface which can bind, query, and exec (Tx, DB)
+type Ext interface {
+	Binder
 	Queryer
 	Execer
 }
@@ -119,14 +126,30 @@ func (db *DB) BindMap(query string, argmap map[string]interface{}) (string, []in
 	return BindMap(BindType(db.driverName), query, argmap)
 }
 
+// Binds a named query to a new query using positional bindvars and a slice
+// of args corresponding to those positions.
+func (db *DB) BindStruct(query string, arg interface{}) (string, []interface{}, error) {
+	return BindStruct(BindType(db.driverName), query, arg)
+}
+
 // Issue a named query using this DB.
-func (db *DB) NamedQuery(query string, argmap map[string]interface{}) (*Rows, error) {
-	return NamedQuery(db, query, argmap)
+func (db *DB) NamedQueryMap(query string, argmap map[string]interface{}) (*Rows, error) {
+	return NamedQueryMap(db, query, argmap)
 }
 
 // Exec a named query using this DB.
-func (db *DB) NamedExec(query string, argmap map[string]interface{}) (sql.Result, error) {
-	return NamedExec(db, query, argmap)
+func (db *DB) NamedExecMap(query string, argmap map[string]interface{}) (sql.Result, error) {
+	return NamedExecMap(db, query, argmap)
+}
+
+// Issue a named query using this DB.
+func (db *DB) NamedQuery(query string, arg interface{}) (*Rows, error) {
+	return NamedQuery(db, query, arg)
+}
+
+// Exec a named query using this DB.
+func (db *DB) NamedExec(query string, arg interface{}) (sql.Result, error) {
+	return NamedExec(db, query, arg)
 }
 
 // Call Select using this db to issue the query.
@@ -220,6 +243,12 @@ func (tx *Tx) Rebind(query string) string {
 // Bind a named query using this transaction's db driver type.
 func (tx *Tx) BindMap(query string, argmap map[string]interface{}) (string, []interface{}, error) {
 	return BindMap(BindType(tx.driverName), query, argmap)
+}
+
+// Binds a named query to a new query using positional bindvars and a slice
+// of args corresponding to those positions.
+func (tx *Tx) BindStruct(query string, arg interface{}) (string, []interface{}, error) {
+	return BindStruct(BindType(tx.driverName), query, arg)
 }
 
 // Issue a named query using thi stransaction.
@@ -616,6 +645,10 @@ func BaseStructType(t reflect.Type) (reflect.Type, error) {
 // Create a fieldmap for a given type and return its fieldmap (or error)
 func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	// if we have a fieldmap cached, return it
+	t, err = BaseStructType(t)
+	if err != nil {
+		return nil, err
+	}
 	fm, ok := fieldmapCache[t]
 	if ok {
 		return fm, nil
@@ -625,6 +658,7 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 
 	var f reflect.StructField
 	var name string
+
 	for i := 0; i < t.NumField(); i++ {
 		f = t.Field(i)
 		name = strings.ToLower(f.Name)
@@ -764,22 +798,42 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 	return nil
 }
 
-// Issue a named query.  Runs BindMap to get a query executable by the driver
-// and then runs Queryx on the result.  May return an error from the binding
-// or from the query execution itself.  Usable on any `Binder`, which are sqlx.DB,
-// sqlx.Tx.
-func NamedQuery(b Binder, query string, argmap map[string]interface{}) (*Rows, error) {
-	q, args, err := b.BindMap(query, argmap)
+// Issue a named query using the struct BindStruct to get a query executable
+// by the driver and then run Queryx on the result.  May return an error
+// from the binding or from the execution itself.  Usable on DB and Tx.
+func NamedQuery(e Ext, query string, arg interface{}) (*Rows, error) {
+	q, args, err := e.BindStruct(query, arg)
 	if err != nil {
 		return nil, err
 	}
-	return b.Queryx(q, args...)
+	return e.Queryx(q, args...)
 }
 
-func NamedExec(b Binder, query string, argmap map[string]interface{}) (sql.Result, error) {
-	q, args, err := b.BindMap(query, argmap)
+// Like NamedQuery, but use Exec instead of Queryx.
+func NamedExec(e Ext, query string, arg interface{}) (sql.Result, error) {
+	q, args, err := e.BindStruct(query, arg)
 	if err != nil {
 		return nil, err
 	}
-	return b.Exec(q, args...)
+	return e.Exec(q, args...)
+}
+
+// Issue a named query.  Runs BindMap to get a query executable by the driver
+// and then runs Queryx on the result.  May return an error from the binding
+// or from the query execution itself.  Usable on DB and Tx.
+func NamedQueryMap(e Ext, query string, argmap map[string]interface{}) (*Rows, error) {
+	q, args, err := e.BindMap(query, argmap)
+	if err != nil {
+		return nil, err
+	}
+	return e.Queryx(q, args...)
+}
+
+// Like NamedQuery, but use Exec instead of Queryx.
+func NamedExecMap(e Ext, query string, argmap map[string]interface{}) (sql.Result, error) {
+	q, args, err := e.BindMap(query, argmap)
+	if err != nil {
+		return nil, err
+	}
+	return e.Exec(q, args...)
 }

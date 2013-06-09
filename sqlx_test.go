@@ -285,7 +285,7 @@ func TestUsage(t *testing.T) {
 		}
 
 		// test advanced querying
-		_, err = db.NamedExec("INSERT INTO person (first_name, last_name, email) VALUES (:first, :last, :email)", map[string]interface{}{
+		_, err = db.NamedExecMap("INSERT INTO person (first_name, last_name, email) VALUES (:first, :last, :email)", map[string]interface{}{
 			"first": "Bin",
 			"last":  "Smuth",
 			"email": "bensmith@allblacks.nz",
@@ -295,7 +295,7 @@ func TestUsage(t *testing.T) {
 		}
 
 		// ensure that if the named param happens right at the end it still works
-		rows, err = db.NamedQuery("SELECT * FROM person WHERE first_name=:first", map[string]interface{}{"first": "Bin"})
+		rows, err = db.NamedQueryMap("SELECT * FROM person WHERE first_name=:first", map[string]interface{}{"first": "Bin"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -312,6 +312,34 @@ func TestUsage(t *testing.T) {
 			if ben.LastName != "Smuth" {
 				t.Fatal("Expected first name of `Smuth`, got " + ben.LastName)
 			}
+		}
+
+		ben.FirstName = "Ben"
+		ben.LastName = "Smith"
+
+		// Insert via a named query using the struct
+		_, err = db.NamedExec("INSERT INTO person (first_name, last_name, email) VALUES (:first_name, :last_name, :email)", ben)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rows, err = db.NamedQuery("SELECT * FROM person WHERE first_name=:first_name", ben)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			err = rows.StructScan(ben)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ben.FirstName != "Ben" {
+				t.Fatal("Expected first name of `Ben`, got " + ben.FirstName)
+			}
+			if ben.LastName != "Smith" {
+				t.Fatal("Expected first name of `Smith`, got " + ben.LastName)
+			}
+
 		}
 
 	}
@@ -373,6 +401,57 @@ func TestBindMap(t *testing.T) {
 
 	if args[3].(string) != "Moiron" {
 		t.Errorf("Expected Moiron, got %v\n", args[3])
+	}
+}
+
+func TestBindStruct(t *testing.T) {
+	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`
+	type tt struct {
+		Name  string
+		Age   int
+		First string
+		Last  string
+	}
+	am := tt{"Jason Moiron", 30, "Jason", "Moiron"}
+
+	bq, args, _ := BindStruct(QUESTION, q1, am)
+	expect := `INSERT INTO foo (a, b, c, d) VALUES (?, ?, ?, ?)`
+	if bq != expect {
+		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
+	}
+
+	if args[0].(string) != "Jason Moiron" {
+		t.Errorf("Expected `Jason Moiron`, got %v\n", args[0])
+	}
+
+	if args[1].(int) != 30 {
+		t.Errorf("Expected 30, got %v\n", args[1])
+	}
+
+	if args[2].(string) != "Jason" {
+		t.Errorf("Expected Jason, got %v\n", args[2])
+	}
+
+	if args[3].(string) != "Moiron" {
+		t.Errorf("Expected Moiron, got %v\n", args[3])
+	}
+
+}
+
+func BenchmarkBindStruct(b *testing.B) {
+	b.StopTimer()
+	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`
+	type t struct {
+		Name  string
+		Age   int
+		First string
+		Last  string
+	}
+	am := t{"Jason Moiron", 30, "Jason", "Moiron"}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		BindStruct(DOLLAR, q1, am)
+		//bindMap(QUESTION, q1, am)
 	}
 }
 

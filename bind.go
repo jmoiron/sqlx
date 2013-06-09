@@ -3,6 +3,7 @@ package sqlx
 import (
 	"bytes"
 	"errors"
+	"reflect"
 	"strconv"
 	"unicode"
 )
@@ -51,6 +52,34 @@ func Rebind(bindType int, query string) string {
 	return string(rqb)
 }
 
+// Bind a named parameter query with fields from a struct argument
+// Use of reflect here makes this
+func BindStruct(bindType int, query string, arg interface{}) (string, []interface{}, error) {
+	arglist := make([]interface{}, 0, 5)
+	t, err := BaseStructType(reflect.TypeOf(arg))
+	if err != nil {
+		return "", arglist, err
+	}
+
+	// resolve this type into a map of fields to field positions
+	fm, err := getFieldmap(t)
+	if err != nil {
+		return "", arglist, err
+	}
+
+	argmap := map[string]interface{}{}
+
+	v := reflect.ValueOf(arg)
+	for v = reflect.ValueOf(arg); v.Kind() == reflect.Ptr; {
+		v = v.Elem()
+	}
+	for key, val := range fm {
+		argmap[key] = v.Field(val).Interface()
+	}
+
+	return BindMap(bindType, query, argmap)
+}
+
 // Bind a named parameter query with a map of arguments to a regular positional
 // bindvar query and return arguments for the new query in a slice.
 func BindMap(bindType int, query string, args map[string]interface{}) (string, []interface{}, error) {
@@ -78,7 +107,7 @@ func BindMap(bindType int, query string, args map[string]interface{}) (string, [
 			}
 			inName = true
 			name = []byte{}
-		} else if inName && unicode.IsLetter(rune(b)) && i != last {
+		} else if inName && (unicode.IsLetter(rune(b)) || b == '_') && i != last {
 			// append the rune to the name if we are in a name and not on the last rune
 			name = append(name, b)
 		} else if inName {

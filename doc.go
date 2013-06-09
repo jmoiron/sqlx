@@ -23,8 +23,15 @@
 // The addition of a set of "Select" functions, which combine Query and
 // StructScan and have "f" and "v" error handling variantes like Exec.
 //
+// The addition of a "Get" function, which is to "QueryRow" what "Select" is
+// to "Query", and will return a special Row that can StructScan.
+//
+// The addition of Named Queries, accessible via either struct arguments or
+// via map arguments
+//
 // A "LoadFile" convenience function which executes the queries in a file.
 //
-// Panicing variants of Connect and Begin: MustConnect, MustBegin.
+// A "Connect" function, which combines "Open" and "Ping", and panicing variants
+// of Connect and Begin: MustConnect, MustBegin.
 //
 package sqlx

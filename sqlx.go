@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+// A wrapper around sql.Rows which caches costly reflect operations
+// during a looped StructScan
 type Rows struct {
 	sql.Rows
 	started bool
@@ -19,6 +21,8 @@ type Rows struct {
 	values  []interface{}
 }
 
+// A reimplementation of sql.Row in order to gain access to the underlying
+// sql.Rows.Columns() data, necessary for StructScan.
 type Row struct {
 	rows sql.Rows
 	err  error
@@ -44,7 +48,8 @@ type Binder interface {
 	BindStruct(string, interface{}) (string, []interface{}, error)
 }
 
-// A union interface which can bind, query, and exec (Tx, DB)
+// A union interface which can bind, query, and exec (Tx, DB), used for
+// NamedQuery and NamedExec, which requires exec/query and BindMap/Struct
 type Ext interface {
 	Binder
 	Queryer
@@ -56,7 +61,7 @@ type Preparer interface {
 	Prepare(query string) (*sql.Stmt, error)
 }
 
-// Same implementation as database/sql.Row.Scan
+// Same implementation as sql.Row.Scan
 func (r *Row) Scan(dest ...interface{}) error {
 	if r.err != nil {
 		return r.err
@@ -88,6 +93,8 @@ func (r *Row) Scan(dest ...interface{}) error {
 	return r.rows.Scan(dest...)
 }
 
+// Return the underlying sql.Rows.Columns(), or the deferred error usually
+// returned by Row.Scan()
 func (r *Row) Columns() ([]string, error) {
 	if r.err != nil {
 		return []string{}, r.err
@@ -95,13 +102,14 @@ func (r *Row) Columns() ([]string, error) {
 	return r.rows.Columns()
 }
 
-// An sqlx wrapper around database/sql's DB with extra functionality
+// An wrapper around sql.DB which keeps track of the driverName upon Open,
+// used mostly to automatically bind named queries using the right bindvars.
 type DB struct {
 	sql.DB
 	driverName string
 }
 
-// Returns the driverName of the db's connection
+// Returns the driverName passed to the Open function for this DB.
 func (db *DB) DriverName() string {
 	return db.driverName
 }
@@ -112,57 +120,52 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	return &DB{*db, driverName}, err
 }
 
-// Rebind a query's bindvars for the current db connection.  Default bindvars
-// are quesiton marks `?`, but this will replace with other bindvar types
-// depending on the driverName.  Provided as a convenience for testing queries
-// across multiple databases.
+// Rebinds a query from QUESTION to the DB driver's bindvar type.
 func (db *DB) Rebind(query string) string {
 	return Rebind(BindType(db.driverName), query)
 }
 
-// Binds a named query to a new query using positional bindvars and a slice
-// of args corresponding to those positions.
+// BindMap's a query using the DB driver's bindvar type.
 func (db *DB) BindMap(query string, argmap map[string]interface{}) (string, []interface{}, error) {
 	return BindMap(BindType(db.driverName), query, argmap)
 }
 
-// Binds a named query to a new query using positional bindvars and a slice
-// of args corresponding to those positions.
+// BindStruct's a query using the DB driver's bindvar type.
 func (db *DB) BindStruct(query string, arg interface{}) (string, []interface{}, error) {
 	return BindStruct(BindType(db.driverName), query, arg)
 }
 
-// Issue a named query using this DB.
+// NamedQueryMap using this DB.
 func (db *DB) NamedQueryMap(query string, argmap map[string]interface{}) (*Rows, error) {
 	return NamedQueryMap(db, query, argmap)
 }
 
-// Exec a named query using this DB.
+// NamedExecMap using this DB.
 func (db *DB) NamedExecMap(query string, argmap map[string]interface{}) (sql.Result, error) {
 	return NamedExecMap(db, query, argmap)
 }
 
-// Issue a named query using this DB.
+// NamedQuery using this DB.
 func (db *DB) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(db, query, arg)
 }
 
-// Exec a named query using this DB.
+// NamedExec using this DB.
 func (db *DB) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	return NamedExec(db, query, arg)
 }
 
-// Call Select using this db to issue the query.
+// Select using this DB.
 func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(db, dest, query, args...)
 }
 
-// Call Get using this db to issue the query.
+// Get using this DB.
 func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
 }
 
-// Call LoadFile using this db to issue the Exec.
+// LoadFile using this DB.
 func (db *DB) LoadFile(path string) (*sql.Result, error) {
 	return LoadFile(db, path)
 }
@@ -177,45 +180,45 @@ func (db *DB) MustBegin() *Tx {
 	return tx
 }
 
-// Beginx is the same as Begin, but returns an *sqlx.Tx instead of an *sql.Tx
+// Same as Begin, but returns an *sqlx.Tx instead of an *sql.Tx.
 func (db *DB) Beginx() (*Tx, error) {
 	tx, err := db.DB.Begin()
 	return &Tx{*tx, db.driverName}, err
 }
 
-// Queryx is the same as Query, but returns an *sqlx.Rows instead of *sql.Rows
+// Same as Query, but returns an *sqlx.Rows instead of *sql.Rows.
 func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 	r, err := db.DB.Query(query, args...)
 	return &Rows{Rows: *r}, err
 }
 
-// QueryRowx is the same as QueryRow, but returns an *sqlx.Row instead of *sql.Row
+// Same as QueryRow, but returns an *sqlx.Row instead of *sql.Row.
 func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
 	r, err := db.DB.Query(query, args...)
 	return &Row{rows: *r, err: err}
 }
 
-// Execv ("verbose") runs Execv using this database.
+// Execv (verbose) runs Execv using this database.
 func (db *DB) Execv(query string, args ...interface{}) (sql.Result, error) {
 	return Execv(db, query, args...)
 }
 
-// Execl ("log") runs Execl using this database.
+// Execl (log) runs Execl using this database.
 func (db *DB) Execl(query string, args ...interface{}) sql.Result {
 	return Execl(db, query, args...)
 }
 
-// Execf ("fatal") runs Execf using this database.
+// Execf (fatal) runs Execf using this database.
 func (db *DB) Execf(query string, args ...interface{}) sql.Result {
 	return Execf(db, query, args...)
 }
 
-// Execp ("panic") runs Execp using this database.
+// Execp (panic) runs Execp using this database.
 func (db *DB) Execp(query string, args ...interface{}) sql.Result {
 	return Execp(db, query, args...)
 }
 
-// MustExec ("panic") runs MustExec using this database.
+// MustExec (panic) runs MustExec using this database.
 func (db *DB) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(db, query, args...)
 }
@@ -231,102 +234,105 @@ type Tx struct {
 	driverName string
 }
 
+// Return the driverName used by the DB which began a transaction.
 func (tx *Tx) DriverName() string {
 	return tx.driverName
 }
 
-// Rebind a query using this transaction's db driver type.
+// Rebind a query within a transaction's bindvar type.
 func (tx *Tx) Rebind(query string) string {
 	return Rebind(BindType(tx.driverName), query)
 }
 
-// Bind a named query using this transaction's db driver type.
+// BindMap's a query within a transaction's bindvar type.
 func (tx *Tx) BindMap(query string, argmap map[string]interface{}) (string, []interface{}, error) {
 	return BindMap(BindType(tx.driverName), query, argmap)
 }
 
-// Binds a named query to a new query using positional bindvars and a slice
-// of args corresponding to those positions.
+// BindStruct's a query within a transaction's bindvar type.
 func (tx *Tx) BindStruct(query string, arg interface{}) (string, []interface{}, error) {
 	return BindStruct(BindType(tx.driverName), query, arg)
 }
 
-// Issue a named query using thi stransaction.
+// NamedQuery within a transaction.
 func (tx *Tx) NamedQuery(query string, argmap map[string]interface{}) (*Rows, error) {
 	return NamedQuery(tx, query, argmap)
 }
 
-// Exec a named query using this Tx.
+// Exec a named query within a transaction.
 func (tx *Tx) NamedExec(query string, argmap map[string]interface{}) (sql.Result, error) {
 	return NamedExec(tx, query, argmap)
 }
 
-// Call LoadFile using this transaction to issue the Exec.
+// LoadFile within a transaction.
 func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
 	return LoadFile(tx, path)
 }
 
-// Call Select using this transaction to issue the Query.
+// Select within a transaction.
 func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(tx, dest, query, args...)
 }
 
+// Query within a transaction, returning *sqlx.Rows instead of *sql.Rows.
 func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
 	r, err := tx.Tx.Query(query, args...)
 	return &Rows{Rows: *r}, err
 }
 
+// QueryRow within a transaction, returning *sqlx.Row instead of *sql.Row.
 func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
 	r, err := tx.Tx.Query(query, args...)
 	return &Row{rows: *r, err: err}
 }
 
-// Call Get using this transaction to issue the query.
+// Get within a transaction.
 func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(tx, dest, query, args...)
 }
 
-// Call Select using this transaction to issue the Query.
+// Selectv (verbose) within a transaction.
 func (tx *Tx) Selectv(dest interface{}, query string, args ...interface{}) error {
 	return Selectv(tx, dest, query, args...)
 }
 
-// Call Selectf using this transaction to issue the Query.
+// Selectf (fatal) within a transaction.
 func (tx *Tx) Selectf(dest interface{}, query string, args ...interface{}) {
 	Selectf(tx, dest, query, args...)
 }
 
-// Execv ("verbose") runs Execv using this transaction.
+// Execv (verbose) runs Execv within a transaction.
 func (tx *Tx) Execv(query string, args ...interface{}) (sql.Result, error) {
 	return Execv(tx, query, args...)
 }
 
-// Execl ("log") runs Execl using this transaction.
+// Execl (log) runs Execl within a transaction.
 func (tx *Tx) Execl(query string, args ...interface{}) sql.Result {
 	return Execl(tx, query, args...)
 }
 
-// Execf ("fatal") runs Execf using this transaction.
+// Execf (fatal) runs Execf within a transaction.
 func (tx *Tx) Execf(query string, args ...interface{}) sql.Result {
 	return Execf(tx, query, args...)
 }
 
-// Execp ("panic") runs Execp using this transaction.
+// Execp (panic) runs Execp within a transaction.
 func (tx *Tx) Execp(query string, args ...interface{}) sql.Result {
 	return Execp(tx, query, args...)
 }
 
-// MustExec ("panic") runs MustExec using this transaction.
+// MustExec (panic) runs MustExec within a transaction.
 func (tx *Tx) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(tx, query, args...)
 }
 
+// Prepare's a statement within a transaction, returning a *sqlx.Stmt instead of an *sql.Stmt.
 func (tx *Tx) Preparex(query string) (*Stmt, error) {
 	return Preparex(tx, query)
 }
 
-// Returns a transaction prepared statement given the provided statement,
-// which can be either an sql.Stmt or an sqlx.Stmt
+// Returns a version of the prepared statement which runs within a transaction.  Provided
+// stmt can be either *sql.Stmt or *sqlx.Stmt, and the return value is always *sqlx.Stmt.
 func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
 	var st sql.Stmt
 	var s *sql.Stmt
@@ -366,53 +372,52 @@ func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
 	return q.Stmt.Exec(args...)
 }
 
-// Call Select using this statement to issue the Query.
+// Select using the prepared statement.
 func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 	return Select(&qStmt{*s}, dest, "", args...)
 }
 
-// Call Get using this statement to issue the query.
-func (s *Stmt) Get(dest interface{}, query string, args ...interface{}) error {
-	return Get(&qStmt{*s}, dest, query, args...)
-}
-
-// Call Selectv using this statement to issue the Query.
+// Selectv (verbose) using the prepared statement.
 func (s *Stmt) Selectv(dest interface{}, args ...interface{}) error {
 	return Selectv(&qStmt{*s}, dest, "", args...)
 }
 
-// Call Selectf using this statement to issue the Query.
+// Selectf (fatal) using the prepared statement.
 func (s *Stmt) Selectf(dest interface{}, args ...interface{}) {
 	Selectf(&qStmt{*s}, dest, "", args...)
 }
 
-// Execv ("verbose") runs Execv using this statement.  Note that the query is
-// not recoverable once a statement has been prepared, so the query portion
-// will be blank.
+// Get using the prepared statement.
+func (s *Stmt) Get(dest interface{}, query string, args ...interface{}) error {
+	return Get(&qStmt{*s}, dest, query, args...)
+}
+
+// Execv (verbose) runs Execv using this statement.  Note that the query
+// portion of the error output will be blank, as Stmt does not expose its query.
 func (s *Stmt) Execv(args ...interface{}) (sql.Result, error) {
 	return Execv(&qStmt{*s}, "", args...)
 }
 
-// Execl ("log") runs Execl using this statement.  Note that the query is
-// not recoverable once a statement has been prepared, so the query portion
-// will be blank.
+// Execl (log) using this statement.  Note that the query portion of the error
+// output will be blank, as Stmt does not expose its query.
 func (s *Stmt) Execl(args ...interface{}) sql.Result {
 	return Execl(&qStmt{*s}, "", args...)
 }
 
-// Execf ("fatal") runs Execf using this statement.  Note that the query is
-// not recoverable once a statement has been prepared, so the query portion
-// will be blank.
+// Execf (fatal) using this statement.  Note that the query portion of the error
+// output will be blank, as Stmt does not expose its query.
 func (s *Stmt) Execf(args ...interface{}) sql.Result {
 	return Execf(&qStmt{*s}, "", args...)
 }
 
-// Execp ("panic") runs Execp using this statement.
+// Execf (panic) using this statement.  Note that the query portion of the error
+// output will be blank, as Stmt does not expose its query.
 func (s *Stmt) Execp(args ...interface{}) sql.Result {
 	return Execp(&qStmt{*s}, "", args...)
 }
 
-// MustExec ("panic") runs MustExec using this statement.
+// MustExec (panic) using this statement.  Note that the query portion of the error
+// output will be blank, as Stmt does not expose its query.
 func (s *Stmt) MustExec(args ...interface{}) sql.Result {
 	return MustExec(&qStmt{*s}, "", args...)
 }
@@ -465,16 +470,6 @@ func (r *Rows) StructScan(dest interface{}) error {
 	return nil
 }
 
-// Connect to a database and panic on error.  Similar to sql.Open, but attempts
-// a simple db.Ping() against the db to see if it was successful
-func MustConnect(driverName, dataSourceName string) *DB {
-	db, err := Connect(driverName, dataSourceName)
-	if err != nil {
-		panic(err)
-	}
-	return db
-}
-
 // Connect to a database and verify with a ping.
 func Connect(driverName, dataSourceName string) (*DB, error) {
 	db, err := Open(driverName, dataSourceName)
@@ -485,15 +480,23 @@ func Connect(driverName, dataSourceName string) (*DB, error) {
 	return db, err
 }
 
-// Preparex prepares a statement given a Preparer (Tx, DB), returning an sqlx
-// wrapped *Stmt.
+// Connect, but panic on error.
+func MustConnect(driverName, dataSourceName string) *DB {
+	db, err := Connect(driverName, dataSourceName)
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+// Preparex prepares a statement given a Preparer (Tx, DB), returning an *sqlx.Stmt.
 func Preparex(p Preparer, query string) (*Stmt, error) {
 	s, err := p.Prepare(query)
 	return &Stmt{*s}, err
 }
 
-// Select uses a Queryer (*DB or *Tx, by default), issues the query w/ args
-// via that Queryer, and sets the dest slice using rows.StructScan
+// Query using the provided Queryer, and StructScan each row into dest, which must
+// be a slice of structs.  The resulting *sql.Rows are closed automatically.
 func Select(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	rows, err := q.Query(query, args...)
 	if err != nil {
@@ -505,15 +508,15 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	return StructScan(rows, dest)
 }
 
-// Get uses a queryer (*DB, *Tx, or *qStmt by default), issues a QueryRow w/ args
-// via that Queryer and sets the dest interface using row.StructScan
+// QueryRow using the provided Queryer, and StructScan the resulting row into dest,
+// which must be a pointer to a struct.  If there was no row, Get will return sql.ErrNoRows.
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	r := q.QueryRowx(query, args...)
 	return r.StructScan(dest)
 }
 
-// Selectv ("verbose") runs Select on its arguments and uses log.Println to print
-// the query and the error in the event of an error.
+// Selectv (verbose) will Select using a Queryer and use log.Println to print
+//the query and the error in the event of an error.
 func Selectv(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	err := Select(q, dest, query, args...)
 	if err != nil {
@@ -522,7 +525,7 @@ func Selectv(q Queryer, dest interface{}, query string, args ...interface{}) err
 	return err
 }
 
-// Selectf ("fatal") runs Select on its arguments and uses log.Fatal to print
+// Selectf (fatal) will Select using a Queryer and use log.Fatal to print
 // the query and the error in the event of an error.
 func Selectf(q Queryer, dest interface{}, query string, args ...interface{}) {
 	err := Select(q, dest, query, args...)
@@ -532,13 +535,15 @@ func Selectf(q Queryer, dest interface{}, query string, args ...interface{}) {
 }
 
 // LoadFile exec's every statement in a file (as a single call to Exec).
-// LoadFile returns a nil pointer and error if an error is encountered since
-// errors can be encountered locating or reading the file, before a Result is
-// created. LoadFile reads the entire file into memory, so it is not suitable
-// for loading large data dumps, but can be useful for initializing database
+// LoadFile may return a nil *sql.Result if errors are encountered locating or
+// reading the file at path.  LoadFile reads the entire file into memory, so it
+// is not suitable for loading large data dumps, but can be useful for initializing
 // schemas or loading indexes.
 // FIXME: this does not really work with multi-statement files for mattn/go-sqlite3
-// or the go-mysql-driver/mysql drivers;  pq seems to be an exception here.
+// or the go-mysql-driver/mysql drivers;  pq seems to be an exception here.  Detecting
+// this by requiring something with DriverName() and then attempting to split the
+// queries will be difficult to get right, and its current driver-specific behavior
+// is deemed at least not complex in its incorrectness.
 func LoadFile(e Execer, path string) (*sql.Result, error) {
 	realpath, err := filepath.Abs(path)
 	if err != nil {
@@ -552,9 +557,8 @@ func LoadFile(e Execer, path string) (*sql.Result, error) {
 	return &res, err
 }
 
-// Execv ("verbose") runs Exec on the query and args and uses log.Println to
-// print the query, result, and error in the event of an error.  Since Execv
-// returns flow to the caller, it returns the result and error.
+// Execv (verbose) Exec's the query using the Execer and uses log.Println to
+// print the query, result, and error in the event of an error.
 func Execv(e Execer, query string, args ...interface{}) (sql.Result, error) {
 	res, err := e.Exec(query, args...)
 	if err != nil {
@@ -563,7 +567,7 @@ func Execv(e Execer, query string, args ...interface{}) (sql.Result, error) {
 	return res, err
 }
 
-// Execl ("log") runs Exec on the query and args and ses log.Println to
+// Execl (log) runs Exec on the query and args and ses log.Println to
 // print the query, result, and error in the event of an error.  Unlike Execv,
 // Execl does not return the error, and can be used in single-value contexts.
 //
@@ -577,9 +581,8 @@ func Execl(e Execer, query string, args ...interface{}) sql.Result {
 	return res
 }
 
-// Execf ("fatal") runs Exec on the query and args and uses log.Fatal to
-// print the query, result, and error in the event of an error.  Since
-// errors are non-recoverable, only a Result is returned on success.
+// Execf (fatal) runs Exec on the query and args and uses log.Fatal to
+// print the query, result, and error in the event of an error.
 func Execf(e Execer, query string, args ...interface{}) sql.Result {
 	res, err := e.Exec(query, args...)
 	if err != nil {
@@ -588,8 +591,7 @@ func Execf(e Execer, query string, args ...interface{}) sql.Result {
 	return res
 }
 
-// Execp ("panic") runs Exec on the query and args and panics on error.  Since
-// the panic interrupts the control flow, errors are not returned to the caller.
+// Execp (panic) runs Exec on the query and args and panics on error.
 func Execp(e Execer, query string, args ...interface{}) sql.Result {
 	res, err := e.Exec(query, args...)
 	if err != nil {
@@ -598,8 +600,7 @@ func Execp(e Execer, query string, args ...interface{}) sql.Result {
 	return res
 }
 
-// MustExec ("panic") runs Exec on the query and args and panics on error.  Since
-// the panic interrupts the control flow, errors are not returned to the caller.
+// MustExec (panic) is an alias for Execp.
 func MustExec(e Execer, query string, args ...interface{}) sql.Result {
 	res, err := e.Exec(query, args...)
 	if err != nil {
@@ -614,8 +615,8 @@ type fieldmap map[string]int
 // A cache of fieldmaps for reflect Types
 var fieldmapCache = map[reflect.Type]fieldmap{}
 
-// Return the underlying slice's type, or an error if the type is
-// not a slice or a pointer to a slice.
+// Return the type for a slice, dereferencing it if it is a pointer.  Returns
+// an error if the destination is not a slice or a pointer to a slice.
 func BaseSliceType(t reflect.Type) (reflect.Type, error) {
 	switch t.Kind() {
 	case reflect.Ptr:
@@ -628,8 +629,8 @@ func BaseSliceType(t reflect.Type) (reflect.Type, error) {
 	return t, nil
 }
 
-// Return a reflect.Type's base struct type, or an error if it is not a struct
-// or pointer to a struct.
+// Return the type of a struct, dereferencing it if it is a pointer.  Returns
+// an error if the destination is not a struct or a pointer to a struct.
 func BaseStructType(t reflect.Type) (reflect.Type, error) {
 	switch t.Kind() {
 	case reflect.Ptr:
@@ -698,6 +699,7 @@ func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 	}
 }
 
+// StructScan's a single Row (result of QueryRowx) into dest
 func (r *Row) StructScan(dest interface{}) error {
 	var v reflect.Value
 	v = reflect.ValueOf(dest)
@@ -733,12 +735,14 @@ func (r *Row) StructScan(dest interface{}) error {
 	return r.Scan(values...)
 }
 
-// Fully scan a sql.Rows result into the dest slice.
+// Fully scan a sql.Rows result into the dest slice.  StructScan destinations MUST
+// have fields that map to every column in the result, and they MAY have fields
+// in addition to those.  Fields are mapped to column names by lowercasing the
+// field names by default:  use the struct tag `db` to specify exact column names
+// for each field.
 //
-// StructScan can incompletely fill a struct, and will also work with
-// any values order returned by the sql driver.
-// StructScan will scan in the entire rows result, so if you need to iterate
-// one at a time (to reduce memory usage, eg) avoid it.
+// StructScan will scan in the entire rows result, so if you need do not want to
+// allocate structs for the entire result, use Queryx and see sqlx.Rows.StructScan.
 func StructScan(rows *sql.Rows, dest interface{}) error {
 	var v, vp reflect.Value
 	var isPtr bool
@@ -798,9 +802,9 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 	return nil
 }
 
-// Issue a named query using the struct BindStruct to get a query executable
+// Issue a named query using BindStruct to get a query executable
 // by the driver and then run Queryx on the result.  May return an error
-// from the binding or from the execution itself.  Usable on DB and Tx.
+// from the binding or from the execution itself.
 func NamedQuery(e Ext, query string, arg interface{}) (*Rows, error) {
 	q, args, err := e.BindStruct(query, arg)
 	if err != nil {
@@ -818,9 +822,9 @@ func NamedExec(e Ext, query string, arg interface{}) (sql.Result, error) {
 	return e.Exec(q, args...)
 }
 
-// Issue a named query.  Runs BindMap to get a query executable by the driver
-// and then runs Queryx on the result.  May return an error from the binding
-// or from the query execution itself.  Usable on DB and Tx.
+// Issue a named query using BindMap to get a query executable by the driver
+// and then run Queryx on the result.  May return an error from the binding
+// or from the query execution itself.
 func NamedQueryMap(e Ext, query string, argmap map[string]interface{}) (*Rows, error) {
 	q, args, err := e.BindMap(query, argmap)
 	if err != nil {

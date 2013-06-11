@@ -8,6 +8,7 @@ import (
 	"unicode"
 )
 
+// Bindvar types supported by sqlx's Rebind & BindMap/Struct functions.
 const (
 	UNKNOWN = iota
 	QUESTION
@@ -52,8 +53,9 @@ func Rebind(bindType int, query string) string {
 	return string(rqb)
 }
 
-// Bind a named parameter query with fields from a struct argument
-// Use of reflect here makes this
+// Bind a named parameter query with fields from a struct argument.  The rules
+// for binding field names to parameter names follow the same conventions as
+// for StructScan, including obeying the `db` struct tags.
 func BindStruct(bindType int, query string, arg interface{}) (string, []interface{}, error) {
 	arglist := make([]interface{}, 0, 5)
 	t, err := BaseStructType(reflect.TypeOf(arg))
@@ -80,8 +82,7 @@ func BindStruct(bindType int, query string, arg interface{}) (string, []interfac
 	return BindMap(bindType, query, argmap)
 }
 
-// Bind a named parameter query with a map of arguments to a regular positional
-// bindvar query and return arguments for the new query in a slice.
+// Bind a named parameter query with a map of arguments.
 func BindMap(bindType int, query string, args map[string]interface{}) (string, []interface{}, error) {
 	arglist := make([]interface{}, 0, 5)
 	// In all likelihood, the rebound query will be shorter
@@ -149,6 +150,11 @@ func BindMap(bindType int, query string, args map[string]interface{}) (string, [
 	}
 	return string(rebound), arglist, nil
 }
+
+// Experimental implementation of Rebind which uses a bytes.Buffer.  The code is
+// much simpler and should be more resistant to odd unicode, but it is twice as
+// slow.  Kept here for benchmarking purposes and to possibly replace Rebind if
+// problems arise with its somewhat naive handling of unicode.
 
 func rebindBuff(bindType int, query string) string {
 	if bindType != DOLLAR {

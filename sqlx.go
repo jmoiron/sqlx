@@ -502,8 +502,7 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	if err != nil {
 		return err
 	}
-	// StructScan will exhaust the rows here, which we are never returning to
-	// the caller, so we have to close it
+	// if something happens here, we want to make sure the rows are Closed
 	defer rows.Close()
 	return StructScan(rows, dest)
 }
@@ -618,10 +617,11 @@ var fieldmapCache = map[reflect.Type]fieldmap{}
 // Return the type for a slice, dereferencing it if it is a pointer.  Returns
 // an error if the destination is not a slice or a pointer to a slice.
 func BaseSliceType(t reflect.Type) (reflect.Type, error) {
+start:
 	switch t.Kind() {
 	case reflect.Ptr:
 		t = t.Elem()
-		fallthrough
+		goto start
 	case reflect.Slice:
 	default:
 		return nil, errors.New("Destination must be a slice.")

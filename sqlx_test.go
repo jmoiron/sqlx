@@ -174,6 +174,8 @@ func MultiExec(e Execer, query string) {
 
 func TestUsage(t *testing.T) {
 	RunTest := func(db *DB, t *testing.T, dbtype string) {
+		var err error
+
 		defer func(dbtype string) {
 			if dbtype != "postgres" {
 				MultiExec(db, drop)
@@ -199,9 +201,9 @@ func TestUsage(t *testing.T) {
 
 		people := []Person{}
 
-		err := db.Select(&people, "SELECT * FROM person ORDER BY first_name ASC")
+		err = db.Select(&people, "SELECT * FROM person ORDER BY first_name ASC")
 		if err != nil {
-			t.Fatalf("Could not select from people")
+			t.Fatalf("Could not select from people: %s", err)
 		}
 
 		jason, john := people[0], people[1]
@@ -246,9 +248,24 @@ func TestUsage(t *testing.T) {
 		}
 
 		// if you have null fields and use SELECT *, you must use sql.Null* in your struct
-		places = []*Place{}
-		err = db.Select(&places, "SELECT * FROM place ORDER BY telcode ASC")
-		usa, singsing, honkers = places[0], places[1], places[2]
+		// this test also verifies that you can use either a []Struct{} or a []*Struct{}
+		places2 := []Place{}
+		err = db.Select(&places2, "SELECT * FROM place ORDER BY telcode ASC")
+		usa, singsing, honkers = &places2[0], &places2[1], &places2[2]
+
+		// this should return a type error that &p is not a pointer to a struct slice
+		p := Place{}
+		err = db.Select(&p, "SELECT * FROM place ORDER BY telcode ASC")
+		if err == nil {
+			t.Errorf("Expected an error, argument to select should be a pointer to a struct slice")
+		}
+
+		// this should be an error because
+		pl := []Place{}
+		err = db.Select(pl, "SELECT * FROM place ORDER BY telcode ASC")
+		if err == nil {
+			t.Errorf("Expected an error, argument to select should be a pointer to a struct slice, not a slice.")
+		}
 
 		if usa.TelCode != 1 || honkers.TelCode != 852 || singsing.TelCode != 65 {
 			t.Errorf("Expected integer telcodes to work, got %#v", places)

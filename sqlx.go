@@ -109,6 +109,10 @@ type DB struct {
 	driverName string
 }
 
+func NewDb(db *sql.DB, driverName string) *DB {
+	return &DB{*db, driverName}
+}
+
 // Returns the driverName passed to the Open function for this DB.
 func (db *DB) DriverName() string {
 	return db.driverName

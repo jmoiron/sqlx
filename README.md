@@ -9,11 +9,11 @@ etc.
 
 Major additional concepts are:
 
-* `NamedQuery` and `NamedExec`, which take named bindvars and an argument map
-* `StructScan`, which automatically scans an `sqlx.Row` or `sqlx.Rows` into a struct
-* `Get` and `Select`, which use QueryRow and Query to return results as structs via `StructScan`
-* `Execf`, `Execp` (also `MustExec`), and `Execl` mnemonics for log.Fatal, panic(), and fmt.Println
-   handling of Exec errors.
+* Named parameter support with `NamedQuery`, `NamedExec`, et al.
+* Scan() into a struct with `StructScan`
+* `Get` and `Select`, which will QueryRow or Query directly into a provided struct or slice
+* Common error handling mnemonics `Execf`, `Execp` (also `MustExec`), and `Execl`
+* `LoadFile` for easy execution of SQL in files
 
 ## usage
 

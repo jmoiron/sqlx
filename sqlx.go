@@ -121,6 +121,9 @@ func (db *DB) DriverName() string {
 // Same as database/sql's Open, but returns an *sqlx.DB instead.
 func Open(driverName, dataSourceName string) (*DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
+	if err != nil {
+		return nil, err
+	}
 	return &DB{*db, driverName}, err
 }
 

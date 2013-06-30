@@ -372,6 +372,15 @@ func TestUsage(t *testing.T) {
 	}
 }
 
+// tests that sqlx will not panic when the wrong driver is passed because
+// of an automatic nil dereference in sqlx.Open(), which was fixed.
+func TestDoNotPanicOnConnect(t *testing.T) {
+	_, err := Connect("bogus", "hehe")
+	if err == nil {
+		t.Errorf("Should return error when using bogus driverName")
+	}
+}
+
 func TestRebind(t *testing.T) {
 	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`

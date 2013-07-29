@@ -195,14 +195,20 @@ func (db *DB) Beginx() (*Tx, error) {
 
 // Same as Query, but returns an *sqlx.Rows instead of *sql.Rows.
 func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
-	r, err := db.DB.Query(query, args...)
-	return &Rows{Rows: *r}, err
+	if r, err := db.DB.Query(query, args...); err != nil {
+		return nil, err
+	} else {
+		return &Rows{Rows: *r}, err
+	}
 }
 
 // Same as QueryRow, but returns an *sqlx.Row instead of *sql.Row.
 func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
-	r, err := db.DB.Query(query, args...)
-	return &Row{rows: *r, err: err}
+	if r, err := db.DB.Query(query, args...); err != nil {
+		return &Row{err: err}
+	} else {
+		return &Row{rows: *r, err: err}
+	}
 }
 
 // Execv (verbose) runs Execv using this database.
@@ -283,14 +289,20 @@ func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error 
 
 // Query within a transaction, returning *sqlx.Rows instead of *sql.Rows.
 func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
-	r, err := tx.Tx.Query(query, args...)
-	return &Rows{Rows: *r}, err
+	if r, err := tx.Tx.Query(query, args...); err != nil {
+		return nil, err
+	} else {
+		return &Rows{Rows: *r}, err
+	}
 }
 
 // QueryRow within a transaction, returning *sqlx.Row instead of *sql.Row.
 func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
-	r, err := tx.Tx.Query(query, args...)
-	return &Row{rows: *r, err: err}
+	if r, err := tx.Tx.Query(query, args...); err != nil {
+		return &Row{err: err}
+	} else {
+		return &Row{rows: *r, err: err}
+	}
 }
 
 // Get within a transaction.
@@ -366,13 +378,19 @@ func (q *qStmt) Query(query string, args ...interface{}) (*sql.Rows, error) {
 }
 
 func (q *qStmt) Queryx(query string, args ...interface{}) (*Rows, error) {
-	r, err := q.Stmt.Query(args...)
-	return &Rows{Rows: *r}, err
+	if r, err := q.Stmt.Query(args...); err != nil {
+		return nil, err
+	} else {
+		return &Rows{Rows: *r}, err
+	}
 }
 
 func (q *qStmt) QueryRowx(query string, args ...interface{}) *Row {
-	r, err := q.Stmt.Query(args...)
-	return &Row{rows: *r, err: err}
+	if r, err := q.Stmt.Query(args...); err != nil {
+		return &Row{err: err}
+	} else {
+		return &Row{rows: *r, err: err}
+	}
 }
 
 func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {

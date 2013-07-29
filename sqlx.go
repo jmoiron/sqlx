@@ -633,6 +633,31 @@ func MustExec(e Execer, query string, args ...interface{}) sql.Result {
 	return res
 }
 
+// Function which maps from a struct field name to its database column name
+var StructToDatabaseFieldNameMapper func(f reflect.StructField) (columnName string) = DefaultFieldNameMapperFunction
+
+// Default mapping uses the db struct attribute if specified otherwise
+// maps structFieldName -> lowercase(structFieldName)
+var DefaultFieldNameMapperFunction = func(f reflect.StructField) (columnName string) {
+	if tag := f.Tag.Get("db"); tag != "" {
+		return tag
+	}
+	return strings.ToLower(f.Name)
+}
+
+// Alternative mapper function which uses db struct attribute if specified otherwise
+// maps structFieldName -> camelCase(structFieldName)
+var CamelCaseFieldNameMapperFunction = func(f reflect.StructField) (columnName string) {
+	if tag := f.Tag.Get("db"); tag != "" {
+		return tag
+	}
+	if len(f.Name) > 1 {
+		return strings.ToLower(f.Name[:1]) + f.Name[1:]
+	} else {
+		return strings.ToLower(f.Name)
+	}
+}
+
 // A map of names to field positions for destination structs
 type fieldmap map[string]int
 
@@ -687,10 +712,7 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 
 	for i := 0; i < t.NumField(); i++ {
 		f = t.Field(i)
-		name = strings.ToLower(f.Name)
-		if tag := f.Tag.Get("db"); tag != "" {
-			name = tag
-		}
+		name = StructToDatabaseFieldNameMapper(f)
 		fm[name] = i
 	}
 	fieldmapCache[t] = fm

@@ -189,8 +189,11 @@ func (db *DB) MustBegin() *Tx {
 
 // Same as Begin, but returns an *sqlx.Tx instead of an *sql.Tx.
 func (db *DB) Beginx() (*Tx, error) {
-	tx, err := db.DB.Begin()
-	return &Tx{*tx, db.driverName}, err
+	if tx, err := db.DB.Begin(); err != nil {
+		return nil, err
+	} else {
+		return &Tx{*tx, db.driverName}, err
+	}
 }
 
 // Same as Query, but returns an *sqlx.Rows instead of *sql.Rows.
@@ -516,8 +519,11 @@ func MustConnect(driverName, dataSourceName string) *DB {
 
 // Preparex prepares a statement given a Preparer (Tx, DB), returning an *sqlx.Stmt.
 func Preparex(p Preparer, query string) (*Stmt, error) {
-	s, err := p.Prepare(query)
-	return &Stmt{*s}, err
+	if s, err := p.Prepare(query); err != nil {
+		return nil, err
+	} else {
+		return &Stmt{*s}, err
+	}
 }
 
 // Query using the provided Queryer, and StructScan each row into dest, which must

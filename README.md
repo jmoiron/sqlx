@@ -15,6 +15,10 @@ Major additional concepts are:
 * Common error handling mnemonics `Execf`, `Execp` (also `MustExec`), and `Execl`
 * `LoadFile` for easy execution of SQL in files
 
+## install
+
+    go get github.com/jmoiron/sqlx
+
 ## usage
 
 Read the [documentation](http://godoc.org/github.com/jmoiron/sqlx) for detailed API docs,

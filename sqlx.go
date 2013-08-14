@@ -167,6 +167,16 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(db, dest, query, args...)
 }
 
+// Selectf using this DB.
+func (db *DB) Selectf(dest interface{}, query string, args ...interface{}) error {
+	return Selectf(db, dest, query, args...)
+}
+
+// Selectv using this DB.
+func (db *DB) Selectv(dest interface{}, query string, args ...interface{}) error {
+	return Selectv(db, dest, query, args...)
+}
+
 // Get using this DB.
 func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)

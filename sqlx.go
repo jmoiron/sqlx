@@ -168,8 +168,8 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 }
 
 // Selectf using this DB.
-func (db *DB) Selectf(dest interface{}, query string, args ...interface{}) error {
-	return Selectf(db, dest, query, args...)
+func (db *DB) Selectf(dest interface{}, query string, args ...interface{}) {
+	Selectf(db, dest, query, args...)
 }
 
 // Selectv using this DB.

@@ -2,18 +2,18 @@
 
 [![Build Status](https://drone.io/github.com/jmoiron/sqlx/status.png)](https://drone.io/github.com/jmoiron/sqlx/latest)
 
-sqlx is a set of extensions upon go's basic `database/sql` module.  They are all
-optional and SQLX versions of sql.DB, sql.Tx, sql.Stmt, etc all leave the underlying
-interfaces untouched, so sqlx.DB.Query will behave exactly the same as sql.DB.Query,
-etc.
+sqlx is a library which provides a set of extensions on go's standard
+`database/sql` library.  The sqlx versions of `sql.DB`, `sql.TX`, `sql.Stmt`,
+et al. all leave the underlying interfaces untouched, so that their interfaces
+are a superset on the standard ones.
 
 Major additional concepts are:
 
-* Named parameter support with `NamedQuery`, `NamedExec`, et al.
-* Scan() into a struct with `StructScan`
-* `Get` and `Select`, which will QueryRow or Query directly into a provided struct or slice
-* Common error handling mnemonics `Execf`, `Execp` (also `MustExec`), and `Execl`
-* `LoadFile` for easy execution of SQL in files
+* Named parameter support (unmarshal struct fields and maps)
+* `StructScan` (marshal rows to structs)
+* `Get` and `Select` for storing one more more results directly into a struct or slice
+* Common error handling mnemonics (eg. `Execf`, `Execp` (`MustExec`), and `Execl`)
+* `LoadFile` for executing statements from a file
 
 ## install
 
@@ -21,13 +21,14 @@ Major additional concepts are:
 
 ## usage
 
-Read the [documentation](http://godoc.org/github.com/jmoiron/sqlx) for detailed API docs,
-and check [sqlx_test.go](https://github.com/jmoiron/sqlx/blob/master/sqlx_test.go) for more usage.  
+Read the [API documentation on godoc](http://godoc.org/github.com/jmoiron/sqlx) 
+for detailed API docs, and check 
+[sqlx_test.go](https://github.com/jmoiron/sqlx/blob/master/sqlx_test.go) for more
+usage.  
 
 Below is an example which shows some common use cases for sqlx.
 
 ```go
-
 package main
 
 import (
@@ -134,7 +135,6 @@ func main() {
     // as the name -> db mapping, so struct fields are lowercased and the `db` tag
     // is taken into consideration.
     rows, err := db.NamedQuery(`SELECT * FROM person WHERE first_name=:first_name`, jason)
-
 }
-
 ```
+

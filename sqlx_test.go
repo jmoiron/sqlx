@@ -190,7 +190,6 @@ func TestUsage(t *testing.T) {
 		} else {
 			db.Execf(schema)
 		}
-
 		tx := db.MustBegin()
 		tx.Execl(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "Jason", "Moiron", "jmoiron@jmoiron.net")
 		tx.Execl(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "John", "Doe", "johndoeDNE@gmail.net")
@@ -203,7 +202,7 @@ func TestUsage(t *testing.T) {
 
 		err = db.Select(&people, "SELECT * FROM person ORDER BY first_name ASC")
 		if err != nil {
-			t.Fatalf("Could not select from people: %s", err)
+			t.Fatal(err)
 		}
 
 		jason, john := people[0], people[1]
@@ -224,7 +223,7 @@ func TestUsage(t *testing.T) {
 		err = db.Get(&jason, db.Rebind("SELECT * FROM person WHERE first_name=?"), "Jason")
 
 		if err != nil {
-			t.Errorf("Expecting no error, got %v\n", err)
+			t.Fatal(err)
 		}
 		if jason.FirstName != "Jason" {
 			t.Errorf("Expecting to get back Jason, but got %v\n", jason.FirstName)
@@ -356,13 +355,45 @@ func TestUsage(t *testing.T) {
 			if ben.LastName != "Smith" {
 				t.Fatal("Expected first name of `Smith`, got " + ben.LastName)
 			}
-
 		}
 		// ensure that Get does not panic on emppty result set
 		person := &Person{}
 		err = db.Get(person, "SELECT * FROM person WHERE first_name=$1", "does-not-exist")
 		if err == nil {
 			t.Fatal("Should have got an error for Get on non-existant row.")
+		}
+
+		// lets test prepared statements some more
+
+		stmt, err = db.Preparex(db.Rebind("SELECT * FROM person WHERE first_name=?"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows, err = stmt.Queryx("Ben")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			err = rows.StructScan(ben)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ben.FirstName != "Ben" {
+				t.Fatal("Expected first name of `Ben`, got " + ben.FirstName)
+			}
+			if ben.LastName != "Smith" {
+				t.Fatal("Expected first name of `Smith`, got " + ben.LastName)
+			}
+		}
+
+		john = Person{}
+		stmt, err = db.Preparex(db.Rebind("SELECT * FROM person WHERE first_name=?"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = stmt.Get(&john, "John")
+		if err != nil {
+			t.Fatal(err)
 		}
 
 	}

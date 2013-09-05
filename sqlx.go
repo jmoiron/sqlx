@@ -383,7 +383,8 @@ func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
 // a wrapper is used to satisfy the Queryer & Execer interfaces.
 type Stmt struct{ sql.Stmt }
 
-// this unexposed wrapper lets you use a Stmt as a Queryer & Execer
+// this unexposed wrapper lets you use a Stmt as a Queryer & Execer by
+// implementing those interfaces but ignoring the `query` argument.
 type qStmt struct{ Stmt }
 
 func (q *qStmt) Query(query string, args ...interface{}) (*sql.Rows, error) {
@@ -426,8 +427,8 @@ func (s *Stmt) Selectf(dest interface{}, args ...interface{}) {
 }
 
 // Get using the prepared statement.
-func (s *Stmt) Get(dest interface{}, query string, args ...interface{}) error {
-	return Get(&qStmt{*s}, dest, query, args...)
+func (s *Stmt) Get(dest interface{}, args ...interface{}) error {
+	return Get(&qStmt{*s}, dest, "", args...)
 }
 
 // Execv (verbose) runs Execv using this statement.  Note that the query
@@ -458,6 +459,18 @@ func (s *Stmt) Execp(args ...interface{}) sql.Result {
 // output will be blank, as Stmt does not expose its query.
 func (s *Stmt) MustExec(args ...interface{}) sql.Result {
 	return MustExec(&qStmt{*s}, "", args...)
+}
+
+// QueryRowx using this statement.
+func (s *Stmt) QueryRowx(args ...interface{}) *Row {
+	qs := &qStmt{*s}
+	return qs.QueryRowx("", args...)
+}
+
+// Queryx using this statement.
+func (s *Stmt) Queryx(args ...interface{}) (*Rows, error) {
+	qs := &qStmt{*s}
+	return qs.Queryx("", args...)
 }
 
 // Like sql.Rows.Scan, but scans a single Row into a single Struct.  Use this
@@ -548,13 +561,6 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	return StructScan(rows, dest)
 }
 
-// QueryRow using the provided Queryer, and StructScan the resulting row into dest,
-// which must be a pointer to a struct.  If there was no row, Get will return sql.ErrNoRows.
-func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
-	r := q.QueryRowx(query, args...)
-	return r.StructScan(dest)
-}
-
 // Selectv (verbose) will Select using a Queryer and use log.Println to print
 //the query and the error in the event of an error.
 func Selectv(q Queryer, dest interface{}, query string, args ...interface{}) error {
@@ -572,6 +578,13 @@ func Selectf(q Queryer, dest interface{}, query string, args ...interface{}) {
 	if err != nil {
 		log.Fatal(query, err)
 	}
+}
+
+// QueryRow using the provided Queryer, and StructScan the resulting row into dest,
+// which must be a pointer to a struct.  If there was no row, Get will return sql.ErrNoRows.
+func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
+	r := q.QueryRowx(query, args...)
+	return r.StructScan(dest)
 }
 
 // LoadFile exec's every statement in a file (as a single call to Exec).

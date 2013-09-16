@@ -281,13 +281,13 @@ func (tx *Tx) BindStruct(query string, arg interface{}) (string, []interface{}, 
 }
 
 // NamedQuery within a transaction.
-func (tx *Tx) NamedQuery(query string, argmap map[string]interface{}) (*Rows, error) {
-	return NamedQuery(tx, query, argmap)
+func (tx *Tx) NamedQuery(query string, arg interface{}) (*Rows, error) {
+	return NamedQuery(tx, query, arg)
 }
 
 // Exec a named query within a transaction.
-func (tx *Tx) NamedExec(query string, argmap map[string]interface{}) (sql.Result, error) {
-	return NamedExec(tx, query, argmap)
+func (tx *Tx) NamedExec(query string, arg interface{}) (sql.Result, error) {
+	return NamedExec(tx, query, arg)
 }
 
 // LoadFile within a transaction.

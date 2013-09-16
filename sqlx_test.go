@@ -105,7 +105,7 @@ func SqliteConnect() {
 func MysqlConnect() {
 
 	if len(os.Getenv("SQLX_NOMYSQL")) > 0 {
-		TestSqlite = false
+		TestMysql = false
 		fmt.Printf("Skipping mysql tests, SQLX_NOMYSQL set.\n")
 		return
 	}

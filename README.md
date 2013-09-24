@@ -132,8 +132,9 @@ func main() {
     rows, err := db.NamedQueryMap(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Bin"})
 
     // Named queries can also use structs.  Their bind names follow the same rules
-    // as the name -> db mapping, so struct fields are lowercased and the `db` tag
-    // is taken into consideration.
+    // as the name -> db mapping, so by default struct fields are lowercased and the `db` tag
+    // is taken into consideration. This mapping can be customized by plugging in your own function into
+    // sqlx.StructToDatabaseFieldNameMapper
     rows, err := db.NamedQuery(`SELECT * FROM person WHERE first_name=:first_name`, jason)
 }
 ```

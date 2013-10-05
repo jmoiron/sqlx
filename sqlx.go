@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+var NameMapper = strings.ToLower
+
 // A wrapper around sql.Rows which caches costly reflect operations
 // during a looped StructScan
 type Rows struct {
@@ -716,7 +718,7 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 
 	for i := 0; i < t.NumField(); i++ {
 		f = t.Field(i)
-		name = strings.ToLower(f.Name)
+		name = NameMapper(f.Name)
 		if tag := f.Tag.Get("db"); tag != "" {
 			name = tag
 		}

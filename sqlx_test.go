@@ -143,11 +143,21 @@ CREATE TABLE place (
 	country text,
 	city text NULL,
 	telcode integer
-)`
+);
+
+CREATE TABLE capplace (
+	"COUNTRY" text,
+	"CITY" text NULL,
+	"TELCODE" integer
+);
+`
+
+var mysqlSchema = strings.Replace(schema, `"`, "`", -1)
 
 var drop = `
 drop table person;
 drop table place;
+drop table capplace;
 `
 
 type Person struct {
@@ -162,6 +172,10 @@ type Place struct {
 	TelCode int
 }
 
+// Note that because of field map caching, we need a new type here
+// if we've used Place already soemwhere in sqlx
+type CPlace Place
+
 func MultiExec(e Execer, query string) {
 	stmts := strings.Split(query, ";\n")
 	if len(strings.Trim(stmts[len(stmts)-1], " \n\t\r")) == 0 {
@@ -173,7 +187,7 @@ func MultiExec(e Execer, query string) {
 }
 
 func TestUsage(t *testing.T) {
-	RunTest := func(db *DB, t *testing.T, dbtype string) {
+	RunTest := func(db *DB, t *testing.T) {
 		var err error
 
 		defer func(dbtype string) {
@@ -182,13 +196,16 @@ func TestUsage(t *testing.T) {
 			} else {
 				db.Execf(drop)
 			}
-		}(dbtype)
+		}(db.DriverName())
 
 		// pq will execute multi-query statements, but sqlite3 won't!
-		if dbtype != "postgres" {
-			MultiExec(db, schema)
-		} else {
+		switch db.DriverName() {
+		case "postgres":
 			db.Execf(schema)
+		case "mysql":
+			MultiExec(db, mysqlSchema)
+		default:
+			MultiExec(db, schema)
 		}
 		tx := db.MustBegin()
 		tx.Execl(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "Jason", "Moiron", "jmoiron@jmoiron.net")
@@ -196,6 +213,11 @@ func TestUsage(t *testing.T) {
 		tx.Execl(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
 		tx.Execl(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
 		tx.Execl(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
+		if db.DriverName() == "mysql" {
+			tx.Execl(tx.Rebind("INSERT INTO capplace (`COUNTRY`, `TELCODE`) VALUES (?, ?)"), "Sarf Efrica", "27")
+		} else {
+			tx.Execl(tx.Rebind("INSERT INTO capplace (\"COUNTRY\", \"TELCODE\") VALUES (?, ?)"), "Sarf Efrica", "27")
+		}
 		tx.Commit()
 
 		people := []Person{}
@@ -389,23 +411,32 @@ func TestUsage(t *testing.T) {
 		john = Person{}
 		stmt, err = db.Preparex(db.Rebind("SELECT * FROM person WHERE first_name=?"))
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 		err = stmt.Get(&john, "John")
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 
+		// test name mapping
+		NameMapper = strings.ToUpper
+		rsa := CPlace{}
+		err = db.Get(&rsa, "SELECT * FROM capplace;")
+		if err != nil {
+			fmt.Println(db.DriverName())
+			t.Error(err)
+		}
+		NameMapper = strings.ToLower
 	}
 
 	if TestPostgres {
-		RunTest(pgdb, t, "postgres")
+		RunTest(pgdb, t)
 	}
 	if TestSqlite {
-		RunTest(sldb, t, "sqlite")
+		RunTest(sldb, t)
 	}
 	if TestMysql {
-		RunTest(mysqldb, t, "mysql")
+		RunTest(mysqldb, t)
 	}
 }
 

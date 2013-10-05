@@ -11,6 +11,10 @@ import (
 	"strings"
 )
 
+// NameMapper is used to map column names to struct field names.  By default,
+// it uses strings.ToLower to lowercase struct field names.  It can be set
+// to whatever you want, but it is encouraged to be set before sqlx is used
+// as field-to-name mappings are cached after first use on a type.
 var NameMapper = strings.ToLower
 
 // A wrapper around sql.Rows which caches costly reflect operations

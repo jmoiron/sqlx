@@ -479,6 +479,41 @@ func (s *Stmt) Queryx(args ...interface{}) (*Rows, error) {
 	return qs.Queryx("", args...)
 }
 
+// Like sql.Rows.Scan, but scans a single Row into a map[string]interface{}.
+// Use this to get results for SQL that might not be under your control
+// (for instance, if you're building an interface for an SQL server that
+// executes SQL from input).  Please do not use this as a primary interface!
+// This will modify the map sent to it in place, so do not reuse the same one
+// on different queries or you may end up with something odd!
+//
+// The resultant map values will be string representations of the various
+// SQL datatypes for existing values and a nil for null values.
+func (r *Rows) MapScan(dest map[string]interface{}) error {
+	// ignore r.started, since we needn't use reflect for anything.
+	columns, err := r.Columns()
+	if err != nil {
+		return err
+	}
+
+	values := make([]interface{}, len(columns))
+	for i, _ := range values {
+		values[i] = &sql.NullString{}
+	}
+
+	r.Scan(values...)
+
+	for i, column := range columns {
+		ns := *(values[i].(*sql.NullString))
+		if ns.Valid {
+			dest[column] = ns.String
+		} else {
+			dest[column] = nil
+		}
+	}
+
+	return nil
+}
+
 // Like sql.Rows.Scan, but scans a single Row into a single Struct.  Use this
 // and iterate over Rows manually when the memory load of Select() might be
 // prohibitive.  *Rows.StructScan caches the reflect work of matching up

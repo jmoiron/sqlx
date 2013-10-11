@@ -322,6 +322,18 @@ func TestUsage(t *testing.T) {
 			}
 		}
 
+		rows, err = db.Queryx("SELECT * FROM place")
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := map[string]interface{}{}
+		for rows.Next() {
+			err = rows.MapScan(m)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
 		// test advanced querying
 		_, err = db.NamedExecMap("INSERT INTO person (first_name, last_name, email) VALUES (:first, :last, :email)", map[string]interface{}{
 			"first": "Bin",

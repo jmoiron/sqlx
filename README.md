@@ -19,6 +19,21 @@ Major additional concepts are:
 
     go get github.com/jmoiron/sqlx
 
+## issues
+
+It's unclear exactly how embedded structs *should* work or if there are indeed
+ semantics that are obvious enough to make them useful.
+
+SQLite can return duplicate header rows on queries like:
+
+```sql
+SELECT a.id, a.name, b.id, b.name FROM foos AS a JOIN foos AS b ON a.parent = b.id;
+```
+
+Making a struct destination ambiguous.  Use `AS` to name your rows, `rows.Scan`
+to scan them manually, or `SliceScan` to get a slice of results.
+
+
 ## usage
 
 Read the [API documentation on godoc](http://godoc.org/github.com/jmoiron/sqlx) 

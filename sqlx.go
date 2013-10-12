@@ -34,6 +34,12 @@ type Row struct {
 	err  error
 }
 
+// An interface for something which can Scan and return a list of columns (Row, Rows)
+type ColScanner interface {
+	Columns() ([]string, error)
+	Scan(dest ...interface{}) error
+}
+
 // An interface for something which can Execute sql queries (Tx, DB, Stmt)
 type Queryer interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
@@ -479,39 +485,14 @@ func (s *Stmt) Queryx(args ...interface{}) (*Rows, error) {
 	return qs.Queryx("", args...)
 }
 
-// Like sql.Rows.Scan, but scans a single Row into a map[string]interface{}.
-// Use this to get results for SQL that might not be under your control
-// (for instance, if you're building an interface for an SQL server that
-// executes SQL from input).  Please do not use this as a primary interface!
-// This will modify the map sent to it in place, so do not reuse the same one
-// on different queries or you may end up with something odd!
-//
-// The resultant map values will be string representations of the various
-// SQL datatypes for existing values and a nil for null values.
+// SliceScan using this Rows.
+func (r *Rows) SliceScan() ([]interface{}, error) {
+	return SliceScan(r)
+}
+
+// MapScan using this Rows.
 func (r *Rows) MapScan(dest map[string]interface{}) error {
-	// ignore r.started, since we needn't use reflect for anything.
-	columns, err := r.Columns()
-	if err != nil {
-		return err
-	}
-
-	values := make([]interface{}, len(columns))
-	for i, _ := range values {
-		values[i] = &sql.NullString{}
-	}
-
-	r.Scan(values...)
-
-	for i, column := range columns {
-		ns := *(values[i].(*sql.NullString))
-		if ns.Valid {
-			dest[column] = ns.String
-		} else {
-			dest[column] = nil
-		}
-	}
-
-	return nil
+	return MapScan(r, dest)
 }
 
 // Like sql.Rows.Scan, but scans a single Row into a single Struct.  Use this
@@ -794,6 +775,16 @@ func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 	}
 }
 
+// SliceScan using this Rows.
+func (r *Row) SliceScan() ([]interface{}, error) {
+	return SliceScan(r)
+}
+
+// MapScan using this Rows.
+func (r *Row) MapScan(dest map[string]interface{}) error {
+	return MapScan(r, dest)
+}
+
 // StructScan's a single Row (result of QueryRowx) into dest
 func (r *Row) StructScan(dest interface{}) error {
 	var v reflect.Value
@@ -828,6 +819,72 @@ func (r *Row) StructScan(dest interface{}) error {
 	setValues(fields, reflect.Indirect(v), values)
 	// scan into the struct field pointers and append to our results
 	return r.Scan(values...)
+}
+
+// Scan a row, returning a []interface{} with values similar to MapScan.
+// This function is primarly intended for use where the number of columns
+// is not known.  Because you can pass an []interface{} directly to Scan,
+// it's recommended that you do that as it will not have to allocate new
+// slices per row.
+func SliceScan(r ColScanner) ([]interface{}, error) {
+	// ignore r.started, since we needn't use reflect for anything.
+	columns, err := r.Columns()
+	if err != nil {
+		return []interface{}{}, err
+	}
+
+	values := make([]interface{}, len(columns))
+	for i, _ := range values {
+		values[i] = &sql.NullString{}
+	}
+
+	r.Scan(values...)
+
+	for i, _ := range columns {
+		ns := *(values[i].(*sql.NullString))
+		if ns.Valid {
+			values[i] = ns.String
+		} else {
+			values[i] = nil
+		}
+	}
+
+	return values, nil
+}
+
+// Like sql.Rows.Scan, but scans a single Row into a map[string]interface{}.
+// Use this to get results for SQL that might not be under your control
+// (for instance, if you're building an interface for an SQL server that
+// executes SQL from input).  Please do not use this as a primary interface!
+// This will modify the map sent to it in place, so do not reuse the same one
+// on different queries or you may end up with something odd!
+//
+// The resultant map values will be string representations of the various
+// SQL datatypes for existing values and a nil for null values.
+func MapScan(r ColScanner, dest map[string]interface{}) error {
+	// ignore r.started, since we needn't use reflect for anything.
+	columns, err := r.Columns()
+	if err != nil {
+		return err
+	}
+
+	values := make([]interface{}, len(columns))
+	for i, _ := range values {
+		values[i] = &sql.NullString{}
+	}
+
+	r.Scan(values...)
+
+	for i, column := range columns {
+		ns := *(values[i].(*sql.NullString))
+		if ns.Valid {
+			dest[column] = ns.String
+		} else {
+			dest[column] = nil
+		}
+	}
+
+	return nil
 }
 
 // Fully scan a sql.Rows result into the dest slice.  StructScan destinations MUST

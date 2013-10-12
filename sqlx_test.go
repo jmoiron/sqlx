@@ -332,6 +332,24 @@ func TestUsage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			_, ok := m["country"]
+			if !ok {
+				t.Errorf("Expected key `country` in map but could not find it (%#v)\n", m)
+			}
+		}
+
+		rows, err = db.Queryx("SELECT * FROM place")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			s, err := rows.SliceScan()
+			if err != nil {
+				t.Error(err)
+			}
+			if len(s) != 3 {
+				t.Errorf("Expected 3 columns in result, got %d\n", len(s))
+			}
 		}
 
 		// test advanced querying

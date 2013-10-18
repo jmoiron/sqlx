@@ -536,6 +536,12 @@ func TestBindStruct(t *testing.T) {
 		First string
 		Last  string
 	}
+
+	type tt2 struct {
+		Field1 string `db:"field_1"`
+		Field2 string `db:"field_2"`
+	}
+
 	am := tt{"Jason Moiron", 30, "Jason", "Moiron"}
 
 	bq, args, _ := BindStruct(QUESTION, q1, am)
@@ -558,6 +564,20 @@ func TestBindStruct(t *testing.T) {
 
 	if args[3].(string) != "Moiron" {
 		t.Errorf("Expected Moiron, got %v\n", args[3])
+	}
+
+	am2 := tt2{"Hello", "World"}
+	bq, args, _ = BindStruct(QUESTION, "INSERT INTO foo (a, b) VALUES (:field_2, :field_1)", am2)
+	expect = `INSERT INTO foo (a, b) VALUES (?, ?)`
+	if bq != expect {
+		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
+	}
+
+	if args[0].(string) != "World" {
+		t.Errorf("Expected 'World', got %s\n", args[0].(string))
+	}
+	if args[1].(string) != "Hello" {
+		t.Errorf("Expected 'Hello', got %s\n", args[1].(string))
 	}
 
 }

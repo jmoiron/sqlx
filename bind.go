@@ -82,6 +82,12 @@ func BindStruct(bindType int, query string, arg interface{}) (string, []interfac
 	return BindMap(bindType, query, argmap)
 }
 
+// Allow digits and letters in bind params;  additionally runes are
+// checked against underscores, meaning that bind params can have be
+// alphanumeric with underscores.  Mind the difference between unicode
+// digits and numbers, where '5' is a digit but '五' is not.
+var allowedBindRunes = []*unicode.RangeTable{unicode.Letter, unicode.Digit}
+
 // Bind a named parameter query with a map of arguments.
 func BindMap(bindType int, query string, args map[string]interface{}) (string, []interface{}, error) {
 	arglist := make([]interface{}, 0, 5)
@@ -108,14 +114,14 @@ func BindMap(bindType int, query string, args map[string]interface{}) (string, [
 			}
 			inName = true
 			name = []byte{}
-		} else if inName && (unicode.IsLetter(rune(b)) || b == '_') && i != last {
+		} else if inName && (unicode.IsOneOf(allowedBindRunes, rune(b)) || b == '_') && i != last {
 			// append the rune to the name if we are in a name and not on the last rune
 			name = append(name, b)
 		} else if inName {
 			inName = false
 			// if this is the final rune of the string and it is part of the name, then
 			// make sure to add it to the name
-			if i == last && unicode.IsLetter(rune(b)) {
+			if i == last && unicode.IsOneOf(allowedBindRunes, rune(b)) {
 				name = append(name, b)
 			}
 			sname = string(name)
@@ -141,7 +147,7 @@ func BindMap(bindType int, query string, args map[string]interface{}) (string, [
 			// is last but is not a letter
 			if i != last {
 				rebound = append(rebound, b)
-			} else if !unicode.IsLetter(rune(b)) {
+			} else if !unicode.IsOneOf(allowedBindRunes, rune(b)) {
 				rebound = append(rebound, b)
 			}
 		} else {

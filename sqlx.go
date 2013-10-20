@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -743,12 +744,16 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 		queue = queue[1:]
 		for j := 0; j < ty.NumField(); j++ {
 			f = ty.Field(j)
+			// skip structs which implement `scanner`
 			if f.Type.Kind() == reflect.Struct && !reflect.PtrTo(f.Type).Implements(scanner) {
 				queue = append(queue, f.Type)
 			} else {
 				name = NameMapper(f.Name)
 				if tag := f.Tag.Get("db"); tag != "" {
 					name = tag
+				}
+				if _, ok := fm[name]; ok {
+					return fm, fmt.Errorf("Field %s shadows another field already embedded in another struct.", name)
 				}
 				fm[name] = i
 				i++
@@ -768,7 +773,6 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 		// find that name in the struct
 		num, ok = fm[name]
 		if !ok {
-			fmt.Println(fm)
 			return fields, errors.New("Could not find name " + name + " in interface")
 		}
 		fields[i] = num

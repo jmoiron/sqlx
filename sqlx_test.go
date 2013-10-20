@@ -172,9 +172,32 @@ type Place struct {
 	City    sql.NullString
 	TelCode int
 }
+
 type PersonPlace struct {
 	Person
 	Place
+}
+
+type NonEmbedded struct {
+	Person Person
+	Place  Place
+}
+
+type EmbedConflict struct {
+	FirstName string `db:"first_name"`
+	Person
+}
+
+type Loop1 struct {
+	Person
+}
+
+type Loop2 struct {
+	Loop1
+}
+
+type Loop3 struct {
+	Loop2
 }
 
 // Note that because of field map caching, we need a new type here
@@ -234,6 +257,51 @@ func TestUsage(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		for _, pp := range peopleAndPlaces {
+			if len(pp.Person.FirstName) == 0 {
+				t.Errorf("Expected non zero lengthed first name.")
+			}
+			if len(pp.Place.Country) == 0 {
+				t.Errorf("Expected non zero lengthed country.")
+			}
+		}
+
+		// test "non embedded" struct namespace collapsing..
+		nes := []NonEmbedded{}
+		err = db.Select(&nes, `select person.*, place.* FROM person natural join place`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, ne := range nes {
+			if len(ne.Person.FirstName) == 0 {
+				t.Errorf("Expected non zero lengthed first name.")
+			}
+			if len(ne.Place.Country) == 0 {
+				t.Errorf("Expected non zero lengthed country.")
+			}
+		}
+
+		// test "deep nesting"
+		l3s := []Loop3{}
+		err = db.Select(&l3s, `select * from person`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, l3 := range l3s {
+			if len(l3.Loop2.Loop1.Person.FirstName) == 0 {
+				t.Errorf("Expected non zero lengthed first name.")
+			}
+		}
+
+		// test "embed conflicts"
+		ec := []EmbedConflict{}
+		err = db.Select(&ec, `select * from person`)
+		// I'm torn between erroring here or having some kind of working behavior
+		// in order to allow for more flexibility in destination structs
+		if err == nil {
+			t.Errorf("Not sure what should happen here?")
+		}
+
 		people := []Person{}
 
 		err = db.Select(&people, "SELECT * FROM person ORDER BY first_name ASC")

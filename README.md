@@ -9,11 +9,14 @@ are a superset on the standard ones.
 
 Major additional concepts are:
 
-* Named parameter support (unmarshal struct fields and maps)
-* `StructScan` (marshal rows to structs)
-* `Get` and `Select` for storing one more more results directly into a struct or slice
+* Marshal rows into structs (with embedded struct support), maps, and slices
+* Named parameter support
+* `Get` and `Select` to go quickly from query to struct/slice
 * Common error handling mnemonics (eg. `Execf`, `Execp` (`MustExec`), and `Execl`)
 * `LoadFile` for executing statements from a file
+
+Read the usage below to see how sqlx might help you, or check out the [API
+documentation on godoc](http://godoc.org/github.com/jmoiron/sqlx).
 
 ## install
 
@@ -21,27 +24,23 @@ Major additional concepts are:
 
 ## issues
 
-It's unclear exactly how embedded structs *should* work or if there are indeed
- semantics that are obvious enough to make them useful.
-
-SQLite can return duplicate header rows on queries like:
+Row headers can be ambiguous (`SELECT 1 AS a, 2 AS a`), and the result of
+`Columns()` can have duplicate names on queries like:
 
 ```sql
 SELECT a.id, a.name, b.id, b.name FROM foos AS a JOIN foos AS b ON a.parent = b.id;
 ```
 
-Making a struct destination ambiguous.  Use `AS` to name your rows, `rows.Scan`
-to scan them manually, or `SliceScan` to get a slice of results.
+making a struct destination ambiguous.  Use `AS` to give rows distinct names, 
+`rows.Scan` to scan them manually, or `SliceScan` to get a slice of results.
 
 
 ## usage
 
-Read the [API documentation on godoc](http://godoc.org/github.com/jmoiron/sqlx) 
-for detailed API docs, and check 
+Below is an example which shows some common use cases for sqlx.  Check 
 [sqlx_test.go](https://github.com/jmoiron/sqlx/blob/master/sqlx_test.go) for more
 usage.  
 
-Below is an example which shows some common use cases for sqlx.
 
 ```go
 package main

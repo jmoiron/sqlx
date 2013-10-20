@@ -735,14 +735,25 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 
 	var f reflect.StructField
 	var name string
-
-	for i := 0; i < t.NumField(); i++ {
-		f = t.Field(i)
-		name = NameMapper(f.Name)
-		if tag := f.Tag.Get("db"); tag != "" {
-			name = tag
+	scannerVal := new(sql.Scanner)
+	scanner := reflect.TypeOf(scannerVal).Elem()
+	queue := []reflect.Type{t}
+	for i := 0; len(queue) != 0; {
+		ty := queue[0]
+		queue = queue[1:]
+		for j := 0; j < ty.NumField(); j++ {
+			f = ty.Field(j)
+			if f.Type.Kind() == reflect.Struct && !reflect.PtrTo(f.Type).Implements(scanner) {
+				queue = append(queue, f.Type)
+			} else {
+				name = NameMapper(f.Name)
+				if tag := f.Tag.Get("db"); tag != "" {
+					name = tag
+				}
+				fm[name] = i
+				i++
+			}
 		}
-		fm[name] = i
 	}
 	fieldmapCache[t] = fm
 	return fm, nil
@@ -770,8 +781,30 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 // The values interface must be initialized to the length of fields, ie
 // make([]interface{}, len(fields)).
 func setValues(fields []int, vptr reflect.Value, values []interface{}) {
+	queue := []reflect.Value{vptr}
+	fieldMap, err := getFieldmap(vptr.Type())
+	if err != nil {
+		panic(err)
+	}
+	flattenedValues := make([]interface{}, len(fieldMap))
+	// TODO: cache indexes into value and use
+	// FieldByIndex
+	for i := 0; len(queue) != 0; {
+		vptr = queue[0]
+		queue = queue[1:]
+		for j := 0; j < vptr.NumField(); j++ {
+			v := vptr.Field(j)
+			_, isScanner := v.Addr().Interface().(sql.Scanner)
+			if v.Kind() == reflect.Struct && !isScanner {
+				queue = append(queue, v)
+			} else {
+				flattenedValues[i] = v.Addr().Interface()
+				i++
+			}
+		}
+	}
 	for i, field := range fields {
-		values[i] = vptr.Field(field).Addr().Interface()
+		values[i] = flattenedValues[field]
 	}
 }
 

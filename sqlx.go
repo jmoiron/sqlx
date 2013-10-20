@@ -114,7 +114,7 @@ func (r *Row) Columns() ([]string, error) {
 	return r.rows.Columns()
 }
 
-// An wrapper around sql.DB which keeps track of the driverName upon Open,
+// A wrapper around sql.DB which keeps track of the driverName upon Open,
 // used mostly to automatically bind named queries using the right bindvars.
 type DB struct {
 	sql.DB
@@ -125,12 +125,12 @@ func NewDb(db *sql.DB, driverName string) *DB {
 	return &DB{*db, driverName}
 }
 
-// Returns the driverName passed to the Open function for this DB.
+// DriverName returns the driverName passed to the Open function for this DB.
 func (db *DB) DriverName() string {
 	return db.driverName
 }
 
-// Same as database/sql's Open, but returns an *sqlx.DB instead.
+// Open is the same as database/sql's Open, but returns an *sqlx.DB instead.
 func Open(driverName, dataSourceName string) (*DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
@@ -139,7 +139,7 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	return &DB{*db, driverName}, err
 }
 
-// Rebinds a query from QUESTION to the DB driver's bindvar type.
+// Rebind transforms a query from QUESTION to the DB driver's bindvar type.
 func (db *DB) Rebind(query string) string {
 	return Rebind(BindType(db.driverName), query)
 }

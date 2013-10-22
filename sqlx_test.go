@@ -25,6 +25,7 @@ import (
 	"os/user"
 	"strings"
 	"testing"
+    "reflect"
 )
 
 var TestPostgres = true
@@ -171,6 +172,10 @@ type Place struct {
 	City    sql.NullString
 	TelCode int
 }
+type PersonPlace struct {
+    Person
+    Place
+}
 
 // Note that because of field map caching, we need a new type here
 // if we've used Place already soemwhere in sqlx
@@ -220,6 +225,14 @@ func TestUsage(t *testing.T) {
 		}
 		tx.Commit()
 
+        peopleAndPlaces := []PersonPlace{}
+        err = db.Select(
+            &peopleAndPlaces,
+            `SELECT person.*, place.* FROM
+             person join place`)
+		if err != nil {
+			t.Fatal(err)
+		}
 		people := []Person{}
 
 		err = db.Select(&people, "SELECT * FROM person ORDER BY first_name ASC")
@@ -478,7 +491,6 @@ func TestDoNotPanicOnConnect(t *testing.T) {
 		t.Errorf("Should return error when using bogus driverName")
 	}
 }
-
 func TestRebind(t *testing.T) {
 	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
@@ -637,4 +649,23 @@ func BenchmarkRebindBuffer(b *testing.B) {
 		rebindBuff(DOLLAR, q1)
 		rebindBuff(DOLLAR, q2)
 	}
+}
+
+func TestGetFieldMap(t *testing.T) {
+    testing_table := map[reflect.Type]fieldmap {
+        reflect.TypeOf(new(Person)): {"first_name":0, "last_name":1, "email": 2},
+        reflect.TypeOf(new(Place)): {"country":0, "city": 1, "telcode": 2},
+        reflect.TypeOf(new(PersonPlace)): {
+            "first_name":0, "last_name":1, "email": 2,
+            "country":3, "city": 4, "telcode": 5},
+    }
+    for typ, expected := range testing_table {
+        fields, err := getFieldmap(typ)
+        if err != nil {
+            t.Fatal(err)
+        }
+        if ! reflect.DeepEqual(fields, expected) {
+            t.Fatalf("wtf %v %v", fields, expected)
+        }
+    }
 }

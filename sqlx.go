@@ -3,7 +3,7 @@ package sqlx
 import (
 	"database/sql"
 	"errors"
-	"fmt"
+
 	"io/ioutil"
 	"log"
 	"path/filepath"
@@ -720,6 +720,8 @@ func BaseStructType(t reflect.Type) (reflect.Type, error) {
 }
 
 // Create a fieldmap for a given type and return its fieldmap (or error)
+// The fieldmap maps names to integers which represent the position of
+// a struct field in a breadth first search of the fields.
 func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	// if we have a fieldmap cached, return it
 	t, err = BaseStructType(t)
@@ -735,14 +737,30 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 
 	var f reflect.StructField
 	var name string
-
-	for i := 0; i < t.NumField(); i++ {
-		f = t.Field(i)
-		name = NameMapper(f.Name)
-		if tag := f.Tag.Get("db"); tag != "" {
-			name = tag
+	scannerVal := new(sql.Scanner)
+	scanner := reflect.TypeOf(scannerVal).Elem()
+	queue := []reflect.Type{t}
+	for i := 0; len(queue) != 0; {
+		ty := queue[0]
+		queue = queue[1:]
+		for j := 0; j < ty.NumField(); j++ {
+			f = ty.Field(j)
+			// skip structs which implement `scanner`
+			if f.Type.Kind() == reflect.Struct && !reflect.PtrTo(f.Type).Implements(scanner) {
+				queue = append(queue, f.Type)
+			} else {
+				name = NameMapper(f.Name)
+				if tag := f.Tag.Get("db"); tag != "" {
+					name = tag
+				}
+				if _, ok := fm[name]; ok {
+					// this name is already in the map, so skip it
+					continue
+				}
+				fm[name] = i
+				i++
+			}
 		}
-		fm[name] = i
 	}
 	fieldmapCache[t] = fm
 	return fm, nil
@@ -757,7 +775,6 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 		// find that name in the struct
 		num, ok = fm[name]
 		if !ok {
-			fmt.Println(fm)
 			return fields, errors.New("Could not find name " + name + " in interface")
 		}
 		fields[i] = num
@@ -770,8 +787,37 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 // The values interface must be initialized to the length of fields, ie
 // make([]interface{}, len(fields)).
 func setValues(fields []int, vptr reflect.Value, values []interface{}) {
+	queue := []reflect.Value{vptr}
+	fieldMap, _ := getFieldmap(vptr.Type())
+	flattenedValues := make([]interface{}, len(fieldMap))
+	// TODO: cache indexes into value and use
+
+	// keep track of struct names we've encountered, so we can skip duplicates.
+	// this mirrors logic in the fieldmap construction process, which is a
+	// breadth first descent.
+	encountered := map[string]uint8{}
+
+	for i := 0; len(queue) != 0; {
+		vptr = queue[0]
+		queue = queue[1:]
+		for j := 0; j < vptr.NumField(); j++ {
+			v := vptr.Field(j)
+			vt := vptr.Type().Field(j)
+			if _, ok := encountered[vt.Name]; ok {
+				continue
+			}
+			encountered[vt.Name] = 0
+			_, isScanner := v.Addr().Interface().(sql.Scanner)
+			if v.Kind() == reflect.Struct && !isScanner {
+				queue = append(queue, v)
+			} else {
+				flattenedValues[i] = v.Addr().Interface()
+				i++
+			}
+		}
+	}
 	for i, field := range fields {
-		values[i] = vptr.Field(field).Addr().Interface()
+		values[i] = flattenedValues[field]
 	}
 }
 

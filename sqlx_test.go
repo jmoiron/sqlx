@@ -298,8 +298,8 @@ func TestUsage(t *testing.T) {
 		err = db.Select(&ec, `select * from person`)
 		// I'm torn between erroring here or having some kind of working behavior
 		// in order to allow for more flexibility in destination structs
-		if err == nil {
-			t.Errorf("Not sure what should happen here?")
+		if err != nil {
+			t.Errorf("Was not expecting an error on embed conflicts.")
 		}
 
 		people := []Person{}
@@ -342,7 +342,6 @@ func TestUsage(t *testing.T) {
 		}
 
 		places := []*Place{}
-
 		err = db.Select(&places, "SELECT telcode FROM place ORDER BY telcode ASC")
 		usa, singsing, honkers := places[0], places[1], places[2]
 

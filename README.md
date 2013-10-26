@@ -31,9 +31,9 @@ Row headers can be ambiguous (`SELECT 1 AS a, 2 AS a`), and the result of
 SELECT a.id, a.name, b.id, b.name FROM foos AS a JOIN foos AS b ON a.parent = b.id;
 ```
 
-making a struct destination ambiguous.  Use `AS` to give rows distinct names, 
-`rows.Scan` to scan them manually, or `SliceScan` to get a slice of results.
-
+making a struct or map destination ambiguous.  Use `AS` in your queries
+to give rows distinct names, `rows.Scan` to scan them manually, or 
+`SliceScan` to get a slice of results.
 
 ## usage
 
@@ -152,3 +152,14 @@ func main() {
 }
 ```
 
+## embedded structs
+
+Structs which do not implement the [sql.Scanner](http://golang.org/pkg/database/sql/#Scanner)
+interface will be inspected and their fields used as possible targets for a scan.  This includes
+embedded and non-embedded structs.
+
+Go makes '[ambiguous selectors](http://play.golang.org/p/MGRxdjLaUc)' a compile time error,
+but does not make structs with possible ambiguous selectors errors.  Sqlx will decide
+which field to use on a struct based on a breadth first search of the struct and any
+structs it contains or embeds, as specified by the order of the fields as accessible
+by `reflect`, which generally means in source-order.

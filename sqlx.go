@@ -3,7 +3,6 @@ package sqlx
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"io/ioutil"
 	"log"
@@ -721,6 +720,8 @@ func BaseStructType(t reflect.Type) (reflect.Type, error) {
 }
 
 // Create a fieldmap for a given type and return its fieldmap (or error)
+// The fieldmap maps names to integers which represent the position of
+// a struct field in a breadth first search of the fields.
 func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	// if we have a fieldmap cached, return it
 	t, err = BaseStructType(t)
@@ -753,7 +754,8 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 					name = tag
 				}
 				if _, ok := fm[name]; ok {
-					return fm, fmt.Errorf("Field %s shadows another field already embedded in another struct.", name)
+					// this name is already in the map, so skip it
+					continue
 				}
 				fm[name] = i
 				i++
@@ -786,18 +788,25 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 // make([]interface{}, len(fields)).
 func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 	queue := []reflect.Value{vptr}
-	fieldMap, err := getFieldmap(vptr.Type())
-	if err != nil {
-		panic(err)
-	}
+	fieldMap, _ := getFieldmap(vptr.Type())
 	flattenedValues := make([]interface{}, len(fieldMap))
 	// TODO: cache indexes into value and use
-	// FieldByIndex
+
+	// keep track of struct names we've encountered, so we can skip duplicates.
+	// this mirrors logic in the fieldmap construction process, which is a
+	// breadth first descent.
+	encountered := map[string]uint8{}
+
 	for i := 0; len(queue) != 0; {
 		vptr = queue[0]
 		queue = queue[1:]
 		for j := 0; j < vptr.NumField(); j++ {
 			v := vptr.Field(j)
+			vt := vptr.Type().Field(j)
+			if _, ok := encountered[vt.Name]; ok {
+				continue
+			}
+			encountered[vt.Name] = 0
 			_, isScanner := v.Addr().Interface().(sql.Scanner)
 			if v.Kind() == reflect.Struct && !isScanner {
 				queue = append(queue, v)

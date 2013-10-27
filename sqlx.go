@@ -3,6 +3,7 @@ package sqlx
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"io/ioutil"
 	"log"
@@ -605,6 +606,7 @@ func Selectf(q Queryer, dest interface{}, query string, args ...interface{}) {
 // QueryRow using the provided Queryer, and StructScan the resulting row into dest,
 // which must be a pointer to a struct.  If there was no row, Get will return sql.ErrNoRows.
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
+	fmt.Println(q)
 	r := q.QueryRowx(query, args...)
 	return r.StructScan(dest)
 }

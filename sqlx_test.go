@@ -341,6 +341,25 @@ func TestUsage(t *testing.T) {
 			t.Errorf("Expected sql.ErrNoRows, got %v\n", err)
 		}
 
+		stmt1, err := db.Preparex(db.Rebind("SELECT * FROM person WHERE first_name=?"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		jason = Person{}
+
+		/*
+			row := stmt1.QueryRow("DoesNotExist")
+			row.Scan(&jason)
+			row = stmt1.QueryRow("DoesNotExist")
+			row.Scan(&jason)
+		*/
+		err = stmt1.Get(&jason, "DoesNotExist")
+		if err == nil {
+			t.Error("Expected an error")
+		}
+		fmt.Println(err)
+		stmt1.Get(&jason, "DoesNotExist")
+
 		places := []*Place{}
 		err = db.Select(&places, "SELECT telcode FROM place ORDER BY telcode ASC")
 		usa, singsing, honkers := places[0], places[1], places[2]
@@ -362,7 +381,7 @@ func TestUsage(t *testing.T) {
 			t.Errorf("Expected an error, argument to select should be a pointer to a struct slice")
 		}
 
-		// this should be an error because
+		// this should be an error
 		pl := []Place{}
 		err = db.Select(pl, "SELECT * FROM place ORDER BY telcode ASC")
 		if err == nil {
@@ -549,6 +568,10 @@ func TestUsage(t *testing.T) {
 	if TestMysql {
 		RunTest(mysqldb, t)
 	}
+}
+
+type Product struct {
+	ProductID int
 }
 
 // tests that sqlx will not panic when the wrong driver is passed because

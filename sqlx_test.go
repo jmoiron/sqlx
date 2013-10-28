@@ -200,6 +200,14 @@ type Loop3 struct {
 	Loop2
 }
 
+type SliceMember struct {
+	Country   string
+	City      sql.NullString
+	TelCode   int
+	People    []Person `db:"-"`
+	Addresses []Place  `db:"-"`
+}
+
 // Note that because of field map caching, we need a new type here
 // if we've used Place already soemwhere in sqlx
 type CPlace Place
@@ -300,6 +308,12 @@ func TestUsage(t *testing.T) {
 		// in order to allow for more flexibility in destination structs
 		if err != nil {
 			t.Errorf("Was not expecting an error on embed conflicts.")
+		}
+
+		slicemembers := []SliceMember{}
+		err = db.Select(&slicemembers, "SELECT * FROM place ORDER BY telcode ASC")
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		people := []Person{}

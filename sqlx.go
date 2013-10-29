@@ -759,6 +759,9 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 					// this name is already in the map, so skip it
 					continue
 				}
+				if name == "-" {
+					continue
+				}
 				fm[name] = i
 				i++
 			}
@@ -806,6 +809,9 @@ func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 			v := vptr.Field(j)
 			vt := vptr.Type().Field(j)
 			if _, ok := encountered[vt.Name]; ok {
+				continue
+			}
+			if tag := vt.Tag.Get("db"); tag == "-" {
 				continue
 			}
 			encountered[vt.Name] = 0

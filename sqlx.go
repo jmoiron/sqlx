@@ -3,7 +3,6 @@ package sqlx
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"io/ioutil"
 	"log"
@@ -31,8 +30,8 @@ type Rows struct {
 // A reimplementation of sql.Row in order to gain access to the underlying
 // sql.Rows.Columns() data, necessary for StructScan.
 type Row struct {
-	rows sql.Rows
 	err  error
+	rows *sql.Rows
 }
 
 // An interface for something which can Scan and return a list of columns (Row, Rows)
@@ -230,11 +229,8 @@ func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 
 // Same as QueryRow, but returns an *sqlx.Row instead of *sql.Row.
 func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
-	if r, err := db.DB.Query(query, args...); err != nil {
-		return &Row{err: err}
-	} else {
-		return &Row{rows: *r, err: err}
-	}
+	rows, err := db.DB.Query(query, args...)
+	return &Row{rows: rows, err: err}
 }
 
 // Execv (verbose) runs Execv using this database.
@@ -324,11 +320,8 @@ func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
 
 // QueryRow within a transaction, returning *sqlx.Row instead of *sql.Row.
 func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
-	if r, err := tx.Tx.Query(query, args...); err != nil {
-		return &Row{err: err}
-	} else {
-		return &Row{rows: *r, err: err}
-	}
+	rows, err := tx.Tx.Query(query, args...)
+	return &Row{rows: rows, err: err}
 }
 
 // Get within a transaction.
@@ -379,22 +372,25 @@ func (tx *Tx) Preparex(query string) (*Stmt, error) {
 // Returns a version of the prepared statement which runs within a transaction.  Provided
 // stmt can be either *sql.Stmt or *sqlx.Stmt, and the return value is always *sqlx.Stmt.
 func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
+	// TODO: test with more scrutiny what happens when pre-prepared statements are
+	// transactionized, as there are problems with copying these as the original
+	// driver's internal info might not make it across
 	var st sql.Stmt
 	var s *sql.Stmt
 	switch stmt.(type) {
 	case sql.Stmt:
 		st = stmt.(sql.Stmt)
+		s = &st
 	case Stmt:
-		st = stmt.(Stmt).Stmt
+		s = stmt.(Stmt).Stmt
 	}
-	s = tx.Stmt(&st)
-	return &Stmt{*s}
+	return &Stmt{s}
 }
 
 // An sqlx wrapper around database/sql's Stmt with extra functionality
 // Although a Stmt's interface differs from Tx and DB's, internally,
 // a wrapper is used to satisfy the Queryer & Execer interfaces.
-type Stmt struct{ sql.Stmt }
+type Stmt struct{ *sql.Stmt }
 
 // this unexposed wrapper lets you use a Stmt as a Queryer & Execer by
 // implementing those interfaces but ignoring the `query` argument.
@@ -413,11 +409,8 @@ func (q *qStmt) Queryx(query string, args ...interface{}) (*Rows, error) {
 }
 
 func (q *qStmt) QueryRowx(query string, args ...interface{}) *Row {
-	if r, err := q.Stmt.Query(args...); err != nil {
-		return &Row{err: err}
-	} else {
-		return &Row{rows: *r, err: err}
-	}
+	rows, err := q.Stmt.Query(args...)
+	return &Row{rows: rows, err: err}
 }
 
 func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
@@ -568,7 +561,7 @@ func Preparex(p Preparer, query string) (*Stmt, error) {
 	if s, err := p.Prepare(query); err != nil {
 		return nil, err
 	} else {
-		return &Stmt{*s}, err
+		return &Stmt{s}, err
 	}
 }
 
@@ -606,7 +599,6 @@ func Selectf(q Queryer, dest interface{}, query string, args ...interface{}) {
 // QueryRow using the provided Queryer, and StructScan the resulting row into dest,
 // which must be a pointer to a struct.  If there was no row, Get will return sql.ErrNoRows.
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
-	fmt.Println(q)
 	r := q.QueryRowx(query, args...)
 	return r.StructScan(dest)
 }

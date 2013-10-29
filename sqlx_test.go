@@ -355,24 +355,24 @@ func TestUsage(t *testing.T) {
 			t.Errorf("Expected sql.ErrNoRows, got %v\n", err)
 		}
 
+		// The following tests check statement reuse, which was actually a problem
+		// due to copying being done when creating Stmt's which was eventually removed
 		stmt1, err := db.Preparex(db.Rebind("SELECT * FROM person WHERE first_name=?"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		jason = Person{}
 
-		/*
-			row := stmt1.QueryRow("DoesNotExist")
-			row.Scan(&jason)
-			row = stmt1.QueryRow("DoesNotExist")
-			row.Scan(&jason)
-		*/
-		err = stmt1.Get(&jason, "DoesNotExist")
+		row := stmt1.QueryRowx("DoesNotExist")
+		row.Scan(&jason)
+		row = stmt1.QueryRowx("DoesNotExist")
+		row.Scan(&jason)
+
+		err = stmt1.Get(&jason, "DoesNotExist User")
 		if err == nil {
 			t.Error("Expected an error")
 		}
-		fmt.Println(err)
-		stmt1.Get(&jason, "DoesNotExist")
+		err = stmt1.Get(&jason, "DoesNotExist User 2")
 
 		places := []*Place{}
 		err = db.Select(&places, "SELECT telcode FROM place ORDER BY telcode ASC")

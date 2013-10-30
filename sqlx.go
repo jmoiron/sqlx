@@ -100,6 +100,9 @@ func (r *Row) Scan(dest ...interface{}) error {
 
 	defer r.rows.Close()
 	if !r.rows.Next() {
+		if r.rows.Err() != nil {
+			return r.rows.Err()
+		}
 		return sql.ErrNoRows
 	}
 	return r.rows.Scan(dest...)

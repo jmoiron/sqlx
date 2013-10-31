@@ -374,6 +374,23 @@ func TestUsage(t *testing.T) {
 		}
 		err = stmt1.Get(&jason, "DoesNotExist User 2")
 
+		stmt2, err := db.Preparex(db.Rebind("SELECT * FROM person WHERE first_name=?"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		jason = Person{}
+		tx, err = db.Beginx()
+		if err != nil {
+			t.Fatal(err)
+		}
+		tstmt2 := tx.Stmtx(stmt2)
+		row2 := tstmt2.QueryRowx("Jason")
+		err = row2.StructScan(&jason)
+		if err != nil {
+			t.Error(err)
+		}
+		tx.Commit()
+
 		places := []*Place{}
 		err = db.Select(&places, "SELECT telcode FROM place ORDER BY telcode ASC")
 		usa, singsing, honkers := places[0], places[1], places[2]

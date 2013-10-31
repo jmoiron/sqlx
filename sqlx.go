@@ -375,9 +375,6 @@ func (tx *Tx) Preparex(query string) (*Stmt, error) {
 // Returns a version of the prepared statement which runs within a transaction.  Provided
 // stmt can be either *sql.Stmt or *sqlx.Stmt, and the return value is always *sqlx.Stmt.
 func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
-	// TODO: test with more scrutiny what happens when pre-prepared statements are
-	// transactionized, as there are problems with copying these as the original
-	// driver's internal info might not make it across
 	var st sql.Stmt
 	var s *sql.Stmt
 	switch stmt.(type) {
@@ -386,8 +383,12 @@ func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
 		s = &st
 	case Stmt:
 		s = stmt.(Stmt).Stmt
+	case *Stmt:
+		s = stmt.(*Stmt).Stmt
+	case *sql.Stmt:
+		s = stmt.(*sql.Stmt)
 	}
-	return &Stmt{s}
+	return &Stmt{tx.Stmt(s)}
 }
 
 // An sqlx wrapper around database/sql's Stmt with extra functionality

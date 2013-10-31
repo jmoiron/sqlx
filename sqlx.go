@@ -38,6 +38,7 @@ type Row struct {
 type ColScanner interface {
 	Columns() ([]string, error)
 	Scan(dest ...interface{}) error
+	Err() error
 }
 
 // An interface for something which can Execute sql queries (Tx, DB, Stmt)
@@ -101,7 +102,8 @@ func (r *Row) Scan(dest ...interface{}) error {
 	defer r.rows.Close()
 	if !r.rows.Next() {
 		if r.rows.Err() != nil {
-			return r.rows.Err()
+			r.err = r.rows.Err()
+			return r.err
 		}
 		return sql.ErrNoRows
 	}
@@ -115,6 +117,10 @@ func (r *Row) Columns() ([]string, error) {
 		return []string{}, r.err
 	}
 	return r.rows.Columns()
+}
+
+func (r *Row) Err() error {
+	return r.err
 }
 
 // A wrapper around sql.DB which keeps track of the driverName upon Open,
@@ -538,7 +544,7 @@ func (r *Rows) StructScan(dest interface{}) error {
 		r.values[i] = base.Field(field).Addr().Interface()
 	}
 	r.Scan(r.values...)
-	return nil
+	return r.Err()
 }
 
 // Connect to a database and verify with a ping.
@@ -899,7 +905,7 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 		}
 	}
 
-	return values, nil
+	return values, r.Err()
 }
 
 // Like sql.Rows.Scan, but scans a single Row into a map[string]interface{}.
@@ -934,7 +940,7 @@ func MapScan(r ColScanner, dest map[string]interface{}) error {
 		}
 	}
 
-	return nil
+	return r.Err()
 }
 
 // Fully scan a sql.Rows result into the dest slice.  StructScan destinations MUST
@@ -1001,7 +1007,7 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 		}
 	}
 
-	return nil
+	return rows.Err()
 }
 
 // Issue a named query using BindStruct to get a query executable

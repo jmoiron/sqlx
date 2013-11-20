@@ -843,6 +843,11 @@ func (r *Row) MapScan(dest map[string]interface{}) error {
 
 // StructScan's a single Row (result of QueryRowx) into dest
 func (r *Row) StructScan(dest interface{}) error {
+	if r.err != nil {
+		return r.err
+	}
+	defer r.rows.Close()
+
 	var v reflect.Value
 	v = reflect.ValueOf(dest)
 	if v.Kind() != reflect.Ptr {

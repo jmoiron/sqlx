@@ -749,6 +749,10 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 		queue = queue[1:]
 		for j := 0; j < ty.NumField(); j++ {
 			f = ty.Field(j)
+			// skip unexported field
+			if len(f.PkgPath) != 0 {
+				continue
+			}
 			// skip structs which implement `scanner`
 			if f.Type.Kind() == reflect.Struct && !reflect.PtrTo(f.Type).Implements(scanner) {
 				queue = append(queue, f.Type)

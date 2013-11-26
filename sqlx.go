@@ -747,7 +747,6 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	scanner := reflect.TypeOf(scannerVal).Elem()
 	queue := []reflect.Type{t}
 	for i := 0; len(queue) != 0; {
-		log.Printf("queue: %s\n", queue)
 		ty := queue[0]
 		queue = queue[1:]
 		for j := 0; j < ty.NumField(); j++ {
@@ -803,7 +802,6 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 	queue := []reflect.Value{vptr}
 	fieldMap, _ := getFieldmap(vptr.Type())
-	log.Printf("fm: %s\n", fieldMap)
 	flattenedValues := make([]interface{}, len(fieldMap))
 	timeType := reflect.TypeOf(time.Now())
 	// TODO: cache indexes into value and use

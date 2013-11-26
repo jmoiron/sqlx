@@ -75,7 +75,7 @@ func PostgresConnect() {
 
 	pgdb, err = Connect("postgres", dsn)
 	if err != nil {
-		fmt.Printf("Could not connect to postgres, try `createdb sqlxtext`, disabling PG tests:\n	%v\n", err)
+		fmt.Printf("Could not connect to postgres, try `createdb sqlxtest`, disabling PG tests:\n	%v\n", err)
 		TestPostgres = false
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // NameMapper is used to map column names to struct field names.  By default,
@@ -741,6 +742,7 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 
 	var f reflect.StructField
 	var name string
+	timeType := reflect.TypeOf(time.Now())
 	scannerVal := new(sql.Scanner)
 	scanner := reflect.TypeOf(scannerVal).Elem()
 	queue := []reflect.Type{t}
@@ -754,7 +756,7 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 				continue
 			}
 			// skip structs which implement `scanner`
-			if f.Type.Kind() == reflect.Struct && !reflect.PtrTo(f.Type).Implements(scanner) {
+			if f.Type.Kind() == reflect.Struct && !reflect.PtrTo(f.Type).Implements(scanner) && f.Type != timeType {
 				queue = append(queue, f.Type)
 			} else {
 				name = NameMapper(f.Name)
@@ -801,6 +803,7 @@ func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 	queue := []reflect.Value{vptr}
 	fieldMap, _ := getFieldmap(vptr.Type())
 	flattenedValues := make([]interface{}, len(fieldMap))
+	timeType := reflect.TypeOf(time.Now())
 	// TODO: cache indexes into value and use
 
 	// keep track of struct names we've encountered, so we can skip duplicates.
@@ -822,7 +825,7 @@ func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 			}
 			encountered[vt.Name] = 0
 			_, isScanner := v.Addr().Interface().(sql.Scanner)
-			if v.Kind() == reflect.Struct && !isScanner {
+			if v.Kind() == reflect.Struct && !isScanner && v.Type() != timeType {
 				queue = append(queue, v)
 			} else {
 				flattenedValues[i] = v.Addr().Interface()

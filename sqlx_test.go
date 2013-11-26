@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 var TestPostgres = true
@@ -137,7 +138,8 @@ var schema = `
 CREATE TABLE person (
 	first_name text,
 	last_name text,
-	email text
+	email text,
+	added_at timestamp default now()
 );
 
 CREATE TABLE place (
@@ -165,6 +167,7 @@ type Person struct {
 	FirstName string `db:"first_name"`
 	LastName  string `db:"last_name"`
 	Email     string
+	AddedAt   time.Time `db:"added_at"`
 }
 
 type Place struct {
@@ -775,11 +778,11 @@ func BenchmarkRebindBuffer(b *testing.B) {
 
 func TestGetFieldMap(t *testing.T) {
 	testing_table := map[reflect.Type]fieldmap{
-		reflect.TypeOf(new(Person)): {"first_name": 0, "last_name": 1, "email": 2},
+		reflect.TypeOf(new(Person)): {"first_name": 0, "last_name": 1, "email": 2, "added_at": 3},
 		reflect.TypeOf(new(Place)):  {"country": 0, "city": 1, "telcode": 2},
 		reflect.TypeOf(new(PersonPlace)): {
-			"first_name": 0, "last_name": 1, "email": 2,
-			"country": 3, "city": 4, "telcode": 5},
+			"first_name": 0, "last_name": 1, "email": 2, "added_at": 3,
+			"country": 4, "city": 5, "telcode": 6},
 	}
 	for typ, expected := range testing_table {
 		fields, err := getFieldmap(typ)

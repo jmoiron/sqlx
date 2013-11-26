@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // NameMapper is used to map column names to struct field names.  By default,
@@ -741,10 +742,12 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 
 	var f reflect.StructField
 	var name string
+	timeInst := time.Now()
 	scannerVal := new(sql.Scanner)
 	scanner := reflect.TypeOf(scannerVal).Elem()
 	queue := []reflect.Type{t}
 	for i := 0; len(queue) != 0; {
+		log.Printf("queue: %s\n", queue)
 		ty := queue[0]
 		queue = queue[1:]
 		for j := 0; j < ty.NumField(); j++ {
@@ -754,7 +757,7 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 				continue
 			}
 			// skip structs which implement `scanner`
-			if f.Type.Kind() == reflect.Struct && !reflect.PtrTo(f.Type).Implements(scanner) {
+			if f.Type.Kind() == reflect.Struct && !reflect.PtrTo(f.Type).Implements(scanner) && f.Type != reflect.TypeOf(timeInst) {
 				queue = append(queue, f.Type)
 			} else {
 				name = NameMapper(f.Name)

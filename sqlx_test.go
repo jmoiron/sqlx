@@ -92,7 +92,7 @@ func SqliteConnect() {
 	var path string
 	var err error
 
-	path = os.Getenv("SQLX_SQLITE_PATH")
+	path = os.Getenv("SQLX_SQLITEPATH")
 	if len(path) == 0 {
 		path = "/tmp/sqlxtest.db"
 	}
@@ -127,7 +127,7 @@ func MysqlConnect() {
 			username = u.Username
 		}
 	}
-	mysqldb, err = Connect("mysql", fmt.Sprintf("%s:%s@/%s", username, password, dbname))
+	mysqldb, err = Connect("mysql", fmt.Sprintf("%s:%s@/%s?parseTime=true", username, password, dbname))
 	if err != nil {
 		fmt.Printf("Could not connect to mysql db, try `mysql -e 'create database sqlxtest'`, disabling MySQL tests:\n    %v", err)
 		TestMysql = false
@@ -156,6 +156,7 @@ CREATE TABLE capplace (
 `
 
 var mysqlSchema = strings.Replace(schema, `"`, "`", -1)
+var sqliteSchema = strings.Replace(schema, `now()`, `CURRENT_TIMESTAMP`, -1)
 
 var drop = `
 drop table person;
@@ -243,6 +244,8 @@ func TestUsage(t *testing.T) {
 			db.Execf(schema)
 		case "mysql":
 			MultiExec(db, mysqlSchema)
+		case "sqlite3":
+			MultiExec(db, sqliteSchema)
 		default:
 			MultiExec(db, schema)
 		}

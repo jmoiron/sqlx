@@ -29,6 +29,12 @@ import (
 	"time"
 )
 
+/* compile time checks that Db, Tx, Stmt (qStmt) implement expected interfaces */
+var _, _ Ext = &DB{}, &Tx{}
+var _, _ ColScanner = &Row{}, &Rows{}
+var _ Queryer = &qStmt{}
+var _ Execer = &qStmt{}
+
 var TestPostgres = true
 var TestSqlite = true
 var TestMysql = true

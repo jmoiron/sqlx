@@ -311,6 +311,16 @@ func (tx *Tx) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	return NamedExec(tx, query, arg)
 }
 
+// NamedQueryMap within a transaction.
+func (tx *Tx) NamedQueryMap(query string, arg map[string]interface{}) (*Rows, error) {
+	return NamedQueryMap(tx, query, arg)
+}
+
+// Exec a named query within a transaction.
+func (tx *Tx) NamedExecMap(query string, arg map[string]interface{}) (sql.Result, error) {
+	return NamedExecMap(tx, query, arg)
+}
+
 // LoadFile within a transaction.
 func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
 	return LoadFile(tx, path)

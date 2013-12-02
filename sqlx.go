@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -705,7 +706,10 @@ func MustExec(e Execer, query string, args ...interface{}) sql.Result {
 type fieldmap map[string]int
 
 // A cache of fieldmaps for reflect Types
-var fieldmapCache = map[reflect.Type]fieldmap{}
+var (
+	fieldmapCache     = map[reflect.Type]fieldmap{}
+	fieldmapCacheLock sync.RWMutex
+)
 
 // Return the type for a slice, dereferencing it if it is a pointer.  Returns
 // an error if the destination is not a slice or a pointer to a slice.
@@ -745,7 +749,9 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	if err != nil {
 		return nil, err
 	}
+	fieldmapCacheLock.RLock()
 	fm, ok := fieldmapCache[t]
+	fieldmapCacheLock.RUnlock()
 	if ok {
 		return fm, nil
 	} else {
@@ -786,7 +792,9 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 			}
 		}
 	}
+	fieldmapCacheLock.Lock()
 	fieldmapCache[t] = fm
+	fieldmapCacheLock.Unlock()
 	return fm, nil
 }
 

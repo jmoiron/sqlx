@@ -14,8 +14,6 @@ import (
 	"time"
 )
 
-var timeType = reflect.TypeOf(time.Now())
-
 // NameMapper is used to map column names to struct field names.  By default,
 // it uses strings.ToLower to lowercase struct field names.  It can be set
 // to whatever you want, but it is encouraged to be set before sqlx is used
@@ -741,10 +739,12 @@ func BaseStructType(t reflect.Type) (reflect.Type, error) {
 	return t, nil
 }
 
-var scannerVal *sql.Scanner
-var scannerIface = reflect.TypeOf(scannerVal).Elem()
-var valuerVal *driver.Valuer
-var valuerIface = reflect.TypeOf(valuerVal).Elem()
+// commonly used reflect types.
+var (
+	scannerIface = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+	valuerIface  = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
+	timeType     = reflect.TypeOf(time.Time{})
+)
 
 // Create a fieldmap for a given type and return its fieldmap (or error)
 // The fieldmap maps names to integers which represent the position of
@@ -766,18 +766,14 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 		fm = fieldmap{}
 	}
 
-	var f reflect.StructField
-	var ft reflect.Type
-	var name string
-
 	queue := []reflect.Type{t}
 
 	for i := 0; len(queue) != 0; {
 		ty := queue[0]
 		queue = queue[1:]
 		for j := 0; j < ty.NumField(); j++ {
-			f = ty.Field(j)
-			ft = f.Type
+			f := ty.Field(j)
+			ft := f.Type
 			// skip unexported field
 			if len(f.PkgPath) != 0 {
 				continue
@@ -789,7 +785,7 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 			if ft.Kind() == reflect.Struct && !reflect.PtrTo(ft).Implements(scannerIface) && ft != timeType {
 				queue = append(queue, ft)
 			} else {
-				name = NameMapper(f.Name)
+				name := NameMapper(f.Name)
 				if tag := f.Tag.Get("db"); tag != "" {
 					name = tag
 				}

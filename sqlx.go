@@ -2,6 +2,7 @@ package sqlx
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 
 	"io/ioutil"
@@ -740,6 +741,11 @@ func BaseStructType(t reflect.Type) (reflect.Type, error) {
 	return t, nil
 }
 
+var scannerVal *sql.Scanner
+var scannerIface = reflect.TypeOf(scannerVal).Elem()
+var valuerVal *driver.Valuer
+var valuerIface = reflect.TypeOf(valuerVal).Elem()
+
 // Create a fieldmap for a given type and return its fieldmap (or error)
 // The fieldmap maps names to integers which represent the position of
 // a struct field in a breadth first search of the fields.
@@ -749,9 +755,11 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	if err != nil {
 		return nil, err
 	}
+
 	fieldmapCacheLock.RLock()
 	fm, ok := fieldmapCache[t]
 	fieldmapCacheLock.RUnlock()
+
 	if ok {
 		return fm, nil
 	} else {
@@ -759,22 +767,27 @@ func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
 	}
 
 	var f reflect.StructField
+	var ft reflect.Type
 	var name string
-	scannerVal := new(sql.Scanner)
-	scanner := reflect.TypeOf(scannerVal).Elem()
+
 	queue := []reflect.Type{t}
+
 	for i := 0; len(queue) != 0; {
 		ty := queue[0]
 		queue = queue[1:]
 		for j := 0; j < ty.NumField(); j++ {
 			f = ty.Field(j)
+			ft = f.Type
 			// skip unexported field
 			if len(f.PkgPath) != 0 {
 				continue
 			}
-			// skip structs which implement `scanner`
-			if f.Type.Kind() == reflect.Struct && !reflect.PtrTo(f.Type).Implements(scanner) && f.Type != timeType {
-				queue = append(queue, f.Type)
+			// perform one level of indirection for pointers to structs
+			if ft.Kind() == reflect.Ptr {
+				ft = ft.Elem()
+			}
+			if ft.Kind() == reflect.Struct && !reflect.PtrTo(ft).Implements(scannerIface) && ft != timeType {
+				queue = append(queue, ft)
 			} else {
 				name = NameMapper(f.Name)
 				if tag := f.Tag.Get("db"); tag != "" {
@@ -817,36 +830,66 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 // Return a slice of values representing the columns
 // These values are actually pointers into the addresses of struct fields
 // The values interface must be initialized to the length of fields, ie
-// make([]interface{}, len(fields)).
+// make([]interface{}, len(fields)).  This function is the complement of
+// the getFieldmap function, in that they enumerate struct fields the same way.
 func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 	queue := []reflect.Value{vptr}
 	fieldMap, _ := getFieldmap(vptr.Type())
 	flattenedValues := make([]interface{}, len(fieldMap))
-	// TODO: cache indexes into value and use
+	// TODO: cache indexes into value and use -- what? -jm
 
 	// keep track of struct names we've encountered, so we can skip duplicates.
 	// this mirrors logic in the fieldmap construction process, which is a
 	// breadth first descent.
 	encountered := map[string]uint8{}
+	var isPtr, isScanner bool
 
 	for i := 0; len(queue) != 0; {
 		vptr = queue[0]
 		queue = queue[1:]
 		for j := 0; j < vptr.NumField(); j++ {
 			v := vptr.Field(j)
-			vt := vptr.Type().Field(j)
-			if _, ok := encountered[vt.Name]; ok {
+			vsf := vptr.Type().Field(j)
+			vt := v.Type()
+			isPtr = false
+			isScanner = false
+
+			// skip duplicate names in the struct tree
+			if _, ok := encountered[vsf.Name]; ok {
 				continue
 			}
-			if tag := vt.Tag.Get("db"); tag == "-" {
+			// skip fields with the db tag set to "-"
+			if tag := vsf.Tag.Get("db"); tag == "-" {
 				continue
 			}
-			encountered[vt.Name] = 0
-			_, isScanner := v.Addr().Interface().(sql.Scanner)
-			if v.Kind() == reflect.Struct && !isScanner && v.Type() != timeType {
-				queue = append(queue, v)
+
+			encountered[vsf.Name] = 0
+			if vt.Kind() == reflect.Ptr {
+				vt = vt.Elem()
+				isPtr = true
+			}
+
+			if isPtr {
+				_, isScanner = v.Interface().(sql.Scanner)
 			} else {
-				flattenedValues[i] = v.Addr().Interface()
+				_, isScanner = v.Addr().Interface().(sql.Scanner)
+			}
+
+			if vt.Kind() == reflect.Struct && !isScanner && vt != timeType {
+				if isPtr {
+					// Allocate a new struct for this poissibly nil pointer field, set it, and add to queue
+					alloc := reflect.New(vt)
+					v.Set(alloc)
+					queue = append(queue, reflect.Indirect(v))
+				} else {
+					queue = append(queue, v)
+				}
+			} else {
+				if isPtr {
+					flattenedValues[i] = v.Interface()
+				} else {
+					flattenedValues[i] = v.Addr().Interface()
+				}
 				i++
 			}
 		}

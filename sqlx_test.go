@@ -18,15 +18,16 @@ package sqlx
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
 	"os"
 	"os/user"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 /* compile time checks that Db, Tx, Stmt (qStmt) implement expected interfaces */
@@ -188,6 +189,11 @@ type PersonPlace struct {
 	Place
 }
 
+type PersonPlacePtr struct {
+	*Person
+	*Place
+}
+
 type NonEmbedded struct {
 	Person Person
 	Place  Place
@@ -278,6 +284,24 @@ func TestUsage(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, pp := range peopleAndPlaces {
+			if len(pp.Person.FirstName) == 0 {
+				t.Errorf("Expected non zero lengthed first name.")
+			}
+			if len(pp.Place.Country) == 0 {
+				t.Errorf("Expected non zero lengthed country.")
+			}
+		}
+
+		// test the same for embedded pointer structs
+		peopleAndPlacesPtrs := []PersonPlacePtr{}
+		err = db.Select(
+			&peopleAndPlacesPtrs,
+			`SELECT person.*, place.* FROM
+             person natural join place`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, pp := range peopleAndPlacesPtrs {
 			if len(pp.Person.FirstName) == 0 {
 				t.Errorf("Expected non zero lengthed first name.")
 			}
@@ -792,6 +816,9 @@ func TestGetFieldMap(t *testing.T) {
 		reflect.TypeOf(new(PersonPlace)): {
 			"first_name": 0, "last_name": 1, "email": 2, "added_at": 3,
 			"country": 4, "city": 5, "telcode": 6},
+		reflect.TypeOf(new(PersonPlacePtr)): {
+			"first_name": 0, "last_name": 1, "email": 2, "added_at": 3,
+			"country": 4, "city": 5, "telcode": 6},
 	}
 	for typ, expected := range testing_table {
 		fields, err := getFieldmap(typ)
@@ -799,7 +826,7 @@ func TestGetFieldMap(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(fields, expected) {
-			t.Fatalf("wtf %v %v", fields, expected)
+			t.Fatalf("Fieldmap error: got `%v`, expected `%v`", fields, expected)
 		}
 	}
 }

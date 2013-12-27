@@ -827,25 +827,24 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 	return fields, nil
 }
 
-// Return a slice of values representing the columns
-// These values are actually pointers into the addresses of struct fields
-// The values interface must be initialized to the length of fields, ie
-// make([]interface{}, len(fields)).  This function is the complement of
-// the getFieldmap function, in that they enumerate struct fields the same way.
-func setValues(fields []int, vptr reflect.Value, values []interface{}) {
-	queue := []reflect.Value{vptr}
-	fieldMap, _ := getFieldmap(vptr.Type())
-	flattenedValues := make([]interface{}, len(fieldMap))
-	// TODO: cache indexes into value and use -- what? -jm
-
-	// keep track of struct names we've encountered, so we can skip duplicates.
-	// this mirrors logic in the fieldmap construction process, which is a
-	// breadth first descent.
+// Given a value for a struct, return a slice of values which are pointers
+// to the well ordered fields in the struct, including embedded structs.
+// The indexes of this list correspond to the indexes from the fieldmap.
+func getValues(v reflect.Value) []interface{} {
+	queue := []reflect.Value{v}
+	fieldMap, _ := getFieldmap(v.Type())
+	values := make([]interface{}, len(fieldMap))
 	encountered := map[string]uint8{}
 	var isPtr, isScanner bool
 
+	// if v is addressable, we return value pointers which are settable.
+	// if v is not addressable, we return the values themselves, which are
+	// then not settable.  This behavior is so that we can use getValues
+	// in read-only contexts, like named binding.
+	returnAddrs := v.CanAddr()
+
 	for i := 0; len(queue) != 0; {
-		vptr = queue[0]
+		vptr := queue[0]
 		queue = queue[1:]
 		for j := 0; j < vptr.NumField(); j++ {
 			v := vptr.Field(j)
@@ -869,7 +868,7 @@ func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 				isPtr = true
 			}
 
-			if isPtr {
+			if isPtr || !returnAddrs {
 				_, isScanner = v.Interface().(sql.Scanner)
 			} else {
 				_, isScanner = v.Addr().Interface().(sql.Scanner)
@@ -885,17 +884,28 @@ func setValues(fields []int, vptr reflect.Value, values []interface{}) {
 					queue = append(queue, v)
 				}
 			} else {
-				if isPtr {
-					flattenedValues[i] = v.Interface()
-				} else {
-					flattenedValues[i] = v.Addr().Interface()
+				if isPtr || !returnAddrs {
+					values[i] = v.Interface()
+				} else if returnAddrs {
+					values[i] = v.Addr().Interface()
 				}
 				i++
 			}
 		}
 	}
+
+	return values
+}
+
+// Return a slice of values representing the columns
+// These values are actually pointers into the addresses of struct fields
+// The values interface must be initialized to the length of fields, ie
+// make([]interface{}, len(fields)).  This function is the complement of
+// the getFieldmap function, in that they enumerate struct fields the same way.
+func setValues(fields []int, vptr reflect.Value, values []interface{}) {
+	vals := getValues(vptr)
 	for i, field := range fields {
-		values[i] = flattenedValues[field]
+		values[i] = vals[field]
 	}
 }
 

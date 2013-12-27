@@ -75,8 +75,11 @@ func BindStruct(bindType int, query string, arg interface{}) (string, []interfac
 	for v = reflect.ValueOf(arg); v.Kind() == reflect.Ptr; {
 		v = v.Elem()
 	}
+
+	values := getValues(v)
+
 	for key, val := range fm {
-		argmap[key] = v.Field(val).Interface()
+		argmap[key] = values[val]
 	}
 
 	return BindMap(bindType, query, argmap)

@@ -699,7 +699,10 @@ func TestBindMap(t *testing.T) {
 }
 
 func TestBindStruct(t *testing.T) {
+	var err error
+
 	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`
+
 	type tt struct {
 		Name  string
 		Age   int
@@ -710,6 +713,11 @@ func TestBindStruct(t *testing.T) {
 	type tt2 struct {
 		Field1 string `db:"field_1"`
 		Field2 string `db:"field_2"`
+	}
+
+	type tt3 struct {
+		tt2
+		Name string
 	}
 
 	am := tt{"Jason Moiron", 30, "Jason", "Moiron"}
@@ -750,6 +758,30 @@ func TestBindStruct(t *testing.T) {
 		t.Errorf("Expected 'Hello', got %s\n", args[1].(string))
 	}
 
+	am3 := tt3{Name: "Hello!"}
+	am3.Field1 = "Hello"
+	am3.Field2 = "World"
+
+	bq, args, err = BindStruct(QUESTION, "INSERT INTO foo (a, b, c) VALUES (:name, :field_1, :field_2)", am3)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expect = `INSERT INTO foo (a, b, c) VALUES (?, ?, ?)`
+	if bq != expect {
+		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
+	}
+
+	if args[0].(string) != "Hello!" {
+		t.Errorf("Expected 'Hello!', got %s\n", args[0].(string))
+	}
+	if args[1].(string) != "Hello" {
+		t.Errorf("Expected 'Hello', got %s\n", args[1].(string))
+	}
+	if args[2].(string) != "World" {
+		t.Errorf("Expected 'World', got %s\n", args[0].(string))
+	}
 }
 
 func BenchmarkBindStruct(b *testing.B) {

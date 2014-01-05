@@ -880,7 +880,7 @@ func getValues(v reflect.Value) []interface{} {
 					queue = append(queue, v)
 				}
 			} else {
-				if isPtr || !returnAddrs {
+				if !returnAddrs {
 					values[i] = v.Interface()
 				} else if returnAddrs {
 					values[i] = v.Addr().Interface()

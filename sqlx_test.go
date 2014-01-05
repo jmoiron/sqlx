@@ -184,6 +184,12 @@ type Place struct {
 	TelCode int
 }
 
+type PlacePtr struct {
+	Country string
+	City    *string
+	TelCode int
+}
+
 type PersonPlace struct {
 	Person
 	Place
@@ -434,6 +440,13 @@ func TestUsage(t *testing.T) {
 		if usa.TelCode != 1 || honkers.TelCode != 852 || singsing.TelCode != 65 {
 			t.Errorf("Expected integer telcodes to work, got %#v", places)
 		}
+
+		placesptr := []PlacePtr{}
+		err = db.Select(&placesptr, "SELECT * FROM place ORDER BY telcode ASC")
+		if err != nil {
+			t.Error(err)
+		}
+		//fmt.Printf("%#v\n%#v\n%#v\n", placesptr[0], placesptr[1], placesptr[2])
 
 		// if you have null fields and use SELECT *, you must use sql.Null* in your struct
 		// this test also verifies that you can use either a []Struct{} or a []*Struct{}

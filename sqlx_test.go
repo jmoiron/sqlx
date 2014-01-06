@@ -1,25 +1,19 @@
 // The following environment variables, if set, will be used:
 //
-//  Sqlite:
-//		* SQLX_SQLITEPATH
+//	* SQLX_SQLITE_DSN
+//	* SQLX_POSTGRES_DSN
+//	* SQLX_MYSQL_DSN
 //
-//  Postgres:
-//		* SQLX_PGUSER
-//		* SQLX_PGPASS
+// Set any of these variables to 'skip' to skip them.  Note that for MySQL,
+// the string '?parseTime=True' will be appended to the DSN if it's not there
+// already.
 //
-//	MySQL:
-//		* SQLX_MYSQLUSER
-//		* SQLX_MYSQLPASS
-//
-//  To disable testing against any of these databases, set one of:
-//		* SQLX_NOPG, SQLX_NOMYSQL, SQLX_NOSQLITE
 package sqlx
 
 import (
 	"database/sql"
 	"fmt"
 	"os"
-	"os/user"
 	"reflect"
 	"strings"
 	"testing"
@@ -46,102 +40,70 @@ var mysqldb *DB
 var active = []*DB{}
 
 func init() {
-	PostgresConnect()
-	SqliteConnect()
-	MysqlConnect()
+	ConnectAll()
 }
 
-func PostgresConnect() {
-
-	if len(os.Getenv("SQLX_NOPG")) > 0 {
-		TestPostgres = false
-		fmt.Printf("Skipping Postgres tests, SQLX_NOPG set.\n")
-		return
-	}
-
-	var username, password string
+func ConnectAll() {
 	var err error
 
-	username = os.Getenv("SQLX_PGUSER")
-	password = os.Getenv("SQLX_PGPASS")
+	pgdsn := os.Getenv("SQLX_POSTGRES_DSN")
+	mydsn := os.Getenv("SQLX_MYSQL_DSN")
+	sqdsn := os.Getenv("SQLX_SQLITE_DSN")
 
-	if len(username) == 0 {
-		u, err := user.Current()
+	TestPostgres = pgdsn != "skip"
+	TestMysql = mydsn != "skip"
+	TestSqlite = sqdsn != "skip"
+
+	if TestPostgres {
+		pgdb, err = Connect("postgres", pgdsn)
 		if err != nil {
-			fmt.Printf("Could not find current user username, trying 'test' instead.")
-			username = "test"
-		} else {
-			username = u.Username
+			fmt.Printf("Disabling PG tests:\n    %v\n", err)
+			TestPostgres = false
 		}
-
+	} else {
+		fmt.Println("Disabling Postgres tests.")
 	}
 
-	dsn := fmt.Sprintf("user=%s dbname=sqlxtest sslmode=disable", username)
-	if len(password) > 0 {
-		dsn = fmt.Sprintf("user=%s password=%s dbname=sqlxtest sslmode=disable", username, password)
-	}
-
-	pgdb, err = Connect("postgres", dsn)
-	if err != nil {
-		fmt.Printf("Could not connect to postgres, try `createdb sqlxtest`, disabling PG tests:\n	%v\n", err)
-		TestPostgres = false
-	}
-}
-
-func SqliteConnect() {
-
-	if len(os.Getenv("SQLX_NOSQLITE")) > 0 {
-		TestSqlite = false
-		fmt.Printf("Skipping sqlite tests, SQLX_NOSQLITE set.\n")
-		return
-	}
-
-	var path string
-	var err error
-
-	path = os.Getenv("SQLX_SQLITEPATH")
-	if len(path) == 0 {
-		path = "/tmp/sqlxtest.db"
-	}
-
-	sldb, err = Connect("sqlite3", path)
-	if err != nil {
-		fmt.Printf("Could not create sqlite3 db in %s:\n	%v", path, err)
-		TestSqlite = false
-	}
-}
-
-func MysqlConnect() {
-
-	if len(os.Getenv("SQLX_NOMYSQL")) > 0 {
-		TestMysql = false
-		fmt.Printf("Skipping mysql tests, SQLX_NOMYSQL set.\n")
-		return
-	}
-	var username, dbname, password string
-	var err error
-
-	username = os.Getenv("SQLX_MYSQLUSER")
-	password = os.Getenv("SQLX_MYSQLPASS")
-	dbname = "sqlxtest"
-
-	if len(username) == 0 {
-		u, err := user.Current()
+	if TestMysql {
+		mysqldb, err = Connect("mysql", mydsn)
 		if err != nil {
-			fmt.Printf("Could not find current user username, trying 'test' instead.")
-			username = "test"
-		} else {
-			username = u.Username
+			fmt.Printf("Disabling MySQL tests:\n    %v", err)
+			TestMysql = false
 		}
+	} else {
+		fmt.Println("Disabling MySQL tests.")
 	}
-	mysqldb, err = Connect("mysql", fmt.Sprintf("%s:%s@/%s?parseTime=true", username, password, dbname))
-	if err != nil {
-		fmt.Printf("Could not connect to mysql db, try `mysql -e 'create database sqlxtest'`, disabling MySQL tests:\n    %v", err)
-		TestMysql = false
+
+	if TestSqlite {
+		sldb, err = Connect("sqlite3", sqdsn)
+		if err != nil {
+			fmt.Printf("Disabling SQLite:\n    %v", err)
+			TestSqlite = false
+		}
+	} else {
+		fmt.Println("Disabling SQLite tests.")
 	}
 }
 
-var schema = `
+type Schema struct {
+	create string
+	drop   string
+}
+
+func (s Schema) Postgres() (string, string) {
+	return s.create, s.drop
+}
+
+func (s Schema) MySQL() (string, string) {
+	return strings.Replace(s.create, `"`, "`", -1), s.drop
+}
+
+func (s Schema) Sqlite3() (string, string) {
+	return strings.Replace(s.create, `now()`, `CURRENT_TIMESTAMP`, -1), s.drop
+}
+
+var defaultSchema = Schema{
+	create: `
 CREATE TABLE person (
 	first_name text,
 	last_name text,
@@ -160,22 +122,32 @@ CREATE TABLE capplace (
 	"CITY" text NULL,
 	"TELCODE" integer
 );
-`
 
-var mysqlSchema = strings.Replace(schema, `"`, "`", -1)
-var sqliteSchema = strings.Replace(schema, `now()`, `CURRENT_TIMESTAMP`, -1)
-
-var drop = `
+CREATE TABLE nullperson (
+    first_name text NULL,
+    last_name text NULL,
+    email text NULL
+);
+`,
+	drop: `
 drop table person;
 drop table place;
 drop table capplace;
-`
+drop table person2;
+`,
+}
 
 type Person struct {
 	FirstName string `db:"first_name"`
 	LastName  string `db:"last_name"`
 	Email     string
 	AddedAt   time.Time `db:"added_at"`
+}
+
+type Person2 struct {
+	FirstName sql.NullString `db:"first_name"`
+	LastName  sql.NullString `db:"last_name"`
+	Email     sql.NullString
 }
 
 type Place struct {
@@ -244,45 +216,50 @@ func MultiExec(e Execer, query string) {
 	}
 }
 
-func TestUsage(t *testing.T) {
-	RunTest := func(db *DB, t *testing.T) {
-		var err error
+func RunWithSchema(schema Schema, t *testing.T, test func(db *DB, t *testing.T)) {
+	runner := func(db *DB, t *testing.T, create, drop string) {
+		defer func() {
+			MultiExec(db, drop)
+		}()
 
-		defer func(dbtype string) {
-			if dbtype != "postgres" {
-				MultiExec(db, drop)
-			} else {
-				db.Execf(drop)
-			}
-		}(db.DriverName())
+		MultiExec(db, create)
+		test(db, t)
+	}
 
-		// pq will execute multi-query statements, but sqlite3 won't!
-		switch db.DriverName() {
-		case "postgres":
-			db.Execf(schema)
-		case "mysql":
-			MultiExec(db, mysqlSchema)
-		case "sqlite3":
-			MultiExec(db, sqliteSchema)
-		default:
-			MultiExec(db, schema)
-		}
-		tx := db.MustBegin()
-		tx.Execl(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "Jason", "Moiron", "jmoiron@jmoiron.net")
-		tx.Execl(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "John", "Doe", "johndoeDNE@gmail.net")
-		tx.Execl(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
-		tx.Execl(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
-		tx.Execl(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
-		if db.DriverName() == "mysql" {
-			tx.Execl(tx.Rebind("INSERT INTO capplace (`COUNTRY`, `TELCODE`) VALUES (?, ?)"), "Sarf Efrica", "27")
-		} else {
-			tx.Execl(tx.Rebind("INSERT INTO capplace (\"COUNTRY\", \"TELCODE\") VALUES (?, ?)"), "Sarf Efrica", "27")
-		}
-		tx.Commit()
+	if TestPostgres {
+		create, drop := schema.Postgres()
+		runner(pgdb, t, create, drop)
+	}
+	if TestSqlite {
+		create, drop := schema.Sqlite3()
+		runner(sldb, t, create, drop)
+	}
+	if TestMysql {
+		create, drop := schema.MySQL()
+		runner(mysqldb, t, create, drop)
+	}
+}
 
-		// test embedded structs
+func loadDefaultFixture(db *DB, t *testing.T) {
+	tx := db.MustBegin()
+	tx.Execl(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "Jason", "Moiron", "jmoiron@jmoiron.net")
+	tx.Execl(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "John", "Doe", "johndoeDNE@gmail.net")
+	tx.Execl(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
+	tx.Execl(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
+	tx.Execl(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
+	if db.DriverName() == "mysql" {
+		tx.Execl(tx.Rebind("INSERT INTO capplace (`COUNTRY`, `TELCODE`) VALUES (?, ?)"), "Sarf Efrica", "27")
+	} else {
+		tx.Execl(tx.Rebind("INSERT INTO capplace (\"COUNTRY\", \"TELCODE\") VALUES (?, ?)"), "Sarf Efrica", "27")
+	}
+	tx.Commit()
+}
+
+func TestEmbeddedStructs(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
 		peopleAndPlaces := []PersonPlace{}
-		err = db.Select(
+		err := db.Select(
 			&peopleAndPlaces,
 			`SELECT person.*, place.* FROM
              person natural join place`)
@@ -351,9 +328,14 @@ func TestUsage(t *testing.T) {
 		if err != nil {
 			t.Errorf("Was not expecting an error on embed conflicts.")
 		}
+	})
+}
 
+func TestUsage(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
 		slicemembers := []SliceMember{}
-		err = db.Select(&slicemembers, "SELECT * FROM place ORDER BY telcode ASC")
+		err := db.Select(&slicemembers, "SELECT * FROM place ORDER BY telcode ASC")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -421,7 +403,7 @@ func TestUsage(t *testing.T) {
 			t.Fatal(err)
 		}
 		jason = Person{}
-		tx, err = db.Beginx()
+		tx, err := db.Beginx()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -637,17 +619,8 @@ func TestUsage(t *testing.T) {
 			t.Error(err)
 		}
 		NameMapper = strings.ToLower
-	}
+	})
 
-	if TestPostgres {
-		RunTest(pgdb, t)
-	}
-	if TestSqlite {
-		RunTest(sldb, t)
-	}
-	if TestMysql {
-		RunTest(mysqldb, t)
-	}
 }
 
 type Product struct {

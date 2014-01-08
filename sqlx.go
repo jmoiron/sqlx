@@ -827,11 +827,12 @@ func getFields(fm fieldmap, columns []string) ([]int, error) {
 // to the well ordered fields in the struct, including embedded structs.
 // The indexes of this list correspond to the indexes from the fieldmap.
 func getValues(v reflect.Value) []interface{} {
+
 	queue := []reflect.Value{v}
 	fieldMap, _ := getFieldmap(v.Type())
 	values := make([]interface{}, len(fieldMap))
 	encountered := map[string]uint8{}
-	var isPtr, isScanner bool
+	var isPtr, isScanner, isValuer bool
 
 	// if v is addressable, we return value pointers which are settable.
 	// if v is not addressable, we return the values themselves, which are
@@ -866,11 +867,13 @@ func getValues(v reflect.Value) []interface{} {
 
 			if isPtr || !returnAddrs {
 				_, isScanner = v.Interface().(sql.Scanner)
+				_, isValuer = v.Interface().(driver.Valuer)
 			} else {
 				_, isScanner = v.Addr().Interface().(sql.Scanner)
+				_, isValuer = v.Addr().Interface().(driver.Valuer)
 			}
 
-			if vt.Kind() == reflect.Struct && !isScanner && vt != timeType {
+			if vt.Kind() == reflect.Struct && !isScanner && !isValuer && vt != timeType {
 				if isPtr {
 					// Allocate a new struct for this poissibly nil pointer field, set it, and add to queue
 					alloc := reflect.New(vt)

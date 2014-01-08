@@ -13,6 +13,7 @@ package sqlx
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -329,6 +330,57 @@ func TestEmbeddedStructs(t *testing.T) {
 			t.Errorf("Was not expecting an error on embed conflicts.")
 		}
 	})
+}
+
+func TestNamedQuery(t *testing.T) {
+	var schema = Schema{
+		create: `
+			CREATE TABLE person (
+				first_name text NULL,
+				last_name text NULL,
+				email text NULL
+			);`,
+		drop: `drop table person;`,
+	}
+
+	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+		type Person struct {
+			FirstName sql.NullString `db:"first_name"`
+			LastName  sql.NullString `db:"last_name"`
+			Email     sql.NullString
+		}
+
+		p := Person{
+			FirstName: sql.NullString{"ben", true},
+			LastName:  sql.NullString{"doe", true},
+			Email:     sql.NullString{"ben@doe.com", true},
+		}
+
+		q1 := `INSERT INTO person (first_name, last_name, email) VALUES (:first_name, :last_name, :email)`
+		_, err := db.NamedExec(q1, p)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		p2 := &Person{}
+		rows, err := db.NamedQuery("SELECT * FROM person WHERE first_name=:first_name", p)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for rows.Next() {
+			err = rows.StructScan(p2)
+			if err != nil {
+				t.Error(err)
+			}
+			if p2.FirstName.String != "ben" {
+				t.Error("Expected first name of `ben`, got " + p2.FirstName.String)
+			}
+			if p2.LastName.String != "doe" {
+				t.Error("Expected first name of `doe`, got " + p2.LastName.String)
+			}
+		}
+	})
+
 }
 
 func TestUsage(t *testing.T) {

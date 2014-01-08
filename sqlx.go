@@ -129,12 +129,12 @@ func (r *Row) Err() error {
 // A wrapper around sql.DB which keeps track of the driverName upon Open,
 // used mostly to automatically bind named queries using the right bindvars.
 type DB struct {
-	sql.DB
+	*sql.DB
 	driverName string
 }
 
 func NewDb(db *sql.DB, driverName string) *DB {
-	return &DB{*db, driverName}
+	return &DB{db, driverName}
 }
 
 // DriverName returns the driverName passed to the Open function for this DB.
@@ -148,7 +148,7 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DB{*db, driverName}, err
+	return &DB{db, driverName}, err
 }
 
 // Rebind transforms a query from QUESTION to the DB driver's bindvar type.

@@ -134,7 +134,7 @@ CREATE TABLE nullperson (
 drop table person;
 drop table place;
 drop table capplace;
-drop table person2;
+drop table nullperson;
 `,
 }
 
@@ -213,7 +213,10 @@ func MultiExec(e Execer, query string) {
 		stmts = stmts[:len(stmts)-1]
 	}
 	for _, s := range stmts {
-		e.Exec(s)
+		_, err := e.Exec(s)
+		if err != nil {
+			fmt.Println(err, s)
+		}
 	}
 }
 
@@ -380,7 +383,40 @@ func TestNamedQuery(t *testing.T) {
 			}
 		}
 	})
+}
 
+func TestScanError(t *testing.T) {
+	var schema = Schema{
+		create: `
+			CREATE TABLE kv (
+				k text,
+				v integer
+			);`,
+		drop: `drop table kv;`,
+	}
+
+	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+		type WrongTypes struct {
+			K int
+			V string
+		}
+		_, err := db.Exec(db.Rebind("INSERT INTO kv (k, v) VALUES (?, ?)"), "hi", 1)
+		if err != nil {
+			t.Error(err)
+		}
+
+		rows, err := db.Queryx("SELECT * FROM kv")
+		if err != nil {
+			t.Error(err)
+		}
+		for rows.Next() {
+			var wt WrongTypes
+			err := rows.StructScan(&wt)
+			if err == nil {
+				t.Errorf("%s: Scanning wrong types into keys should have errored.", db.DriverName())
+			}
+		}
+	})
 }
 
 func TestUsage(t *testing.T) {

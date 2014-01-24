@@ -556,7 +556,10 @@ func (r *Rows) StructScan(dest interface{}) error {
 	for i, field := range r.fields {
 		r.values[i] = base.Field(field).Addr().Interface()
 	}
-	r.Scan(r.values...)
+	err := r.Scan(r.values...)
+	if err != nil {
+		return err
+	}
 	return r.Err()
 }
 
@@ -976,7 +979,11 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 		values[i] = &sql.NullString{}
 	}
 
-	r.Scan(values...)
+	err = r.Scan(values...)
+
+	if err != nil {
+		return values, err
+	}
 
 	for i, _ := range columns {
 		ns := *(values[i].(*sql.NullString))
@@ -1011,7 +1018,10 @@ func MapScan(r ColScanner, dest map[string]interface{}) error {
 		values[i] = &sql.NullString{}
 	}
 
-	r.Scan(values...)
+	err = r.Scan(values...)
+	if err != nil {
+		return err
+	}
 
 	for i, column := range columns {
 		ns := *(values[i].(*sql.NullString))

@@ -49,6 +49,7 @@ import (
     _ "github.com/lib/pq"
     "database/sql"
     "github.com/jmoiron/sqlx"
+    "log"
 )
 
 var schema = `
@@ -79,7 +80,10 @@ type Place struct {
 func main() {
     // this connects & tries a simple 'SELECT 1', panics on error
     // use sqlx.Open() for sql.Open() semantics
-    db := sqlx.Connect("postgres", "user=foo dbname=bar sslmode=disable")
+    db, err := sqlx.Connect("postgres", "user=foo dbname=bar sslmode=disable")
+    if err != nil {
+        log.Fatalln(err)
+    }
 
     // exec the schema or fail; multi-statement Exec behavior varies between
     // database drivers;  pq will exec them all, sqlite3 won't, ymmv
@@ -91,6 +95,8 @@ func main() {
     tx.Execl("INSERT INTO place (country, city, telcode) VALUES ($1, $2, $3)", "United States", "New York", "1")
     tx.Execl("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Hong Kong", "852")
     tx.Execl("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Singapore", "65")
+    // Named queries can use structs, so if you have an existing struct (i.e. person := &Person{}) that you have populated, you can pass it in as &person
+    tx.NamedExec("INSERT INTO person (first_name, last_name, email) VALUES (:first_name, :last_name, :email)", &Person{"Jane", "Citizen", "jane.citzen@example.com"})
     tx.Commit()
 
     // Query the database, storing results in a []Person (wrapped in []interface{})
@@ -126,7 +132,10 @@ func main() {
     place := Place{}
     rows, err := db.Queryx("SELECT * FROM place")
     for rows.Next() {
-        rows.StructScan(&place)
+        err := rows.StructScan(&place)
+        if err != nil {
+            log.Fataln(err)
+        } 
         fmt.Printf("%#v\n", place)
     }
     // Place{Country:"United States", City:sql.NullString{String:"New York", Valid:true}, TelCode:1}

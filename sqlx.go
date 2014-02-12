@@ -853,6 +853,11 @@ func getValues(v reflect.Value) []interface{} {
 			isPtr = false
 			isScanner = false
 
+			// skip unexported fields
+			if len(vsf.PkgPath) != 0 {
+				continue
+			}
+
 			// skip duplicate names in the struct tree
 			if _, ok := encountered[vsf.Name]; ok {
 				continue

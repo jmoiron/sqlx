@@ -15,7 +15,7 @@ const (
 	DOLLAR
 )
 
-// Return the bindtype for a given database given a drivername
+// BindType returns the bindtype for a given database given a drivername
 func BindType(driverName string) int {
 	switch driverName {
 	case "postgres":
@@ -53,9 +53,9 @@ func Rebind(bindType int, query string) string {
 	return string(rqb)
 }
 
-// Bind a named parameter query with fields from a struct argument.  The rules
-// for binding field names to parameter names follow the same conventions as
-// for StructScan, including obeying the `db` struct tags.
+// BindStruct binds a named parameter query with fields from a struct argument.
+// The rules for binding field names to parameter names follow the same
+// conventions as for StructScan, including obeying the `db` struct tags.
 func BindStruct(bindType int, query string, arg interface{}) (string, []interface{}, error) {
 	arglist := make([]interface{}, 0, 5)
 	t, err := BaseStructType(reflect.TypeOf(arg))
@@ -91,7 +91,7 @@ func BindStruct(bindType int, query string, arg interface{}) (string, []interfac
 // digits and numbers, where '5' is a digit but '五' is not.
 var allowedBindRunes = []*unicode.RangeTable{unicode.Letter, unicode.Digit}
 
-// Bind a named parameter query with a map of arguments.
+// BindMap binds a named parameter query with a map of arguments.
 func BindMap(bindType int, query string, args map[string]interface{}) (string, []interface{}, error) {
 	arglist := make([]interface{}, 0, 5)
 	// In all likelihood, the rebound query will be shorter

@@ -1,4 +1,4 @@
-// Package SQLX provides general purpose extensions to database/sql.t
+// Package sqlx provides general purpose extensions to database/sql.
 //
 // sqlx is intended to seamlessly wrap database/sql and provide convenience
 // methods which are useful in the development of database driven applications.

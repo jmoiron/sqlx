@@ -430,6 +430,11 @@ func (tx *Tx) NamedStmt(stmt *NamedStmt) *NamedStmt {
 	}
 }
 
+// PrepareNamed returns an sqlx.NamedStmt
+func (tx *Tx) PrepareNamed(query string) (*NamedStmt, error) {
+	return prepareNamed(tx, query)
+}
+
 // Stmt is an sqlx wrapper around database/sql's Stmt with extra functionality
 type Stmt struct{ *sql.Stmt }
 

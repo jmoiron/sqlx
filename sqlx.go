@@ -281,6 +281,11 @@ func (db *DB) Preparex(query string) (*Stmt, error) {
 	return Preparex(db, query)
 }
 
+// PrepareNamed returns an sqlx.NamedStmt
+func (db *DB) PrepareNamed(query string) (*NamedStmt, error) {
+	return prepareNamed(db, query)
+}
+
 // Tx is an sqlx wrapper around database/sql's Tx with extra functionality
 type Tx struct {
 	sql.Tx
@@ -414,6 +419,15 @@ func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
 		s = stmt.(*sql.Stmt)
 	}
 	return &Stmt{tx.Stmt(s)}
+}
+
+// NamedStmt returns a version of the prepared statement which runs within a transaction.
+func (tx *Tx) NamedStmt(stmt *NamedStmt) *NamedStmt {
+	return &NamedStmt{
+		QueryString: stmt.QueryString,
+		Params:      stmt.Params,
+		Stmt:        tx.Stmtx(stmt.Stmt),
+	}
 }
 
 // Stmt is an sqlx wrapper around database/sql's Stmt with extra functionality
@@ -693,11 +707,7 @@ func Execf(e Execer, query string, args ...interface{}) sql.Result {
 
 // Execp (panic) runs Exec on the query and args and panics on error.
 func Execp(e Execer, query string, args ...interface{}) sql.Result {
-	res, err := e.Exec(query, args...)
-	if err != nil {
-		panic(err)
-	}
-	return res
+	return MustExec(e, query, args...)
 }
 
 // MustExec (panic) is an alias for Execp.

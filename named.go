@@ -12,8 +12,10 @@ package sqlx
 //  * compileNamedQuery - rebind a named query, returning a query and list of names
 //
 import (
+	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"strconv"
 	"unicode"
@@ -22,32 +24,175 @@ import (
 // NamedStmt is a prepared statement that executes named queries.  Prepare it
 // how you would execute a NamedQuery, but pass in a struct (or map for the map
 // variants) when you go to execute.
-type namedStmt struct {
-	Params []string
-	Query  string
-	Stmt   *Stmt
+type NamedStmt struct {
+	Params      []string
+	QueryString string
+	Stmt        *Stmt
 }
 
-// BindStruct binds a named parameter query with fields from a struct argument.
-// The rules for binding field names to parameter names follow the same
-// conventions as for StructScan, including obeying the `db` struct tags.
-func BindStruct(bindType int, query string, arg interface{}) (string, []interface{}, error) {
-	bound, names, err := compileNamedQuery([]byte(query), bindType)
-	if err != nil {
-		return "", []interface{}{}, err
-	}
+// Close closes the named statement.
+func (n *NamedStmt) Close() error {
+	return n.Stmt.Close()
+}
 
+// Exec executes a named statement using the struct passed.
+func (n *NamedStmt) Exec(arg interface{}) (sql.Result, error) {
+	args, err := bindStruct(n.Params, arg)
+	if err != nil {
+		return *new(sql.Result), err
+	}
+	return n.Stmt.Exec(args...)
+}
+
+// Query executes a named statement using the struct argument, returning rows.
+func (n *NamedStmt) Query(arg interface{}) (*sql.Rows, error) {
+	args, err := bindStruct(n.Params, arg)
+	if err != nil {
+		return nil, err
+	}
+	return n.Stmt.Query(args...)
+}
+
+// QueryRow executes a named statement against the database.  Because sqlx cannot
+// create a *sql.Row with an error condition pre-set for binding errors, sqlx
+// returns a *sqlx.Row instead.
+func (n *NamedStmt) QueryRow(arg interface{}) *Row {
+	args, err := bindStruct(n.Params, arg)
+	if err != nil {
+		return &Row{err: err}
+	}
+	return n.Stmt.QueryRowx(args...)
+}
+
+// Execv execs a NamedStmt with the given arg, printing errors and returning them
+func (n *NamedStmt) Execv(arg interface{}) (sql.Result, error) {
+	res, err := n.Exec(arg)
+	if err != nil {
+		log.Println(n.QueryString, res, err)
+	}
+	return res, err
+}
+
+// Execl execs a NamedStmt with the given arg, logging errors
+func (n *NamedStmt) Execl(arg interface{}) sql.Result {
+	res, err := n.Exec(arg)
+	if err != nil {
+		log.Println(n.QueryString, res, err)
+	}
+	return res
+}
+
+// Execf execs a NamedStmt, using log.fatal to print out errors
+func (n *NamedStmt) Execf(arg interface{}) sql.Result {
+	res, err := n.Exec(arg)
+	if err != nil {
+		log.Fatal(n.QueryString, res, err)
+	}
+	return res
+}
+
+// Execp execs a NamedStmt, panicing on error
+func (n *NamedStmt) Execp(arg interface{}) sql.Result {
+	return n.MustExec(arg)
+}
+
+// MustExec execs a NamedStmt, panicing on error
+func (n *NamedStmt) MustExec(arg interface{}) sql.Result {
+	res, err := n.Exec(arg)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+// Queryx using this NamedStmt
+func (n *NamedStmt) Queryx(arg interface{}) (*Rows, error) {
+	r, err := n.Query(arg)
+	if err != nil {
+		return nil, err
+	}
+	return &Rows{Rows: *r}, err
+}
+
+// QueryRowx this NamedStmt.  Because of limitations with QueryRow, this is
+// an alias for QueryRow.
+func (n *NamedStmt) QueryRowx(arg interface{}) *Row {
+	return n.QueryRow(arg)
+}
+
+// Select using this NamedStmt
+func (n *NamedStmt) Select(dest interface{}, arg interface{}) error {
+	rows, err := n.Query(arg)
+	if err != nil {
+		return err
+	}
+	// if something happens here, we want to make sure the rows are Closed
+	defer rows.Close()
+	return StructScan(rows, dest)
+}
+
+// Selectv using this NamedStmt
+func (n *NamedStmt) Selectv(dest interface{}, arg interface{}) error {
+	err := n.Select(dest, arg)
+	if err != nil {
+		log.Println(n.QueryString, err)
+	}
+	return err
+}
+
+// Selectf using this NamedStmt
+func (n *NamedStmt) Selectf(dest interface{}, arg interface{}) {
+	err := n.Select(dest, arg)
+	if err != nil {
+		log.Fatal(n.QueryString, err)
+	}
+}
+
+// Get using this NamedStmt
+func (n *NamedStmt) Get(dest interface{}, arg interface{}) error {
+	r := n.QueryRowx(arg)
+	return r.StructScan(dest)
+}
+
+// A union interface of preparer and binder, required to be able to prepare
+// named statements (as the bindtype must be determined).
+type namedPreparer interface {
+	Preparer
+	Binder
+}
+
+func prepareNamed(p namedPreparer, query string) (*NamedStmt, error) {
+	bindType := BindType(p.DriverName())
+	q, args, err := compileNamedQuery([]byte(query), bindType)
+	if err != nil {
+		return nil, err
+	}
+	stmt, err := Preparex(p, q)
+	if err != nil {
+		return nil, err
+	}
+	return &NamedStmt{
+		QueryString: q,
+		Params:      args,
+		Stmt:        stmt,
+	}, nil
+}
+
+// private interface to generate a list of interfaces from a given struct
+// type, given a list of names to pull out of the struct.  Used by public
+// BindStruct interface.
+func bindStruct(names []string, arg interface{}) ([]interface{}, error) {
 	arglist := make([]interface{}, 0, len(names))
 
 	t, err := BaseStructType(reflect.TypeOf(arg))
 	if err != nil {
-		return "", arglist, err
+		return arglist, err
 	}
 
 	// resolve this arg's type into a map of fields to field positions
 	fm, err := getFieldmap(t)
 	if err != nil {
-		return "", arglist, err
+		return arglist, err
 	}
 
 	// grab the indirected value of arg
@@ -61,9 +206,26 @@ func BindStruct(bindType int, query string, arg interface{}) (string, []interfac
 	for _, name := range names {
 		val, ok := fm[name]
 		if !ok {
-			return "", arglist, fmt.Errorf("could not find name %s in %v", name, arg)
+			return arglist, fmt.Errorf("could not find name %s in %v", name, arg)
 		}
 		arglist = append(arglist, values[val])
+	}
+
+	return arglist, nil
+}
+
+// BindStruct binds a named parameter query with fields from a struct argument.
+// The rules for binding field names to parameter names follow the same
+// conventions as for StructScan, including obeying the `db` struct tags.
+func BindStruct(bindType int, query string, arg interface{}) (string, []interface{}, error) {
+	bound, names, err := compileNamedQuery([]byte(query), bindType)
+	if err != nil {
+		return "", []interface{}{}, err
+	}
+
+	arglist, err := bindStruct(names, arg)
+	if err != nil {
+		return "", []interface{}{}, err
 	}
 
 	return bound, arglist, nil

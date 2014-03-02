@@ -187,6 +187,11 @@ func (db *DB) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(db, query, arg)
 }
 
+// NamedQueryRow using this DB.
+func (db *DB) NamedQueryRow(query string, arg interface{}) *Row {
+	return NamedQueryRow(db, query, arg)
+}
+
 // NamedExec using this DB.
 func (db *DB) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	return NamedExec(db, query, arg)
@@ -310,6 +315,11 @@ func (tx *Tx) BindStruct(query string, arg interface{}) (string, []interface{}, 
 // NamedQuery within a transaction.
 func (tx *Tx) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(tx, query, arg)
+}
+
+// NamedQueryRow within a transaction.
+func (tx *Tx) NamedQueryRow(query string, arg interface{}) *Row {
+	return NamedQueryRow(tx, query, arg)
 }
 
 // NamedExec a named query within a transaction.
@@ -1119,6 +1129,16 @@ func NamedQuery(e Ext, query string, arg interface{}) (*Rows, error) {
 		return nil, err
 	}
 	return e.Queryx(q, args...)
+}
+
+// NamedQueryRow uses BindStruct to get a query executable by the driver and
+// then run QueryRowx on the result.  Returns an sqlx.Row.
+func NamedQueryRow(e Ext, query string, arg interface{}) *Row {
+	q, args, err := e.BindStruct(query, arg)
+	if err != nil {
+		return &Row{rows: nil, err: err}
+	}
+	return e.QueryRowx(q, args...)
 }
 
 // NamedExec uses BindStruct to get a query executable by the driver and

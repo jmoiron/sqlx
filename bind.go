@@ -13,6 +13,7 @@ const (
 	UNKNOWN = iota
 	QUESTION
 	DOLLAR
+	NAMED
 )
 
 // BindType returns the bindtype for a given database given a drivername
@@ -24,6 +25,8 @@ func BindType(driverName string) int {
 		return QUESTION
 	case "sqlite":
 		return QUESTION
+	case "oci8":
+		return NAMED
 	}
 	return UNKNOWN
 }
@@ -137,6 +140,9 @@ func BindMap(bindType int, query string, args map[string]interface{}) (string, [
 			// proper bindvar for the bindType
 			arglist = append(arglist, val)
 			switch bindType {
+			case NAMED:
+				rebound = append(rebound, ':')
+				rebound = append(rebound, name...)
 			case QUESTION, UNKNOWN:
 				rebound = append(rebound, '?')
 			case DOLLAR:

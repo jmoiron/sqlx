@@ -304,6 +304,10 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 			name = make([]byte, 0, 10)
 			// add a proper bindvar for the bindType
 			switch bindType {
+			// oracle only supports named type bind vars even for positional
+			case NAMED:
+				rebound = append(rebound, ':')
+				rebound = append(rebound, name...)
 			case QUESTION, UNKNOWN:
 				rebound = append(rebound, '?')
 			case DOLLAR:

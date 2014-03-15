@@ -10,6 +10,7 @@ const (
 	UNKNOWN = iota
 	QUESTION
 	DOLLAR
+	NAMED
 )
 
 // BindType returns the bindtype for a given database given a drivername
@@ -21,6 +22,8 @@ func BindType(driverName string) int {
 		return QUESTION
 	case "sqlite":
 		return QUESTION
+	case "oci8":
+		return NAMED
 	}
 	return UNKNOWN
 }
@@ -49,7 +52,6 @@ func Rebind(bindType int, query string) string {
 			rqb = append(rqb, b)
 		}
 	}
-
 	return string(rqb)
 }
 

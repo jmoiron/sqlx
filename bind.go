@@ -31,6 +31,8 @@ func BindType(driverName string) int {
 // FIXME: this should be able to be tolerant of escaped ?'s in queries without
 // losing much speed, and should be to avoid confusion.
 
+// FIXME: this is now produces the wrong results for oracle's NAMED bindtype
+
 // Rebind a query from the default bindtype (QUESTION) to the target bindtype
 func Rebind(bindType int, query string) string {
 	if bindType != DOLLAR {

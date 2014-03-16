@@ -331,3 +331,53 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 
 	return string(rebound), names, err
 }
+
+// bindAny binds a struct or a map by inspecting the arg interface.
+func bindAny(e Ext, query string, arg interface{}) (string, []interface{}, error) {
+	if maparg, ok := arg.(map[string]interface{}); ok {
+		return e.BindMap(query, maparg)
+	}
+	return e.BindStruct(query, arg)
+}
+
+// NamedQuery binds a named query and then runs Query on the result using the
+// provided Ext (sqlx.Tx, sqlx.Db).  It works with both structs and with
+// map[string]interface{} types.
+func NamedQuery(e Ext, query string, arg interface{}) (*Rows, error) {
+	q, args, err := bindAny(e, query, arg)
+	if err != nil {
+		return nil, err
+	}
+	return e.Queryx(q, args...)
+}
+
+// NamedExec uses BindStruct to get a query executable by the driver and
+// then runs Exec on the result.  Returns an error from the binding
+// or the query excution itself.
+func NamedExec(e Ext, query string, arg interface{}) (sql.Result, error) {
+	q, args, err := bindAny(e, query, arg)
+	if err != nil {
+		return nil, err
+	}
+	return e.Exec(q, args...)
+}
+
+// NamedQueryMap runs a named query using a map instead of a struct.
+// DEPRECATED:  Use NamedQuery instead, which also supports maps.
+func NamedQueryMap(e Ext, query string, argmap map[string]interface{}) (*Rows, error) {
+	q, args, err := e.BindMap(query, argmap)
+	if err != nil {
+		return nil, err
+	}
+	return e.Queryx(q, args...)
+}
+
+// NamedExecMap executes a named query using a map instead of a struct.
+// DEPRECATED: Use NamedExec instead, which also supports maps.
+func NamedExecMap(e Ext, query string, argmap map[string]interface{}) (sql.Result, error) {
+	q, args, err := e.BindMap(query, argmap)
+	if err != nil {
+		return nil, err
+	}
+	return e.Exec(q, args...)
+}

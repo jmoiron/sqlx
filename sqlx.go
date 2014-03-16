@@ -173,11 +173,13 @@ func (db *DB) BindStruct(query string, arg interface{}) (string, []interface{}, 
 }
 
 // NamedQueryMap using this DB.
+// DEPRECATED: use NamedQuery instead.
 func (db *DB) NamedQueryMap(query string, argmap map[string]interface{}) (*Rows, error) {
 	return NamedQueryMap(db, query, argmap)
 }
 
 // NamedExecMap using this DB.
+// DEPRECATED: use NamedExec instead
 func (db *DB) NamedExecMap(query string, argmap map[string]interface{}) (sql.Result, error) {
 	return NamedExecMap(db, query, argmap)
 }
@@ -323,11 +325,13 @@ func (tx *Tx) NamedExec(query string, arg interface{}) (sql.Result, error) {
 }
 
 // NamedQueryMap within a transaction.
+// DEPRECATED: Use NamedQuery instead
 func (tx *Tx) NamedQueryMap(query string, arg map[string]interface{}) (*Rows, error) {
 	return NamedQueryMap(tx, query, arg)
 }
 
 // NamedExecMap a named query within a transaction.
+// DEPRECATED: Use NamedExec instead
 func (tx *Tx) NamedExecMap(query string, arg map[string]interface{}) (sql.Result, error) {
 	return NamedExecMap(tx, query, arg)
 }

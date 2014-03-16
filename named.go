@@ -3,13 +3,15 @@ package sqlx
 // Named Query Support
 //
 //  * BindStruct, BindMap - bind query bindvars to map/struct args
-//	* NamedExec, NamedQuery - named query w/ struct
-//  * NamedExecMap, NamedQueryMap - named query w/ maps
+//	* NamedExec, NamedQuery - named query w/ struct or map
+//  * NamedExecMap, NamedQueryMap - named query w/ maps (DEPRECATED)
 //  * NamedStmt - a pre-compiled named query which is a prepared statement
 //
 // Internal Interfaces:
 //
 //  * compileNamedQuery - rebind a named query, returning a query and list of names
+//  * bindArgs, bindMapArgs, bindAnyArgs - given a list of names, return an arglist
+//  * bindAny - call BindStruct or BindMap depending on the type of the argument
 //
 import (
 	"database/sql"
@@ -22,8 +24,7 @@ import (
 )
 
 // NamedStmt is a prepared statement that executes named queries.  Prepare it
-// how you would execute a NamedQuery, but pass in a struct (or map for the map
-// variants) when you go to execute.
+// how you would execute a NamedQuery, but pass in a struct or map when executing.
 type NamedStmt struct {
 	Params      []string
 	QueryString string
@@ -37,7 +38,7 @@ func (n *NamedStmt) Close() error {
 
 // Exec executes a named statement using the struct passed.
 func (n *NamedStmt) Exec(arg interface{}) (sql.Result, error) {
-	args, err := bindStruct(n.Params, arg)
+	args, err := bindAnyArgs(n.Params, arg)
 	if err != nil {
 		return *new(sql.Result), err
 	}
@@ -46,7 +47,7 @@ func (n *NamedStmt) Exec(arg interface{}) (sql.Result, error) {
 
 // Query executes a named statement using the struct argument, returning rows.
 func (n *NamedStmt) Query(arg interface{}) (*sql.Rows, error) {
-	args, err := bindStruct(n.Params, arg)
+	args, err := bindAnyArgs(n.Params, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +58,7 @@ func (n *NamedStmt) Query(arg interface{}) (*sql.Rows, error) {
 // create a *sql.Row with an error condition pre-set for binding errors, sqlx
 // returns a *sqlx.Row instead.
 func (n *NamedStmt) QueryRow(arg interface{}) *Row {
-	args, err := bindStruct(n.Params, arg)
+	args, err := bindAnyArgs(n.Params, arg)
 	if err != nil {
 		return &Row{err: err}
 	}
@@ -178,10 +179,17 @@ func prepareNamed(p namedPreparer, query string) (*NamedStmt, error) {
 	}, nil
 }
 
+func bindAnyArgs(names []string, arg interface{}) ([]interface{}, error) {
+	if maparg, ok := arg.(map[string]interface{}); ok {
+		return bindMapArgs(names, maparg)
+	}
+	return bindArgs(names, arg)
+}
+
 // private interface to generate a list of interfaces from a given struct
 // type, given a list of names to pull out of the struct.  Used by public
 // BindStruct interface.
-func bindStruct(names []string, arg interface{}) ([]interface{}, error) {
+func bindArgs(names []string, arg interface{}) ([]interface{}, error) {
 	arglist := make([]interface{}, 0, len(names))
 
 	t, err := BaseStructType(reflect.TypeOf(arg))
@@ -214,6 +222,20 @@ func bindStruct(names []string, arg interface{}) ([]interface{}, error) {
 	return arglist, nil
 }
 
+// like bindArgs, but for maps.
+func bindMapArgs(names []string, arg map[string]interface{}) ([]interface{}, error) {
+	arglist := make([]interface{}, 0, len(names))
+
+	for _, name := range names {
+		val, ok := arg[name]
+		if !ok {
+			return arglist, fmt.Errorf("could not find name %s in %v", name, arg)
+		}
+		arglist = append(arglist, val)
+	}
+	return arglist, nil
+}
+
 // BindStruct binds a named parameter query with fields from a struct argument.
 // The rules for binding field names to parameter names follow the same
 // conventions as for StructScan, including obeying the `db` struct tags.
@@ -223,7 +245,7 @@ func BindStruct(bindType int, query string, arg interface{}) (string, []interfac
 		return "", []interface{}{}, err
 	}
 
-	arglist, err := bindStruct(names, arg)
+	arglist, err := bindArgs(names, arg)
 	if err != nil {
 		return "", []interface{}{}, err
 	}
@@ -238,17 +260,8 @@ func BindMap(bindType int, query string, args map[string]interface{}) (string, [
 		return "", []interface{}{}, err
 	}
 
-	arglist := make([]interface{}, 0, len(names))
-
-	for _, name := range names {
-		val, ok := args[name]
-		if !ok {
-			return "", arglist, fmt.Errorf("could not find name %s in %v", name, args)
-		}
-		arglist = append(arglist, val)
-	}
-
-	return bound, arglist, nil
+	arglist, err := bindMapArgs(names, args)
+	return bound, arglist, err
 }
 
 // -- Compilation of Named Queries

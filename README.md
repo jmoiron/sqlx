@@ -5,12 +5,13 @@
 sqlx is a library which provides a set of extensions on go's standard
 `database/sql` library.  The sqlx versions of `sql.DB`, `sql.TX`, `sql.Stmt`,
 et al. all leave the underlying interfaces untouched, so that their interfaces
-are a superset on the standard ones.
+are a superset on the standard ones.  This makes it relatively painless to
+integrate existing codebases using database/sql with sqlx.
 
 Major additional concepts are:
 
 * Marshal rows into structs (with embedded struct support), maps, and slices
-* Named parameter support
+* Named parameter support including prepared statements
 * `Get` and `Select` to go quickly from query to struct/slice
 * Common error handling mnemonics (eg. `Execf`, `Execp` (`MustExec`), and `Execl`)
 * `LoadFile` for executing statements from a file
@@ -144,7 +145,7 @@ func main() {
 
     // Named queries, using `:name` as the bindvar.  Automatic bindvar support
     // which takes into account the dbtype based on the driverName on sqlx.Open/Connect
-    _, err = db.NamedExecMap(`INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)`, 
+    _, err = db.NamedExec(`INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)`, 
         map[string]interface{}{
             "first": "Bin",
             "last": "Smuth",
@@ -152,7 +153,7 @@ func main() {
     })
 
     // Selects Mr. Smith from the database
-    rows, err := db.NamedQueryMap(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Bin"})
+    rows, err := db.NamedQuery(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Bin"})
 
     // Named queries can also use structs.  Their bind names follow the same rules
     // as the name -> db mapping, so struct fields are lowercased and the `db` tag

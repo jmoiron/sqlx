@@ -603,7 +603,8 @@ func TestUsage(t *testing.T) {
 		}
 
 		// test advanced querying
-		_, err = db.NamedExecMap("INSERT INTO person (first_name, last_name, email) VALUES (:first, :last, :email)", map[string]interface{}{
+		// test that NamedExec works with a map as well as a struct
+		_, err = db.NamedExec("INSERT INTO person (first_name, last_name, email) VALUES (:first, :last, :email)", map[string]interface{}{
 			"first": "Bin",
 			"last":  "Smuth",
 			"email": "bensmith@allblacks.nz",
@@ -613,7 +614,8 @@ func TestUsage(t *testing.T) {
 		}
 
 		// ensure that if the named param happens right at the end it still works
-		rows, err = db.NamedQueryMap("SELECT * FROM person WHERE first_name=:first", map[string]interface{}{"first": "Bin"})
+		// ensure that NamedQuery works with a map[string]interface{}
+		rows, err = db.NamedQuery("SELECT * FROM person WHERE first_name=:first", map[string]interface{}{"first": "Bin"})
 		if err != nil {
 			t.Fatal(err)
 		}

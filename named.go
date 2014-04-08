@@ -312,9 +312,8 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 			if i == last && unicode.IsOneOf(allowedBindRunes, rune(b)) {
 				name = append(name, b)
 			}
-			// add the string representation to the names list and reset our name buffer
+			// add the string representation to the names list
 			names = append(names, string(name))
-			name = make([]byte, 0, 10)
 			// add a proper bindvar for the bindType
 			switch bindType {
 			// oracle only supports named type bind vars even for positional

@@ -37,12 +37,12 @@ func TestCompileQuery(t *testing.T) {
 	}
 
 	for _, test := range table {
-		qq, names, err := compileNamedQuery([]byte(test.Q), QUESTION)
+		qr, names, err := compileNamedQuery([]byte(test.Q), QUESTION)
 		if err != nil {
 			t.Error(err)
 		}
-		if qq != test.R {
-			t.Errorf("expected %s, got %s", test.R, qq)
+		if qr != test.R {
+			t.Errorf("expected %s, got %s", test.R, qr)
 		}
 		if len(names) != len(test.N) {
 			t.Errorf("expected %#v, got %#v", test.N, names)
@@ -56,6 +56,11 @@ func TestCompileQuery(t *testing.T) {
 		qd, _, _ := compileNamedQuery([]byte(test.Q), DOLLAR)
 		if qd != test.D {
 			t.Errorf("expected %s, got %s", test.D, qd)
+		}
+
+		qq, _, _ := compileNamedQuery([]byte(test.Q), NAMED)
+		if qq != test.Q {
+			t.Errorf("expected %s, got %s", test.Q, qq)
 		}
 	}
 }

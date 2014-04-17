@@ -279,6 +279,30 @@ func TestEmbeddedStructs(t *testing.T) {
 			}
 		}
 
+		// test embedded structs with StructScan
+		rows, err := db.Queryx(
+			`SELECT person.*, place.* FROM
+         person natural join place`)
+		if err != nil {
+			t.Error(err)
+		}
+
+		perp := PersonPlace{}
+		rows.Next()
+		err = rows.StructScan(&perp)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(perp.Person.FirstName) == 0 {
+			t.Errorf("Expected non zero lengthed first name.")
+		}
+		if len(perp.Place.Country) == 0 {
+			t.Errorf("Expected non zero lengthed country.")
+		}
+
+		rows.Close()
+
 		// test the same for embedded pointer structs
 		peopleAndPlacesPtrs := []PersonPlacePtr{}
 		err = db.Select(

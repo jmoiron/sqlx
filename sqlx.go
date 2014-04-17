@@ -579,9 +579,10 @@ func (r *Rows) StructScan(dest interface{}) error {
 		}
 		r.started = true
 	}
-	for i, field := range r.fields {
-		r.values[i] = base.Field(field).Addr().Interface()
-	}
+
+	// create a new struct type (which returns PtrTo) and indirect it
+	setValues(r.fields, reflect.Indirect(v), r.values)
+	// scan into the struct field pointers and append to our results
 	err := r.Scan(r.values...)
 	if err != nil {
 		return err

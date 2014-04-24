@@ -198,7 +198,7 @@ func bindArgs(names []string, arg interface{}) ([]interface{}, error) {
 	}
 
 	// resolve this arg's type into a map of fields to field positions
-	fm, err := getFieldmap(t)
+	fm, err := getFieldMap(t)
 	if err != nil {
 		return arglist, err
 	}
@@ -209,7 +209,8 @@ func bindArgs(names []string, arg interface{}) ([]interface{}, error) {
 		v = v.Elem()
 	}
 
-	values := getValues(v)
+	// FIXME: what the hell is going on here
+	values := fm.allValues(v)
 
 	for _, name := range names {
 		val, ok := fm[name]

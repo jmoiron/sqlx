@@ -942,7 +942,7 @@ func BenchmarkRebindBuffer(b *testing.B) {
 }
 
 func TestGetFieldMap(t *testing.T) {
-	testingTable := map[reflect.Type]fieldmap{
+	testingTable := map[reflect.Type]fieldMap{
 		reflect.TypeOf(new(Person)): {"first_name": 0, "last_name": 1, "email": 2, "added_at": 3},
 		reflect.TypeOf(new(Place)):  {"country": 0, "city": 1, "telcode": 2},
 		reflect.TypeOf(new(PersonPlace)): {
@@ -953,7 +953,7 @@ func TestGetFieldMap(t *testing.T) {
 			"country": 4, "city": 5, "telcode": 6},
 	}
 	for typ, expected := range testingTable {
-		fields, err := getFieldmap(typ)
+		fields, err := getFieldMap(typ)
 		if err != nil {
 			t.Fatal(err)
 		}

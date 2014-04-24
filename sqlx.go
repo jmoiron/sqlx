@@ -2,17 +2,13 @@ package sqlx
 
 import (
 	"database/sql"
-	"database/sql/driver"
 	"errors"
-	"fmt"
 
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
-	"time"
 )
 
 // NameMapper is used to map column names to struct field names.  By default,
@@ -551,13 +547,14 @@ func (r *Rows) StructScan(dest interface{}) error {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
 	}
 	base := reflect.Indirect(v)
-	// see if we have a cached fieldmap
+
+	fm, err := getFieldMap(base.Type())
+	if err != nil {
+		return err
+	}
+
 	if !r.started {
 
-		fm, err := getFieldmap(base.Type())
-		if err != nil {
-			return err
-		}
 		columns, err := r.Columns()
 		if err != nil {
 			return err
@@ -581,9 +578,9 @@ func (r *Rows) StructScan(dest interface{}) error {
 	}
 
 	// create a new struct type (which returns PtrTo) and indirect it
-	setValues(r.fields, reflect.Indirect(v), r.values)
+	fm.getValues(reflect.Indirect(v), r.fields, r.values)
 	// scan into the struct field pointers and append to our results
-	err := r.Scan(r.values...)
+	err = r.Scan(r.values...)
 	if err != nil {
 		return err
 	}
@@ -729,215 +726,6 @@ func MustExec(e Execer, query string, args ...interface{}) sql.Result {
 	return res
 }
 
-// A map of names to field positions for destination structs
-type fieldmap map[string]int
-
-// A cache of fieldmaps for reflect Types
-var (
-	fieldmapCache     = map[reflect.Type]fieldmap{}
-	fieldmapCacheLock sync.RWMutex
-)
-
-// dereference pointers to a particular kind
-func deref(t reflect.Type, k reflect.Kind) (reflect.Type, error) {
-	for {
-		switch t.Kind() {
-		case reflect.Ptr:
-			t = t.Elem()
-			continue
-		case k:
-			return t, nil
-		default:
-			return nil, fmt.Errorf("destination must be %s", k)
-		}
-	}
-}
-
-// BaseSliceType returns the type for a slice, dereferencing it if it is a pointer.
-// Returns an error if the destination is not a slice or a pointer to a slice.
-func BaseSliceType(t reflect.Type) (reflect.Type, error) {
-	return deref(t, reflect.Slice)
-}
-
-// BaseStructType returns the type of a struct, dereferencing it if it is a pointer.
-// Returns an error if the destination is not a struct or a pointer to a struct.
-func BaseStructType(t reflect.Type) (reflect.Type, error) {
-	return deref(t, reflect.Struct)
-}
-
-// commonly used reflect types.
-var (
-	scannerIface = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
-	valuerIface  = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
-	timeType     = reflect.TypeOf(time.Time{})
-)
-
-// Create a fieldmap for a given type and return its fieldmap (or error)
-// The fieldmap maps names to integers which represent the position of
-// a struct field in a breadth first search of the fields.
-func getFieldmap(t reflect.Type) (fm fieldmap, err error) {
-	// if we have a fieldmap cached, return it
-	t, err = BaseStructType(t)
-	if err != nil {
-		return nil, err
-	}
-
-	fieldmapCacheLock.RLock()
-	fm, ok := fieldmapCache[t]
-	fieldmapCacheLock.RUnlock()
-
-	if ok {
-		return fm, nil
-	}
-
-	fm = fieldmap{}
-	queue := []reflect.Type{t}
-
-	for i := 0; len(queue) != 0; {
-		ty := queue[0]
-		queue = queue[1:]
-		for j := 0; j < ty.NumField(); j++ {
-			f := ty.Field(j)
-			ft := f.Type
-			// skip unexported field
-			if len(f.PkgPath) != 0 {
-				continue
-			}
-			// perform one level of indirection for pointers to structs
-			if ft.Kind() == reflect.Ptr {
-				ft = ft.Elem()
-			}
-			if ft.Kind() == reflect.Struct && !reflect.PtrTo(ft).Implements(scannerIface) && ft != timeType {
-				queue = append(queue, ft)
-			} else {
-				name := NameMapper(f.Name)
-				if tag := f.Tag.Get("db"); tag != "" {
-					name = tag
-				}
-				if _, ok := fm[name]; ok {
-					// this name is already in the map, so skip it
-					continue
-				}
-				if name == "-" {
-					continue
-				}
-				fm[name] = i
-				i++
-			}
-		}
-	}
-	fieldmapCacheLock.Lock()
-	fieldmapCache[t] = fm
-	fieldmapCacheLock.Unlock()
-	return fm, nil
-}
-
-// Return the numeric fields corresponding to the columns
-func getFields(fm fieldmap, columns []string) ([]int, error) {
-	var num int
-	var ok bool
-	fields := make([]int, len(columns))
-	for i, name := range columns {
-		// find that name in the struct
-		num, ok = fm[name]
-		if !ok {
-			return fields, errors.New("Could not find name " + name + " in interface")
-		}
-		fields[i] = num
-	}
-	return fields, nil
-}
-
-// Given a value for a struct, return a slice of values which are pointers
-// to the well ordered fields in the struct, including embedded structs.
-// The indexes of this list correspond to the indexes from the fieldmap.
-func getValues(v reflect.Value) []interface{} {
-
-	queue := []reflect.Value{v}
-	fieldMap, _ := getFieldmap(v.Type())
-	values := make([]interface{}, len(fieldMap))
-	encountered := map[string]uint8{}
-	var isPtr, isScanner, isValuer bool
-
-	// if v is addressable, we return value pointers which are settable.
-	// if v is not addressable, we return the values themselves, which are
-	// then not settable.  This behavior is so that we can use getValues
-	// in read-only contexts, like named binding.
-	returnAddrs := v.CanAddr()
-
-	for i := 0; len(queue) != 0; {
-		vptr := queue[0]
-		queue = queue[1:]
-		for j := 0; j < vptr.NumField(); j++ {
-			v := vptr.Field(j)
-			vsf := vptr.Type().Field(j)
-			vt := v.Type()
-			isPtr = false
-			isScanner = false
-
-			// skip unexported fields
-			if len(vsf.PkgPath) != 0 {
-				continue
-			}
-
-			// skip duplicate names in the struct tree
-			if _, ok := encountered[vsf.Name]; ok {
-				continue
-			}
-			// skip fields with the db tag set to "-"
-			if tag := vsf.Tag.Get("db"); tag == "-" {
-				continue
-			}
-
-			encountered[vsf.Name] = 0
-			if vt.Kind() == reflect.Ptr {
-				vt = vt.Elem()
-				isPtr = true
-			}
-
-			if isPtr || !returnAddrs {
-				_, isScanner = v.Interface().(sql.Scanner)
-				_, isValuer = v.Interface().(driver.Valuer)
-			} else {
-				_, isScanner = v.Addr().Interface().(sql.Scanner)
-				_, isValuer = v.Addr().Interface().(driver.Valuer)
-			}
-
-			if vt.Kind() == reflect.Struct && !isScanner && !isValuer && vt != timeType {
-				if isPtr {
-					// Allocate a new struct for this poissibly nil pointer field, set it, and add to queue
-					alloc := reflect.New(vt)
-					v.Set(alloc)
-					queue = append(queue, reflect.Indirect(v))
-				} else {
-					queue = append(queue, v)
-				}
-			} else {
-				if !returnAddrs {
-					values[i] = v.Interface()
-				} else if returnAddrs {
-					values[i] = v.Addr().Interface()
-				}
-				i++
-			}
-		}
-	}
-
-	return values
-}
-
-// Return a slice of values representing the columns
-// These values are actually pointers into the addresses of struct fields
-// The values interface must be initialized to the length of fields, ie
-// make([]interface{}, len(fields)).  This function is the complement of
-// the getFieldmap function, in that they enumerate struct fields the same way.
-func setValues(fields []int, vptr reflect.Value, values []interface{}) {
-	vals := getValues(vptr)
-	for i, field := range fields {
-		values[i] = vals[field]
-	}
-}
-
 // SliceScan using this Rows.
 func (r *Row) SliceScan() ([]interface{}, error) {
 	return SliceScan(r)
@@ -967,7 +755,7 @@ func (r *Row) StructScan(dest interface{}) error {
 		return err
 	}
 
-	fm, err := getFieldmap(base)
+	fm, err := getFieldMap(base)
 	if err != nil {
 		return err
 	}
@@ -977,14 +765,11 @@ func (r *Row) StructScan(dest interface{}) error {
 		return err
 	}
 
-	fields, err := getFields(fm, columns)
-	if err != nil {
-		return err
-	}
+	indexes := fm.getFieldIndexes(columns)
 
 	values := make([]interface{}, len(columns))
 	// create a new struct type (which returns PtrTo) and indirect it
-	setValues(fields, reflect.Indirect(v), values)
+	fm.getValues(reflect.Indirect(v), indexes, values)
 	// scan into the struct field pointers and append to our results
 	return r.Scan(values...)
 }
@@ -1092,7 +877,7 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 		return err
 	}
 
-	fm, err := getFieldmap(base)
+	fm, err := getFieldMap(base)
 	if err != nil {
 		return err
 	}
@@ -1102,24 +887,24 @@ func StructScan(rows *sql.Rows, dest interface{}) error {
 		return err
 	}
 
-	fields, err := getFields(fm, columns)
-	if err != nil {
-		return err
-	}
+	indexes := fm.getFieldIndexes(columns)
+
 	// this will hold interfaces which are pointers to each field in the struct
 	values := make([]interface{}, len(columns))
+
 	for rows.Next() {
 		// create a new struct type (which returns PtrTo) and indirect it
 		vp = reflect.New(base)
 		v = reflect.Indirect(vp)
 
-		setValues(fields, v, values)
+		fm.getValues(v, indexes, values)
 
 		// scan into the struct field pointers and append to our results
 		err = rows.Scan(values...)
 		if err != nil {
 			return err
 		}
+
 		if isPtr {
 			direct.Set(reflect.Append(direct, vp))
 		} else {

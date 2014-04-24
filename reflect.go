@@ -171,8 +171,7 @@ func (f fieldMap) getValues(v reflect.Value, indexes []int, values []interface{}
 		if index >= 0 {
 			values[i] = all[index]
 		} else {
-			// NOTE: this is known not to work with timestamp fields w/ lib/pq
-			values[i] = &[]byte{}
+			values[i] = new(interface{})
 		}
 	}
 }
@@ -185,7 +184,7 @@ func (f fieldMap) getValuesList(v reflect.Value, indexes []int) []interface{} {
 		if index >= 0 {
 			values[i] = all[index]
 		} else {
-			values[i] = &[]byte{}
+			values[i] = new(interface{})
 		}
 	}
 	return values

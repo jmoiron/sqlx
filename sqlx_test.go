@@ -267,8 +267,8 @@ func TestMissingNames(t *testing.T) {
 		type PersonPlus struct {
 			FirstName string `db:"first_name"`
 			LastName  string `db:"last_name"`
-			//Email     string
-			AddedAt time.Time `db:"added_at"`
+			Email     string
+			//AddedAt time.Time `db:"added_at"`
 		}
 
 		// test Select first

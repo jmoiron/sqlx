@@ -209,7 +209,8 @@ func bindArgs(names []string, arg interface{}) ([]interface{}, error) {
 		v = v.Elem()
 	}
 
-	// FIXME: what the hell is going on here
+	// FIXME: why aren't we using reflect helpers here?
+
 	values := fm.allValues(v)
 
 	for _, name := range names {

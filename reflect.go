@@ -168,7 +168,12 @@ func (f fieldMap) getFieldIndexes(names []string) []int {
 func (f fieldMap) getValues(v reflect.Value, indexes []int, values []interface{}) {
 	all := f.allValues(v)
 	for i, index := range indexes {
-		values[i] = all[index]
+		if index >= 0 {
+			values[i] = all[index]
+		} else {
+			// NOTE: this is known not to work with timestamp fields w/ lib/pq
+			values[i] = &[]byte{}
+		}
 	}
 }
 
@@ -177,7 +182,11 @@ func (f fieldMap) getValuesList(v reflect.Value, indexes []int) []interface{} {
 	all := f.allValues(v)
 	values := make([]interface{}, len(indexes))
 	for i, index := range indexes {
-		values[i] = all[index]
+		if index >= 0 {
+			values[i] = all[index]
+		} else {
+			values[i] = &[]byte{}
+		}
 	}
 	return values
 }

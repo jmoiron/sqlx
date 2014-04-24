@@ -259,6 +259,47 @@ func loadDefaultFixture(db *DB, t *testing.T) {
 	tx.Commit()
 }
 
+// Test a new backwards compatible feature, that missing scan destinations
+// will silently scan into sql.RawText rather than failing/panicing
+func TestMissingNames(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		type PersonPlus struct {
+			FirstName string `db:"first_name"`
+			LastName  string `db:"last_name"`
+			//Email     string
+			AddedAt time.Time `db:"added_at"`
+		}
+
+		// test Select first
+		pps := []PersonPlus{}
+		// pps lacks added_at destination
+		err := db.Select(&pps, "SELECT * FROM person")
+		if err != nil {
+			t.Error(err)
+		}
+
+		// test Get
+		pp := PersonPlus{}
+		err = db.Get(&pp, "SELECT * FROM person LIMIT 1")
+		if err != nil {
+			t.Error(err)
+		}
+
+		// test naked StructScan
+		rows, err := db.Query("SELECT * FROM person LIMIT 1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows.Next()
+		err = StructScan(rows, &pps)
+		if err != nil {
+			t.Error(err)
+		}
+		rows.Close()
+	})
+}
+
 func TestEmbeddedStructs(t *testing.T) {
 	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
 		loadDefaultFixture(db, t)

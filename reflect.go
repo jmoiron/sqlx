@@ -3,6 +3,7 @@ package sqlx
 import (
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -147,47 +148,38 @@ func newFieldMap(t reflect.Type) (fieldMap, error) {
 
 // getFieldIndexes returns a list of indexes corresponding to names from the
 // fieldmap.  If a name can't be found, it gets a -1 associated with it.
-func (f fieldMap) getFieldIndexes(names []string) []int {
+func (f fieldMap) getFieldIndexes(names []string, unsafe bool) ([]int, error) {
 	fields := make([]int, len(names))
 
 	for i, name := range names {
 		// find that name in the struct
 		num, ok := f[name]
-		if !ok {
+		if !ok && unsafe {
 			fields[i] = -1
+		} else if !ok {
+			return fields, fmt.Errorf("Could not find name %s in destination.", name)
 		} else {
 			fields[i] = num
 		}
 	}
-	return fields
+	return fields, nil
 }
 
 // getValues fills values with the interface{} from v for fields corresponding
 // to indexes.  If v is addressable, these are pointers, otherwise they are just
 // copies.
-func (f fieldMap) getValues(v reflect.Value, indexes []int, values []interface{}) {
+func (f fieldMap) getValues(v reflect.Value, indexes []int, values []interface{}, unsafe bool) error {
 	all := f.allValues(v)
 	for i, index := range indexes {
 		if index >= 0 {
 			values[i] = all[index]
-		} else {
+		} else if unsafe {
 			values[i] = new(interface{})
+		} else {
+			return errors.New("Unsafe not set but unknown field found.")
 		}
 	}
-}
-
-// getValuesList is a version of getValues which returns a new []interface{}
-func (f fieldMap) getValuesList(v reflect.Value, indexes []int) []interface{} {
-	all := f.allValues(v)
-	values := make([]interface{}, len(indexes))
-	for i, index := range indexes {
-		if index >= 0 {
-			values[i] = all[index]
-		} else {
-			values[i] = new(interface{})
-		}
-	}
-	return values
+	return nil
 }
 
 // allValues fetches all field values from a struct value.  These values are in

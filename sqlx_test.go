@@ -275,28 +275,58 @@ func TestMissingNames(t *testing.T) {
 		pps := []PersonPlus{}
 		// pps lacks added_at destination
 		err := db.Select(&pps, "SELECT * FROM person")
-		if err != nil {
-			t.Error(err)
+		if err == nil {
+			t.Error("Expected missing name from Select to fail, but it did not.")
 		}
 
 		// test Get
 		pp := PersonPlus{}
 		err = db.Get(&pp, "SELECT * FROM person LIMIT 1")
-		if err != nil {
-			t.Error(err)
+		if err == nil {
+			t.Error("Expected missing name Get to fail, but it did not.")
 		}
 
 		// test naked StructScan
+		pps = []PersonPlus{}
 		rows, err := db.Query("SELECT * FROM person LIMIT 1")
 		if err != nil {
 			t.Fatal(err)
 		}
 		rows.Next()
 		err = StructScan(rows, &pps)
+		if err == nil {
+			t.Error("Expected missing name in StructScan to fail, but it did not.")
+		}
+		rows.Close()
+
+		// now try various things with unsafe set.
+		db = db.Unsafe()
+		pps = []PersonPlus{}
+		err = db.Select(&pps, "SELECT * FROM person")
 		if err != nil {
 			t.Error(err)
 		}
-		rows.Close()
+
+		// test Get
+		pp = PersonPlus{}
+		err = db.Get(&pp, "SELECT * FROM person LIMIT 1")
+		if err != nil {
+			t.Error(err)
+		}
+
+		// test naked StructScan
+		pps = []PersonPlus{}
+		rowsx, err := db.Queryx("SELECT * FROM person LIMIT 1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		rowsx.Next()
+		err = StructScan(rowsx, &pps)
+		if err != nil {
+			t.Error(err)
+		}
+		rowsx.Close()
+
 	})
 }
 

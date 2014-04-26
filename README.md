@@ -198,7 +198,7 @@ simply shown in an example:
 ```go
     db, err := sqlx.Connect("postgres", "user=foo dbname=bar sslmode=disable")
     if err != nil {
-        log.Fatalln(err)
+        log.Fatal(err)
     }
 
     type Person {

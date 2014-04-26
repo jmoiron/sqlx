@@ -813,6 +813,9 @@ func (r *Row) StructScan(dest interface{}) error {
 	if v.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
 	}
+	if v.IsNil() {
+		return errors.New("nil pointer passed to StructScan destination")
+	}
 
 	direct := reflect.Indirect(v)
 	base, err := BaseStructType(direct.Type())
@@ -937,6 +940,9 @@ func StructScan(rows rowsi, dest interface{}) error {
 	value := reflect.ValueOf(dest)
 	if value.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
+	}
+	if value.IsNil() {
+		return errors.New("nil pointer passed to StructScan destination")
 	}
 
 	direct := reflect.Indirect(value)

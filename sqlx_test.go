@@ -430,6 +430,22 @@ func TestEmbeddedStructs(t *testing.T) {
 	})
 }
 
+func TestNilReceiver(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		var p *Person
+		err := db.Get(p, "SELECT * FROM person LIMIT 1")
+		if err == nil {
+			t.Error("Expected error when getting into nil struct ptr.")
+		}
+		var pp *[]Person
+		err = db.Select(pp, "SELECT * FROM person")
+		if err == nil {
+			t.Error("Expected an error when selecting into nil slice ptr.")
+		}
+	})
+}
+
 func TestNamedQuery(t *testing.T) {
 	var schema = Schema{
 		create: `

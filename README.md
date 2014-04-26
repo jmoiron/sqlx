@@ -173,3 +173,48 @@ but does not make structs with possible ambiguous selectors errors.  Sqlx will d
 which field to use on a struct based on a breadth first search of the struct and any
 structs it contains or embeds, as specified by the order of the fields as accessible
 by `reflect`, which generally means in source-order.
+
+## scan safety
+
+By default, scanning into structs requires the structs to have fields for all of the
+columns in the query.  This was done for a few reasons:
+
+* A mistake in naming during development could lead you to believe that data is
+  being written to a field when actually it can't be found and it is being dropped
+* This behavior mirrors the behavior of the Go compiler with respect to unused
+  variables
+* Selecting more data than you need is wasteful (more data on the wire, more time
+  marshalling, etc)
+
+Unlike Marshallers in the stdlib, the programmer scanning an sql result into a struct
+will generally have a full understanding of what the underlying data model is *and*
+full control over the SQL statement.
+
+Despite this, there are use cases where it's convenient to be able to ignore unknown
+columns.  In most of these cases, you might be better off with `ScanSlice`, but where
+you want to still use structs, there is now the `Unsafe` method.  Its usage is most
+simply shown in an example:
+
+```go
+    db, err := sqlx.Connect("postgres", "user=foo dbname=bar sslmode=disable")
+    if err != nil {
+        log.Fatalln(err)
+    }
+
+    type Person {
+        Name string
+    }
+    var p Person
+
+    // This fails, because there is no destination for location in Person
+    err = db.Get(&p, "SELECT name, location FROM person LIMIT 1")
+    
+    udb := db.Unsafe()
+    
+    // This succeeds and just sets `Name` in the p struct
+    err = udb.Get(&p, "SELECT name, location FROM person LIMIT 1")
+```
+
+The `Unsafe` method is implemented on `Tx`, `DB`, and `Stmt`.  When you use an unsafe
+`Tx` or `DB` to create a new `Tx` or `Stmt`, those inherit its lack of safety.
+

@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"io/ioutil"
-	"log"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -203,18 +202,6 @@ func (db *DB) BindStruct(query string, arg interface{}) (string, []interface{}, 
 	return BindStruct(BindType(db.driverName), query, arg)
 }
 
-// NamedQueryMap using this DB.
-// DEPRECATED: use NamedQuery instead.
-func (db *DB) NamedQueryMap(query string, argmap map[string]interface{}) (*Rows, error) {
-	return NamedQueryMap(db, query, argmap)
-}
-
-// NamedExecMap using this DB.
-// DEPRECATED: use NamedExec instead
-func (db *DB) NamedExecMap(query string, argmap map[string]interface{}) (sql.Result, error) {
-	return NamedExecMap(db, query, argmap)
-}
-
 // NamedQuery using this DB.
 func (db *DB) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(db, query, arg)
@@ -230,24 +217,9 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(db, dest, query, args...)
 }
 
-// Selectf using this DB.
-func (db *DB) Selectf(dest interface{}, query string, args ...interface{}) {
-	Selectf(db, dest, query, args...)
-}
-
-// Selectv using this DB.
-func (db *DB) Selectv(dest interface{}, query string, args ...interface{}) error {
-	return Selectv(db, dest, query, args...)
-}
-
 // Get using this DB.
 func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
-}
-
-// LoadFile using this DB.
-func (db *DB) LoadFile(path string) (*sql.Result, error) {
-	return LoadFile(db, path)
 }
 
 // MustBegin starts a transaction, and panics on error.  Returns an *sqlx.Tx instead
@@ -282,26 +254,6 @@ func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
 	rows, err := db.DB.Query(query, args...)
 	return &Row{rows: rows, err: err, unsafe: db.unsafe}
-}
-
-// Execv (verbose) runs Execv using this database.
-func (db *DB) Execv(query string, args ...interface{}) (sql.Result, error) {
-	return Execv(db, query, args...)
-}
-
-// Execl (log) runs Execl using this database.
-func (db *DB) Execl(query string, args ...interface{}) sql.Result {
-	return Execl(db, query, args...)
-}
-
-// Execf (fatal) runs Execf using this database.
-func (db *DB) Execf(query string, args ...interface{}) sql.Result {
-	return Execf(db, query, args...)
-}
-
-// Execp (panic) runs Execp using this database.
-func (db *DB) Execp(query string, args ...interface{}) sql.Result {
-	return Execp(db, query, args...)
 }
 
 // MustExec (panic) runs MustExec using this database.
@@ -362,23 +314,6 @@ func (tx *Tx) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	return NamedExec(tx, query, arg)
 }
 
-// NamedQueryMap within a transaction.
-// DEPRECATED: Use NamedQuery instead
-func (tx *Tx) NamedQueryMap(query string, arg map[string]interface{}) (*Rows, error) {
-	return NamedQueryMap(tx, query, arg)
-}
-
-// NamedExecMap a named query within a transaction.
-// DEPRECATED: Use NamedExec instead
-func (tx *Tx) NamedExecMap(query string, arg map[string]interface{}) (sql.Result, error) {
-	return NamedExecMap(tx, query, arg)
-}
-
-// LoadFile within a transaction.
-func (tx *Tx) LoadFile(path string) (*sql.Result, error) {
-	return LoadFile(tx, path)
-}
-
 // Select within a transaction.
 func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(tx, dest, query, args...)
@@ -402,36 +337,6 @@ func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
 // Get within a transaction.
 func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(tx, dest, query, args...)
-}
-
-// Selectv (verbose) within a transaction.
-func (tx *Tx) Selectv(dest interface{}, query string, args ...interface{}) error {
-	return Selectv(tx, dest, query, args...)
-}
-
-// Selectf (fatal) within a transaction.
-func (tx *Tx) Selectf(dest interface{}, query string, args ...interface{}) {
-	Selectf(tx, dest, query, args...)
-}
-
-// Execv (verbose) runs Execv within a transaction.
-func (tx *Tx) Execv(query string, args ...interface{}) (sql.Result, error) {
-	return Execv(tx, query, args...)
-}
-
-// Execl (log) runs Execl within a transaction.
-func (tx *Tx) Execl(query string, args ...interface{}) sql.Result {
-	return Execl(tx, query, args...)
-}
-
-// Execf (fatal) runs Execf within a transaction.
-func (tx *Tx) Execf(query string, args ...interface{}) sql.Result {
-	return Execf(tx, query, args...)
-}
-
-// Execp (panic) runs Execp within a transaction.
-func (tx *Tx) Execp(query string, args ...interface{}) sql.Result {
-	return Execp(tx, query, args...)
 }
 
 // MustExec runs MustExec within a transaction.
@@ -494,43 +399,9 @@ func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 	return Select(&qStmt{*s}, dest, "", args...)
 }
 
-// Selectv (verbose) using the prepared statement.
-func (s *Stmt) Selectv(dest interface{}, args ...interface{}) error {
-	return Selectv(&qStmt{*s}, dest, "", args...)
-}
-
-// Selectf (fatal) using the prepared statement.
-func (s *Stmt) Selectf(dest interface{}, args ...interface{}) {
-	Selectf(&qStmt{*s}, dest, "", args...)
-}
-
 // Get using the prepared statement.
 func (s *Stmt) Get(dest interface{}, args ...interface{}) error {
 	return Get(&qStmt{*s}, dest, "", args...)
-}
-
-// Execv (verbose) runs Execv using this statement.  Note that the query
-// portion of the error output will be blank, as Stmt does not expose its query.
-func (s *Stmt) Execv(args ...interface{}) (sql.Result, error) {
-	return Execv(&qStmt{*s}, "", args...)
-}
-
-// Execl (log) using this statement.  Note that the query portion of the error
-// output will be blank, as Stmt does not expose its query.
-func (s *Stmt) Execl(args ...interface{}) sql.Result {
-	return Execl(&qStmt{*s}, "", args...)
-}
-
-// Execf (fatal) using this statement.  Note that the query portion of the error
-// output will be blank, as Stmt does not expose its query.
-func (s *Stmt) Execf(args ...interface{}) sql.Result {
-	return Execf(&qStmt{*s}, "", args...)
-}
-
-// Execp (panic) using this statement.  Note that the query portion of the error
-// output will be blank, as Stmt does not expose its query.
-func (s *Stmt) Execp(args ...interface{}) sql.Result {
-	return Execp(&qStmt{*s}, "", args...)
 }
 
 // MustExec (panic) using this statement.  Note that the query portion of the error
@@ -693,25 +564,6 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	return StructScan(rows, dest)
 }
 
-// Selectv (verbose) will Select using a Queryer and use log.Println to print
-//the query and the error in the event of an error.
-func Selectv(q Queryer, dest interface{}, query string, args ...interface{}) error {
-	err := Select(q, dest, query, args...)
-	if err != nil {
-		log.Println(query, err)
-	}
-	return err
-}
-
-// Selectf (fatal) will Select using a Queryer and use log.Fatal to print
-// the query and the error in the event of an error.
-func Selectf(q Queryer, dest interface{}, query string, args ...interface{}) {
-	err := Select(q, dest, query, args...)
-	if err != nil {
-		log.Fatal(query, err)
-	}
-}
-
 // Get does a QueryRow using the provided Queryer, and StructScan the resulting
 // row into dest, which must be a pointer to a struct.  If there was no row,
 // Get will return sql.ErrNoRows like row.Scan would.
@@ -743,46 +595,7 @@ func LoadFile(e Execer, path string) (*sql.Result, error) {
 	return &res, err
 }
 
-// Execv (verbose) Exec's the query using the Execer and uses log.Println to
-// print the query, result, and error in the event of an error.
-func Execv(e Execer, query string, args ...interface{}) (sql.Result, error) {
-	res, err := e.Exec(query, args...)
-	if err != nil {
-		log.Println(query, res, err)
-	}
-	return res, err
-}
-
-// Execl (log) runs Exec on the query and args and ses log.Println to
-// print the query, result, and error in the event of an error.  Unlike Execv,
-// Execl does not return the error, and can be used in single-value contexts.
-//
-// Do not abuse Execl; it is convenient for experimentation but generally not
-// for production use.
-func Execl(e Execer, query string, args ...interface{}) sql.Result {
-	res, err := e.Exec(query, args...)
-	if err != nil {
-		log.Println(query, res, err)
-	}
-	return res
-}
-
-// Execf (fatal) runs Exec on the query and args and uses log.Fatal to
-// print the query, result, and error in the event of an error.
-func Execf(e Execer, query string, args ...interface{}) sql.Result {
-	res, err := e.Exec(query, args...)
-	if err != nil {
-		log.Fatal(query, res, err)
-	}
-	return res
-}
-
-// Execp (panic) runs Exec on the query and args and panics on error.
-func Execp(e Execer, query string, args ...interface{}) sql.Result {
-	return MustExec(e, query, args...)
-}
-
-// MustExec (panic) is an alias for Execp.
+// MustExec execs the query using e and panics if there was an error.
 func MustExec(e Execer, query string, args ...interface{}) sql.Result {
 	res, err := e.Exec(query, args...)
 	if err != nil {

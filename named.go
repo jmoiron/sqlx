@@ -17,7 +17,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"strconv"
 	"unicode"
@@ -65,38 +64,6 @@ func (n *NamedStmt) QueryRow(arg interface{}) *Row {
 	return n.Stmt.QueryRowx(args...)
 }
 
-// Execv execs a NamedStmt with the given arg, printing errors and returning them
-func (n *NamedStmt) Execv(arg interface{}) (sql.Result, error) {
-	res, err := n.Exec(arg)
-	if err != nil {
-		log.Println(n.QueryString, res, err)
-	}
-	return res, err
-}
-
-// Execl execs a NamedStmt with the given arg, logging errors
-func (n *NamedStmt) Execl(arg interface{}) sql.Result {
-	res, err := n.Exec(arg)
-	if err != nil {
-		log.Println(n.QueryString, res, err)
-	}
-	return res
-}
-
-// Execf execs a NamedStmt, using log.fatal to print out errors
-func (n *NamedStmt) Execf(arg interface{}) sql.Result {
-	res, err := n.Exec(arg)
-	if err != nil {
-		log.Fatal(n.QueryString, res, err)
-	}
-	return res
-}
-
-// Execp execs a NamedStmt, panicing on error
-func (n *NamedStmt) Execp(arg interface{}) sql.Result {
-	return n.MustExec(arg)
-}
-
 // MustExec execs a NamedStmt, panicing on error
 func (n *NamedStmt) MustExec(arg interface{}) sql.Result {
 	res, err := n.Exec(arg)
@@ -130,23 +97,6 @@ func (n *NamedStmt) Select(dest interface{}, arg interface{}) error {
 	// if something happens here, we want to make sure the rows are Closed
 	defer rows.Close()
 	return StructScan(rows, dest)
-}
-
-// Selectv using this NamedStmt
-func (n *NamedStmt) Selectv(dest interface{}, arg interface{}) error {
-	err := n.Select(dest, arg)
-	if err != nil {
-		log.Println(n.QueryString, err)
-	}
-	return err
-}
-
-// Selectf using this NamedStmt
-func (n *NamedStmt) Selectf(dest interface{}, arg interface{}) {
-	err := n.Select(dest, arg)
-	if err != nil {
-		log.Fatal(n.QueryString, err)
-	}
 }
 
 // Get using this NamedStmt
@@ -370,26 +320,6 @@ func NamedQuery(e Ext, query string, arg interface{}) (*Rows, error) {
 // or the query excution itself.
 func NamedExec(e Ext, query string, arg interface{}) (sql.Result, error) {
 	q, args, err := bindAny(e, query, arg)
-	if err != nil {
-		return nil, err
-	}
-	return e.Exec(q, args...)
-}
-
-// NamedQueryMap runs a named query using a map instead of a struct.
-// DEPRECATED:  Use NamedQuery instead, which also supports maps.
-func NamedQueryMap(e Ext, query string, argmap map[string]interface{}) (*Rows, error) {
-	q, args, err := e.BindMap(query, argmap)
-	if err != nil {
-		return nil, err
-	}
-	return e.Queryx(q, args...)
-}
-
-// NamedExecMap executes a named query using a map instead of a struct.
-// DEPRECATED: Use NamedExec instead, which also supports maps.
-func NamedExecMap(e Ext, query string, argmap map[string]interface{}) (sql.Result, error) {
-	q, args, err := e.BindMap(query, argmap)
 	if err != nil {
 		return nil, err
 	}

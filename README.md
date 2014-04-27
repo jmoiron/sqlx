@@ -19,6 +19,27 @@ Major additional concepts are:
 Read the usage below to see how sqlx might help you, or check out the [API
 documentation on godoc](http://godoc.org/github.com/jmoiron/sqlx).
 
+## Important API Stability Note
+
+The sqlx API has been stable for a long time as I have attempted to learn
+from the way that it interacts with real code and taken in bug reports.
+There have been very minor breaking changes in the past, many of which would
+not have affected most code.
+
+However, the API is very large, and there's little evidence that some of the
+repeated "convenience" verbs deserve to be so widely distributed amongst the
+nouns of DB, Tx, and Stmt.  Removing these methods but preserving the base
+convenience functions (which take any of these via an interface) would reduce
+the surface of the API a lot and make it easier to understand.
+
+In addition to this, there are some functions which were exported with the
+intent to facilitate building richer ORM libraries on top of sqlx, but after
+having [built one myself](http://github.com/jmoiron/modl), I'm not convinced
+that this is possible given the limited exposure of the name mapping that is
+revealed in the public API.  If it's a choice between exposing more of it or
+exposing none of it, I'd rather expose none of it in the `sqlx` namespace.
+
+
 ## install
 
     go get github.com/jmoiron/sqlx

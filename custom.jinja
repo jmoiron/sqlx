@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>{{title}}</title>
+        <link href='http://fonts.googleapis.com/css?family=PT+Sans:400,700' rel='stylesheet' type='text/css'>
+        {% if prettify %}
+        <link href="assets/css/prettify.css" rel="stylesheet">
+        <script src="assets/js/prettify.js"></script>
+        {% endif %}
+
+        <style>
+            .container { width: 660px; margin: 0 auto; margin-top: 2em; color: #333; font-family: "PT Sans", sans-serif; }
+            .prettyprint.linenums { box-shadow: none; -webkit-box-shadow: none; }
+            .prettyprint { border: 0;  background-color: #f2f2f2; padding: .5em 1em; }
+            ol.linenums { padding: 0; margin: 0; list-style-type: none; }
+            ol.linenums li { padding: 0; margin: 0; }
+            strong { color: #000; }
+            h1 { margin-bottom: 12px; }
+            h2 { margin-bottom: 6px; }
+            td.code { width: 100%; }
+            pre {
+                font-family: consolas,monospace;
+                font-size: 80%;
+                line-height: 1.5em;
+                padding: .5em 1em; 
+                border-radius: 5px;
+                background-color: #f2f2f2;
+                text-shadow: 0 1px 0 white;
+                overflow-x: auto;
+            }
+            code {
+                font-family: consolas,monospace;
+                font-size: 85%;
+                color: #000;           
+                font-weight: bold;
+            }
+        </style>
+
+    </head>
+    <body {% if prettify %}onload="prettyPrint();"{% endif %}>
+    <div class="container">
+    {{ header|safe }}
+    {{ document }}
+    {{ footer|safe }}
+
+    </body>
+</html>

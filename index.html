@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title></title>
+        <link href='http://fonts.googleapis.com/css?family=PT+Sans:400,700' rel='stylesheet' type='text/css'>
+        
+        <link href="assets/css/prettify.css" rel="stylesheet">
+        <script src="assets/js/prettify.js"></script>
+        
+
+        <style>
+            .container { width: 660px; margin: 0 auto; margin-top: 2em; color: #333; font-family: "PT Sans", sans-serif; }
+            .prettyprint.linenums { box-shadow: none; -webkit-box-shadow: none; }
+            .prettyprint { border: 0;  background-color: #f2f2f2; padding: .5em 1em; }
+            ol.linenums { padding: 0; margin: 0; list-style-type: none; }
+            ol.linenums li { padding: 0; margin: 0; }
+            strong { color: #000; }
+            h1 { margin-bottom: 12px; }
+            h2 { margin-bottom: 6px; }
+            td.code { width: 100%; }
+            pre {
+                font-family: consolas,monospace;
+                font-size: 80%;
+                line-height: 1.5em;
+                padding: .5em 1em; 
+                border-radius: 5px;
+                background-color: #f2f2f2;
+                text-shadow: 0 1px 0 white;
+                overflow-x: auto;
+            }
+            code {
+                font-family: consolas,monospace;
+                font-size: 85%;
+                color: #000;           
+                font-weight: bold;
+            }
+        </style>
+
+    </head>
+    <body onload="prettyPrint();">
+    <div class="container">
+    
+    <h1>Illustrated guide to SQLX</h1>
+<p><a href="https://github.com/jmoiron/sqlx/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"></a></p>
+<p><code>sqlx</code> is a package for Go which provides a set of extentions on top of the excellent built-in <code>database/sql</code> package.  </p>
+<p>Examining <em>Go</em> idioms is the focus of this document, so there is no presumption being made that any <em>SQL</em> herein is actually a recommended way to use a database.  It will not cover setting up a Go development environment, basic Go information about syntax or semantics, or SQL itself. </p>
+<p>Finally, the standard <code>err</code> variable will be used to indicate that errors are being returned, but for brevity they will be ignored.  You should make sure to check and attempt to deal with all errors in an actual program.</p>
+<h2>Resources</h2>
+<p>There are other resources of excellent information about using SQL in Go:</p>
+<ul>
+<li><a href="http://golang.org/pkg/database/sql/">database/sql documentation</a></li>
+<li><a href="http://go-database-sql.org/">go-database-sql tutorial</a></li>
+</ul>
+<p>Because the underlying database/sql interface is left in tact by sqlx, all of the advice in these documents also apply to the extensions provided by sqlx.</p>
+<h2>Getting Started</h2>
+<p>You will want to install <code>sqlx</code> and a database driver.  Since it's infrastructureless, I recommend mattn's sqlite3 driver:</p>
+<pre class="prettyprint linenums">
+$ go get github.com/jmoiron/sqlx
+$ go get github.com/mattn/go-sqlite3
+</pre>
+
+<h2>Introduction to SQLX</h2>
+<p><code>sqlx</code> is intended to have the same <em>feel</em> as <code>databse/sql</code>.  There are 4 main <strong>handle</strong> types:</p>
+<ul>
+<li><code>sqlx.DB</code> - analagous to <code>sql.DB</code>, a representation of a database</li>
+<li><code>sqlx.Tx</code> - analagous to <code>sql.Tx</code>, a representation of a transaction</li>
+<li><code>sqlx.Stmt</code> - analagous to <code>sql.Stmt</code>, a representation of a prepared statement</li>
+<li><code>sqlx.NamedStmt</code> - a representation of a prepared statement with support for <a href="#named-params">named
+  parameters</a></li>
+</ul>
+<p>Handle types all <a href="http://golang.org/doc/effective_go.html#embedding">embed</a> their database/sql equivalents, meaning that when you call <code>sqlx.DB.Query</code>, you are calling the <em>same</em> code as <code>sql.DB.Query</code>.  This makes it easy to introduce into an existing codebase.</p>
+<p>In addition to these, there are 2 <strong>cursor</strong> types:</p>
+<ul>
+<li><code>sqlx.Rows</code> - analagous to <code>sql.Rows</code>, a cursor returned from <code>Queryx</code></li>
+<li><code>sqlx.Row</code> - analagous to <code>sql.Row</code>, a result returned from <code>QueryRowx</code></li>
+</ul>
+<p>Similarly to the handle types, <code>sqlx.Rows</code> embeds its equivalent in the standard library.  Because the underlying implementation was inaccessible, <code>sqlx.Row</code> is a partial re-implementation of <code>sql.Row</code> with the same behavior for the standard interface.</p>
+<h3>Connecting to Your Database</h3>
+<p>A <code>DB</code> instance is <em>not</em> a connection, but an abstraction representing a Database.  This is why creating a DB does not return an error and will not panic.  It maintains a connection pool internally once an attempt to connect to a databse is successful.  You can create an sqlx.DB via <code>Open</code> or by creating a new sqlx DB handle from an existing sql.DB via <code>NewDB</code>:</p>
+<pre class="prettyprint linenums">
+var db *sqlx.DB
+
+// exactly the same as the built-in 
+db = sqlx.Open("sqlite3", ":memory:")
+
+// from a pre-existing sql.DB; note the required driverName
+db = sqlx.NewDB(sql.Open("sqlite3", ":memory:"), "sqlite3")
+
+// force a connection
+err = db.Ping()
+</pre>
+
+<p>In some situations, you might want to open a DB and connect at the same time; for instance, in order to catch configuration issues during your initialization phase.  You can do this in one go with <code>Connect</code>, which Opens a new DB and attempts a <code>Ping</code>.  The <code>MustConnect</code> variant follows the common Go idiom of a <code>Must</code> variant which, instead of returning an error, panics on it instead, suitable for use at the module level of your package.</p>
+<pre class="prettyprint linenums">
+var err error
+// open and connect at the same time:
+db, err = sqlx.Connect("sqlite3", ":memory:")
+
+// open and connect at the same time, panicing on error
+db = sqlx.MustConnect("sqlite3", ":memory:")
+</pre>
+
+<h3>Querying 101</h3>
+<p>The handle types in sqlx implement the same basic verbs for querying your database:</p>
+<ul>
+<li><code>Query(...) (*sql.Rows, error)</code> - unchanged from database/sql</li>
+<li><code>QueryRow(...) *sql.Row</code> - unchanged from database/sql</li>
+<li><code>Exec(...) (sql.Result, error)</code> - unchanged from database/sql</li>
+</ul>
+<p>These extensions to the built-in verbs:</p>
+<ul>
+<li><code>Queryx(...) (*sqlx.Rows, error)</code> - Query, but return an sqlx.Rows</li>
+<li><code>QueryRowx(...) *sqlx.Row</code> -- QueryRow, but return an sqlx.Row</li>
+<li><code>MustExec() sql.Result</code> -- Exec, but panic on error</li>
+</ul>
+<p>And these new semantics:</p>
+<ul>
+<li><code>Get(dest interface{}, ...) error</code></li>
+<li><code>Select(dest interface{}, ...) error</code></li>
+</ul>
+<p>Let's go from the unchanged interface through the new semantics, explaining their use.</p>
+<h4>Exec</h4>
+<p>The Exec family of functions grabs a connection from the connection pool and executes that query on the server.  For drivers that do not support ad-hoc query execution, a prepared statement <em>may</em> be created behind the scenes to be executed.  The connection is returned to the pool before the result is returned.</p>
+<pre class="prettyprint linenums">
+schema := `CREATE TABLE place (
+    country text,
+    city text NULL,
+    telcode integer);`
+
+// execute a query on the server
+result, err := db.Exec(schema)
+
+// or, you can use MustExec, which panics on error
+cityState := `INSERT INTO place (country, telcode) VALUES (?, ?)`
+countryCity := `INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)`
+db.MustExec(cityState, "Hong Kong", 852)
+db.MustExec(cityState, "Singapore", 65)
+db.MustExec(countryCity, "South Africa", "Johannesburg", 27)
+</pre>
+
+<p>The <a href="http://golang.org/pkg/database/sql/#Result">result</a> has two possible pieces of data: <code>LastCreatedId()</code> or <code>RowsAffected()</code>, both of which are available in different situations depending on the driver.  In MySQL, for instance, <code>LastCreatedId()</code> will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a row cursor with the <code>RETURNING</code> clause.</p>
+<p>The <code>?</code> query placeholders, called <code>bindvars</code> internally, are important;  you should <em>always</em> use these to send values to the database, as they will prevent <a href="http://en.wikipedia.org/wiki/SQL_injection">SQL injection</a> attacks.  Note that for most popular databases, the escaping happens on the server, <em>not</em> in the database/sql library and not in the driver code.  This means that bindvars are database specific;  MySQL accepts the <code>?</code> variant shown above, PostgreSQL requires an enumerated <code>$1</code>, <code>$2</code>, etc bindvar syntax, and SQLite accepts either.  You can use the <code>sqlx.DB.Rebind()</code> function with the <code>?</code> syntax to ensure that the query is executable on the current database type.</p>
+<h4>Query</h4>
+<p>Query is the primary interface in database/sql to run queries against your database.  It returns an <code>sql.Rows</code> object, which acts more like a database cursor than a list of rows:</p>
+<pre class="prettyprint linenums">
+// fetch all places from the db
+rows, err := db.Query("SELECT country, city, telcode FROM place")
+for rows.Next() {
+    var country, city string
+    var telcode int
+    err = rows.Scan(&country, &city, &telcode)
+}
+</pre>
+
+<p>The error returned by Query is any error that might have happened while performing the actual query on the server.  This can include grabbing a bad connection from the pool, although database/sql will <a href="http://golang.org/src/pkg/database/sql/sql.go?s=23888:23957#L885">retry 10 times</a> to attempt to find or create a working connection.  Generally, the error will be due to an error in SQL syntax or incorrect field and table names.</p>
+<p>The rows return is database cursor which can be used to iterate through the query results.  Although the driver will buffer the actual network traffic on its own in most cases, iterating via <code>Next()</code> is a good way to bound the memory usage of large queries, as you're only scanning a single row at a time.  <code>Scan()</code> uses <a href="http://golang.org/pkg/reflect">reflect</a> to map sql column return types to Go types like <code>string</code>, <code>[]byte</code>, et al.  </p>
+<p>In most cases, Scan will copy the data it gets from the driver, as it is not aware of how the driver may reuse its buffers.  The special type <code>sql.RawBytes</code> can be used to get a <em>zero-copy</em> slice of bytes from the actual data returned by the driver.  After the next call to Next(), such a value is no longer valid, as that memory might have been overwritten by the driver.</p>
+<p>Finally, the connection taken from the pool by Query remains active until <em>either</em> all rows are exhausted by the iteration via Next, or <code>rows.Close()</code> is called.  For more information, see the section on <a href="#connection-pool">the connection pool</a>.</p>
+<p>The sqlx extension <code>Queryx</code> behaves exactly as Query does, but returns an <code>sqlx.Rows</code>, which has extended behaviors:</p>
+<pre class="prettyprint linenums">
+type Place struct {
+    Country       string
+    City          string
+    TelephoneCode int `db:"telcode"`
+}
+
+rows, err := db.Queryx("SELECT * FROM place")
+for rows.Next() {
+    var p Place
+    err = rows.StructScan(&p)
+}
+</pre>
+
+<p>The primary interface extension added to Rows is <code>StructScan()</code>, which automatically scans results into struct fields.  Note that the fields must be <a href="http://golang.org/doc/effective_go.html#names">exported</a> in order for sqlx to be able to write into them, something true of <em>all</em> marshallers in Go.  You can use the <code>db</code> struct tag to specify which column name maps to each struct field, or set <code>sqlx.NameMapper</code> to a <code>func(string) string</code> to define a mapping.  The default mapping is to use <code>strings.Lower</code>.  For more information about <code>StructScan</code> and the additional extensions <code>SliceScan</code> and <code>MapScan</code>, see the <a href="#scanning">section on advanced scanning</a>.</p>
+<h4>QueryRow</h4>
+<p>QueryRow is suitable for fetching one row from the server.  It takes a connection from the connection pool and executes the query using Query, returning a <code>Row</code> object which has its own internal rows and cached error result:</p>
+<pre class="prettyprint linenums">
+row := db.QueryRow("SELECT * FROM place WHERE telcode=?", 852)
+var telcode int
+err = row.Scan(&telcode)
+</pre>
+
+<p>Unlike Query, QueryRow returns a Row type result with no error, making it safe to chain the Scan off of the return.  If there was an error executing the query, that error is return when the row is Scanned.  If there are no rows, <code>sql.ErrNoRows</code> is returned.  If the scan itself fails (eg. due to type mismatch), that error is also returned.  </p>
+<p>The Rows struct internal to the Row result is Closed upon Scan, meaning that the connection used by QueryRow is kept open until the result is scanned.  It also means that <code>sql.RawBytes</code> is not usable here, since the referenced memory belongs to the driver and may already be invalid by the time control is returned to the caller.</p>
+<p>The sqlx extension <code>QueryRowx</code> will return an sqlx.Row instead of an sql.Row, and it implements identical scanning behaviors as displayed by sqlx.Rows above and in the <a href="#scanning">advanced scanning section</a>:</p>
+<pre class="prettyprint linenums">
+var p Place
+err := db.QueryRowx("SELECT city, telcode FROM place LIMIT 1").StructScan(&p)
+</pre>
+
+<h4>Get and Select</h4>
+<p>Get and Select are extensions to the handle types which combine the execution stage of the statement with StructScan.  <code>Get</code> is therefore analagous with the QueryRowx example above, while <code>Select</code> provides an interface to select a list of results directly into a slice of Go structs:</p>
+<pre class="prettyprint linenums">
+p := Place{}
+pp := []Place{}
+
+// this will pull the first place directly into p
+err = db.Get(&p, "SELECT * FROM place LIMIT 1")
+// this will pull places with telcode > 50 into the slice pp
+err = db.Select(&pp, "SELECT * FROM place WHERE telcode > ?", 50)
+</pre>
+
+<p>Get and Select both will close the Rows they create under the hood to execute the query, and will return any error encountered at any step of the process.  Since they use StructScan under the hood, the details on this in the <a href="#scanning">advanced scanning section</a> below also applies to Get and Select.</p>
+<p>Select can save you a lot of typing, but beware!  It's semantically different from <code>Queryx</code>, since it will load the entire result set into memory at once.  If that set is not bounded by your query to some reasonable size, it might be best to use the classic Queryx/StructScan iteration instead.</p>
+<p><a id="transactions"></a>  </p>
+<h3>Transactions</h3>
+<p>To use transactions, you must create a transaction handle with <code>DB.Begin()</code>.  Code like this <strong>will not work</strong>:</p>
+<pre class="prettyprint linenums">
+// this will not work if connection pool > 1
+db.MustExec("BEGIN;")
+db.MustExec(...)
+db.MustExec("COMMIT;")
+</pre>
+
+<p>Remember, Exec and all other query verbs will ask the DB for a connection and then return it to the pool each time.  There's no guarantee that you will receive the same connection that the BEGIN statement was executed on.  To use transactions, you must therefore use <code>DB.Begin()</code></p>
+<pre class="prettyprint linenums">
+tx, err := db.Begin()
+err = tx.Exec(...)
+err = tx.Commit()
+</pre>
+
+<p>The DB handle also has the extensions <code>Beginx()</code> and <code>MustBegin()</code>, which return an <code>sqlx.Tx</code> instead of an <code>sql.Tx</code>:</p>
+<pre class="prettyprint linenums">
+tx := db.MustBegin()
+tx.MustExec(...)
+err = tx.Commit()
+</pre>
+
+<p>As hinted at above, a <code>sqlx.Tx</code> has all of the query verb extensions that an <code>sqlx.DB</code> has.</p>
+<p><a id="prepared-statements"></a>  </p>
+<h3>Prepared Statements</h3>
+<p><a id="scanning"></a>  </p>
+<h3>Advanced Scanning</h3>
+<p><code>StructScan</code> is deceptively sophisticated.  It supports embedded structs, and assigns to fields using an order of precedence that is identical to the way Go resolves embedded fields.  This allows you to share common parts of a table model among many tables.  For instance:</p>
+<pre class="prettyprint linenums">
+type AutoIncr struct {
+    ID       uint64
+    Created  time.Time
+}
+
+type Place struct {
+    Address string
+    AutoIncr
+}
+
+type Person struct {
+    Name string
+    AutoIncr
+}
+</pre>
+
+<p>With the structs above, Person and Place will both be able to receive <code>id</code> and <code>created</code> columns from a StructScan, because they embed the <code>AutoIncr</code> struct which defines them.  This feature can enable you to quickly create an ad-hoc table for joins.  It works recursively as well;  the following will have the Person's Name and its AutoIncr ID and Created fields accessible, both via the Go dot operator and via StructScan:</p>
+<pre class="prettyprint linenums">
+type Employee struct {
+    BossID uint64
+    EmployeeID uint64
+    Person
+}
+</pre>
+
+<p>Unfortunately, this also opens us up to a problem.  In Go, it's okay to shadow descendent fields;  if Employee defined a <code>Name</code>, it would take precedence over the Person's Name.  But <em>ambiguous</em> selectors are illegal and cause <a href="http://play.golang.org/p/MGRxdjLaUc">a runtime error</a>.  If we wanted to create a quick JOIN type for Person and Place, where would we put the <code>id</code> column, which is defined in both via their embedded AutoIncr?  Would there be an error?</p>
+<p>Because of the way that sqlx builds the mapping of field name to field address, by the time you Scan into a struct, it no longer knows whether or not a name was encountered twice during its traversal of the struct tree.  So unlike Go, StructScan will choose the "first" field encountered which has that name.  Since Go struct fields are ordered from top to bottom, and sqlx does a breadth-first traversal in order to maintain precedence rules, it would happen in the shallowest, top-most definition.  For example, in the type:</p>
+<pre class="prettyprint linenums">
+type PersonPlace struct {
+    Person
+    Place
+}
+</pre>
+
+<p>A StructScan will set an <code>id</code> column result in <code>Person.AutoIncr.ID</code>, also accessible as <code>Person.ID</code>.  To avoid confusion, it's suggested that you use <code>AS</code> to create column aliases in your SQL instead.</p>
+<h4>Alternate Scan Types</h4>
+<p>In addition to using Scan and StructScan, an sqlx Row or Rows can be used to automatically return a slice or a map of results:</p>
+<pre class="prettyprint linenums">
+rows, err := db.Queryx("SELECT * FROM place")
+for rows.Next() {
+    // cols is an []interface{} of all of the column results
+    cols, err := rows.SliceScan()
+}
+
+rows, err := db.Queryx("SELECT * FROM place")
+for rows.Next() {
+    results := map[string]interface{}
+    err = rows.MapScan(results)
+}
+</pre>
+
+<p>SliceScan returns an <code>[]interface{}</code> of all columns, which can be useful in <a href="http://wts.jmoiron.net">situations</a> where you are executing queries on behalf of a third party and have no way of knowing what columns may be returned.  MapScan behaves the same way, but maps the column names to interface{} values.  An important caveat here is that the results returned by <code>rows.Columns()</code> does not (<em>FIXME</em>: ever?) include table or alias namespaces, such that <code>SELECT a.id, b.id FROM a NATURAL JOIN b</code> will result in a Columns result of <code>[]string{"id", "id"}</code>, clobbering one of the results in your map. </p>
+<p><a id="connection-pool"></a>  </p>
+<h3>The Connection Pool</h3>
+<p>If you neglect to do one of these things, the connection may be held until garbage collection, and your db will end up creating far more connections at once in order to compensate for the ones its using.  Since Close can be called more than once without issue, it's acceptable to always call it.</p>
+    
+
+    </body>
+</html>

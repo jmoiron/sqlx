@@ -259,6 +259,7 @@ err = stmt.Get(&p, 852)
 
 The standard sql.Tx object also has a `Stmt()` method which returns a transaction-specific statement from a pre-existing one.  sqlx.Tx has a `Stmtx` version which will create a new transaction specific `sqlx.Stmt` from an existing sql.Stmt *or* sqlx.Stmt.
 
+<a id="named-params"></a>
 ## Named Queries
 
 Named queries are an extension provided by sqlx which is common to many other database packages.  They allow you to use a bindvar syntax which refers to the names of struct fields or map keys to bind into a query, rather than having to refer to everything positionally.  The struct field naming conventions follow that of `StructScan`, meaning that they use sqlx.NameMapper and the `db` struct tag.  There are two extra query verbs related to named queries:

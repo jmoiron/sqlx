@@ -350,7 +350,7 @@ for rows.Next() {
 
 rows, err := db.Queryx("SELECT * FROM place")
 for rows.Next() {
-    results := map[string]interface{}
+    results := make(map[string]interface{})
     err = rows.MapScan(results)
 }
 ```

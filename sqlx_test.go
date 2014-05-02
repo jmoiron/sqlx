@@ -430,6 +430,35 @@ func TestEmbeddedStructs(t *testing.T) {
 	})
 }
 
+func TestSelectSliceMapTime(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		rows, err := db.Queryx("SELECT * FROM person")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			_, err := rows.SliceScan()
+			if err != nil {
+				t.Error(err)
+			}
+		}
+
+		rows, err = db.Queryx("SELECT * FROM person")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			m := map[string]interface{}{}
+			err := rows.MapScan(m)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+
+	})
+}
+
 func TestNilReceiver(t *testing.T) {
 	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
 		loadDefaultFixture(db, t)

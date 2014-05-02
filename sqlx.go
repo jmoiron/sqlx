@@ -862,7 +862,7 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 
 	values := make([]interface{}, len(columns))
 	for i := range values {
-		values[i] = &sql.NullString{}
+		values[i] = new(interface{})
 	}
 
 	err = r.Scan(values...)
@@ -872,12 +872,7 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 	}
 
 	for i := range columns {
-		ns := *(values[i].(*sql.NullString))
-		if ns.Valid {
-			values[i] = ns.String
-		} else {
-			values[i] = nil
-		}
+		values[i] = *(values[i].(*interface{}))
 	}
 
 	return values, r.Err()
@@ -902,7 +897,7 @@ func MapScan(r ColScanner, dest map[string]interface{}) error {
 
 	values := make([]interface{}, len(columns))
 	for i := range values {
-		values[i] = &sql.NullString{}
+		values[i] = new(interface{})
 	}
 
 	err = r.Scan(values...)
@@ -911,12 +906,7 @@ func MapScan(r ColScanner, dest map[string]interface{}) error {
 	}
 
 	for i, column := range columns {
-		ns := *(values[i].(*sql.NullString))
-		if ns.Valid {
-			dest[column] = ns.String
-		} else {
-			dest[column] = nil
-		}
+		dest[column] = *(values[i].(*interface{}))
 	}
 
 	return r.Err()

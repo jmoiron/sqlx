@@ -339,6 +339,16 @@ func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(tx, dest, query, args...)
 }
 
+// Selectv (verbose) within a transaction.
+func (tx *Tx) Selectv(dest interface{}, query string, args ...interface{}) error {
+	return Selectv(tx, dest, query, args...)
+}
+
+// Selectf (fatal) within a transaction.
+func (tx *Tx) Selectf(dest interface{}, query string, args ...interface{}) {
+	Selectf(tx, dest, query, args...)
+}
+
 // MustExec runs MustExec within a transaction.
 func (tx *Tx) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(tx, query, args...)

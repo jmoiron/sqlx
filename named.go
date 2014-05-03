@@ -66,6 +66,7 @@ func (n *NamedStmt) QueryRow(arg interface{}) *Row {
 }
 
 // Execv execs a NamedStmt with the given arg, printing errors and returning them
+// Deprecated: to be removed in future release
 func (n *NamedStmt) Execv(arg interface{}) (sql.Result, error) {
 	res, err := n.Exec(arg)
 	if err != nil {
@@ -75,6 +76,7 @@ func (n *NamedStmt) Execv(arg interface{}) (sql.Result, error) {
 }
 
 // Execl execs a NamedStmt with the given arg, logging errors
+// Deprecated: to be removed in future release
 func (n *NamedStmt) Execl(arg interface{}) sql.Result {
 	res, err := n.Exec(arg)
 	if err != nil {
@@ -84,6 +86,7 @@ func (n *NamedStmt) Execl(arg interface{}) sql.Result {
 }
 
 // Execf execs a NamedStmt, using log.fatal to print out errors
+// Deprecated: to be removed in future release
 func (n *NamedStmt) Execf(arg interface{}) sql.Result {
 	res, err := n.Exec(arg)
 	if err != nil {
@@ -93,6 +96,7 @@ func (n *NamedStmt) Execf(arg interface{}) sql.Result {
 }
 
 // Execp execs a NamedStmt, panicing on error
+// Deprecated: to be removed in future release
 func (n *NamedStmt) Execp(arg interface{}) sql.Result {
 	return n.MustExec(arg)
 }

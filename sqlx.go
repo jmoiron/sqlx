@@ -285,21 +285,25 @@ func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
 }
 
 // Execv (verbose) runs Execv using this database.
+// Deprecated: to be removed in future release
 func (db *DB) Execv(query string, args ...interface{}) (sql.Result, error) {
 	return Execv(db, query, args...)
 }
 
 // Execl (log) runs Execl using this database.
+// Deprecated: to be removed in future release
 func (db *DB) Execl(query string, args ...interface{}) sql.Result {
 	return Execl(db, query, args...)
 }
 
 // Execf (fatal) runs Execf using this database.
+// Deprecated: to be removed in future release
 func (db *DB) Execf(query string, args ...interface{}) sql.Result {
 	return Execf(db, query, args...)
 }
 
 // Execp (panic) runs Execp using this database.
+// Deprecated: to be removed in future release
 func (db *DB) Execp(query string, args ...interface{}) sql.Result {
 	return Execp(db, query, args...)
 }
@@ -415,21 +419,25 @@ func (tx *Tx) Selectf(dest interface{}, query string, args ...interface{}) {
 }
 
 // Execv (verbose) runs Execv within a transaction.
+// Deprecated: to be removed in future release
 func (tx *Tx) Execv(query string, args ...interface{}) (sql.Result, error) {
 	return Execv(tx, query, args...)
 }
 
 // Execl (log) runs Execl within a transaction.
+// Deprecated: to be removed in future release
 func (tx *Tx) Execl(query string, args ...interface{}) sql.Result {
 	return Execl(tx, query, args...)
 }
 
 // Execf (fatal) runs Execf within a transaction.
+// Deprecated: to be removed in future release
 func (tx *Tx) Execf(query string, args ...interface{}) sql.Result {
 	return Execf(tx, query, args...)
 }
 
 // Execp (panic) runs Execp within a transaction.
+// Deprecated: to be removed in future release
 func (tx *Tx) Execp(query string, args ...interface{}) sql.Result {
 	return Execp(tx, query, args...)
 }
@@ -511,24 +519,28 @@ func (s *Stmt) Get(dest interface{}, args ...interface{}) error {
 
 // Execv (verbose) runs Execv using this statement.  Note that the query
 // portion of the error output will be blank, as Stmt does not expose its query.
+// Deprecated: to be removed in future release
 func (s *Stmt) Execv(args ...interface{}) (sql.Result, error) {
 	return Execv(&qStmt{*s}, "", args...)
 }
 
 // Execl (log) using this statement.  Note that the query portion of the error
 // output will be blank, as Stmt does not expose its query.
+// Deprecated: to be removed in future release
 func (s *Stmt) Execl(args ...interface{}) sql.Result {
 	return Execl(&qStmt{*s}, "", args...)
 }
 
 // Execf (fatal) using this statement.  Note that the query portion of the error
 // output will be blank, as Stmt does not expose its query.
+// Deprecated: to be removed in future release
 func (s *Stmt) Execf(args ...interface{}) sql.Result {
 	return Execf(&qStmt{*s}, "", args...)
 }
 
 // Execp (panic) using this statement.  Note that the query portion of the error
 // output will be blank, as Stmt does not expose its query.
+// Deprecated: to be removed in future release
 func (s *Stmt) Execp(args ...interface{}) sql.Result {
 	return Execp(&qStmt{*s}, "", args...)
 }

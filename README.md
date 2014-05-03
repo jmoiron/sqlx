@@ -13,7 +13,6 @@ Major additional concepts are:
 * Marshal rows into structs (with embedded struct support), maps, and slices
 * Named parameter support including prepared statements
 * `Get` and `Select` to go quickly from query to struct/slice
-* Common error handling mnemonics (eg. `Execf`, `Execp` (`MustExec`), and `Execl`)
 * `LoadFile` for executing statements from a file
 
 There is now some [fairly comprehensive documentation](http://jmoiron.github.io/sqlx/) for sqlx.
@@ -89,14 +88,14 @@ func main() {
 
     // exec the schema or fail; multi-statement Exec behavior varies between
     // database drivers;  pq will exec them all, sqlite3 won't, ymmv
-    db.Execf(schema)
+    db.MustExec(schema)
     
     tx := db.MustBegin()
-    tx.Execl("INSERT INTO person (first_name, last_name, email) VALUES ($1, $2, $3)", "Jason", "Moiron", "jmoiron@jmoiron.net")
-    tx.Execl("INSERT INTO person (first_name, last_name, email) VALUES ($1, $2, $3)", "John", "Doe", "johndoeDNE@gmail.net")
-    tx.Execl("INSERT INTO place (country, city, telcode) VALUES ($1, $2, $3)", "United States", "New York", "1")
-    tx.Execl("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Hong Kong", "852")
-    tx.Execl("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Singapore", "65")
+    tx.MustExec("INSERT INTO person (first_name, last_name, email) VALUES ($1, $2, $3)", "Jason", "Moiron", "jmoiron@jmoiron.net")
+    tx.MustExec("INSERT INTO person (first_name, last_name, email) VALUES ($1, $2, $3)", "John", "Doe", "johndoeDNE@gmail.net")
+    tx.MustExec("INSERT INTO place (country, city, telcode) VALUES ($1, $2, $3)", "United States", "New York", "1")
+    tx.MustExec("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Hong Kong", "852")
+    tx.MustExec("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Singapore", "65")
     // Named queries can use structs, so if you have an existing struct (i.e. person := &Person{}) that you have populated, you can pass it in as &person
     tx.NamedExec("INSERT INTO person (first_name, last_name, email) VALUES (:first_name, :last_name, :email)", &Person{"Jane", "Citizen", "jane.citzen@example.com"})
     tx.Commit()

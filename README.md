@@ -16,7 +16,8 @@ Major additional concepts are:
 * Common error handling mnemonics (eg. `Execf`, `Execp` (`MustExec`), and `Execl`)
 * `LoadFile` for executing statements from a file
 
-Read the usage below to see how sqlx might help you, or check out the [API
+There is now some [fairly comprehensive documentation](http://jmoiron.github.io/sqlx/) for sqlx.
+You can also read the usage below for a quick sample on how sqlx works, or check out the [API
 documentation on godoc](http://godoc.org/github.com/jmoiron/sqlx).
 
 ## Important API Stability Note

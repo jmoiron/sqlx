@@ -626,6 +626,9 @@ func (r *Row) StructScan(dest interface{}) error {
 	if v.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
 	}
+	if v.IsNil() {
+		return errors.New("nil pointer passed to StructScan destination")
+	}
 
 	direct := reflect.Indirect(v)
 	base, err := BaseStructType(direct.Type())
@@ -672,7 +675,7 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 
 	values := make([]interface{}, len(columns))
 	for i := range values {
-		values[i] = &sql.NullString{}
+		values[i] = new(interface{})
 	}
 
 	err = r.Scan(values...)
@@ -682,12 +685,7 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 	}
 
 	for i := range columns {
-		ns := *(values[i].(*sql.NullString))
-		if ns.Valid {
-			values[i] = ns.String
-		} else {
-			values[i] = nil
-		}
+		values[i] = *(values[i].(*interface{}))
 	}
 
 	return values, r.Err()
@@ -712,7 +710,7 @@ func MapScan(r ColScanner, dest map[string]interface{}) error {
 
 	values := make([]interface{}, len(columns))
 	for i := range values {
-		values[i] = &sql.NullString{}
+		values[i] = new(interface{})
 	}
 
 	err = r.Scan(values...)
@@ -721,12 +719,7 @@ func MapScan(r ColScanner, dest map[string]interface{}) error {
 	}
 
 	for i, column := range columns {
-		ns := *(values[i].(*sql.NullString))
-		if ns.Valid {
-			dest[column] = ns.String
-		} else {
-			dest[column] = nil
-		}
+		dest[column] = *(values[i].(*interface{}))
 	}
 
 	return r.Err()
@@ -750,6 +743,9 @@ func StructScan(rows rowsi, dest interface{}) error {
 	value := reflect.ValueOf(dest)
 	if value.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
+	}
+	if value.IsNil() {
+		return errors.New("nil pointer passed to StructScan destination")
 	}
 
 	direct := reflect.Indirect(value)

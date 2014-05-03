@@ -137,6 +137,7 @@ func (n *NamedStmt) Select(dest interface{}, arg interface{}) error {
 }
 
 // Selectv using this NamedStmt
+// Deprecated: to be removed in a future release
 func (n *NamedStmt) Selectv(dest interface{}, arg interface{}) error {
 	err := n.Select(dest, arg)
 	if err != nil {
@@ -146,6 +147,7 @@ func (n *NamedStmt) Selectv(dest interface{}, arg interface{}) error {
 }
 
 // Selectf using this NamedStmt
+// Deprecated: to be removed in a future release
 func (n *NamedStmt) Selectf(dest interface{}, arg interface{}) {
 	err := n.Select(dest, arg)
 	if err != nil {

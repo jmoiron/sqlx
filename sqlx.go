@@ -231,11 +231,13 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 }
 
 // Selectf using this DB.
+// Deprecated: to be removed in a future release
 func (db *DB) Selectf(dest interface{}, query string, args ...interface{}) {
 	Selectf(db, dest, query, args...)
 }
 
 // Selectv using this DB.
+// Deprecated: to be removed in a future release
 func (db *DB) Selectv(dest interface{}, query string, args ...interface{}) error {
 	return Selectv(db, dest, query, args...)
 }
@@ -409,11 +411,13 @@ func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 }
 
 // Selectv (verbose) within a transaction.
+// Deprecated: to be removed in a future release
 func (tx *Tx) Selectv(dest interface{}, query string, args ...interface{}) error {
 	return Selectv(tx, dest, query, args...)
 }
 
 // Selectf (fatal) within a transaction.
+// Deprecated: to be removed in a future release
 func (tx *Tx) Selectf(dest interface{}, query string, args ...interface{}) {
 	Selectf(tx, dest, query, args...)
 }
@@ -503,11 +507,13 @@ func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 }
 
 // Selectv (verbose) using the prepared statement.
+// Deprecated: to be removed in a future release
 func (s *Stmt) Selectv(dest interface{}, args ...interface{}) error {
 	return Selectv(&qStmt{*s}, dest, "", args...)
 }
 
 // Selectf (fatal) using the prepared statement.
+// Deprecated: to be removed in a future release
 func (s *Stmt) Selectf(dest interface{}, args ...interface{}) {
 	Selectf(&qStmt{*s}, dest, "", args...)
 }

@@ -1,7 +1,9 @@
 package reflect
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -24,11 +26,11 @@ func TestBasic(t *testing.T) {
 	}
 	v = FieldByName(f, "B")
 	if ival(v) != f.B {
-		t.Errorf("Expecting %d, got %d", ival(v), f.B)
+		t.Errorf("Expecting %d, got %d", f.B, ival(v))
 	}
 	v = FieldByName(f, "C")
 	if ival(v) != f.C {
-		t.Errorf("Expecting %d, got %d", ival(v), f.C)
+		t.Errorf("Expecting %d, got %d", f.C, ival(v))
 	}
 }
 
@@ -69,8 +71,10 @@ func TestMapping(t *testing.T) {
 		WearsGlasses bool `db:"wears_glasses"`
 	}
 
-	//m := NewMapperFunc("db", strings.ToLower)
-	//p := Person{1, "Jason", true}
+	m := NewMapperFunc("db", strings.ToLower)
+	p := Person{1, "Jason", true}
+	mapping := m.MapType(reflect.TypeOf(p))
+	fmt.Printf("%#v\n", mapping)
 }
 
 type E1 struct {
@@ -132,6 +136,19 @@ func BenchmarkFieldPosL4(b *testing.B) {
 		f = f.Field(0)
 		f = f.Field(0)
 		f = f.Field(0)
+		if f.Interface().(int) != 1 {
+			b.Fatal("Wrong value.")
+		}
+	}
+}
+
+func BenchmarkFieldByIndexL4(b *testing.B) {
+	e4 := E4{}
+	e4.A = 1
+	idx := []int{0, 0, 0, 0}
+	for i := 0; i < b.N; i++ {
+		v := reflect.ValueOf(e4)
+		f := fieldByIndexes(v, idx)
 		if f.Interface().(int) != 1 {
 			b.Fatal("Wrong value.")
 		}

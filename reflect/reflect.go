@@ -1,26 +1,14 @@
 package reflect
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 import "reflect"
 
 type stringMap map[string]string
 type intMap map[string][]int
-
-var cache = struct {
-	mapping map[reflect.Type]stringMap
-	sync.RWMutex
-}{}
-
-var cacheint = struct {
-	mapping map[reflect.Type]intMap
-	sync.RWMutex
-}{}
-
-func init() {
-	cache.mapping = make(map[reflect.Type]stringMap)
-	cacheint.mapping = make(map[reflect.Type]intMap)
-}
 
 // Mapper is a general purpose mapper of names to struct fields.  A Mapper
 // behaves like most marshallers, optionally obeying a field tag for name
@@ -56,6 +44,16 @@ func (m *Mapper) MapType(t reflect.Type) stringMap {
 	return getMapping(t, m.tagName, m.mapFunc)
 }
 
+func (m *Mapper) FieldMap(v reflect.Value) map[string]reflect.Value {
+	r := map[string]reflect.Value{}
+	nm := m.MapType(v.Type())
+	fmt.Println(nm)
+	for tagName, fieldName := range nm {
+		r[tagName] = v.FieldByName(fieldName)
+	}
+	return r
+}
+
 func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) stringMap {
 	queue := []reflect.Type{t}
 	m := stringMap{}
@@ -69,7 +67,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) str
 
 			name := f.Tag.Get(tagName)
 			if len(name) == 0 {
-				name = f.Name
+				name = mapFunc(f.Name)
 			}
 
 			// if the name is "-", disabled via a tag, skip it
@@ -93,23 +91,17 @@ func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) str
 				continue
 			}
 			// add it to the map at the current position
-			m[name] = mapFunc(f.Name)
+			m[name] = f.Name
 		}
 	}
 	return m
 }
 
-func getMappingInt(reflect.Type) intMap {
-	return intMap{}
-}
+func noop(s string) string { return s }
 
 func FieldByName(i interface{}, name string) reflect.Value {
 	t := reflect.TypeOf(i)
-	m, ok := cache.mapping[t]
-	if !ok {
-		m = getMapping(t, "db", func(s string) string { return s })
-		cache.mapping[t] = m
-	}
+	m := getMapping(t, "db", noop)
 	v := reflect.ValueOf(i)
 	return v.FieldByName(m[name])
 }

@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"strconv"
 	"unicode"
+
+	reflectx "github.com/jmoiron/sqlx/reflect"
 )
 
 // NamedStmt is a prepared statement that executes named queries.  Prepare it
@@ -142,33 +144,20 @@ func bindAnyArgs(names []string, arg interface{}) ([]interface{}, error) {
 func bindArgs(names []string, arg interface{}) ([]interface{}, error) {
 	arglist := make([]interface{}, 0, len(names))
 
-	t, err := BaseStructType(reflect.TypeOf(arg))
-	if err != nil {
-		return arglist, err
-	}
-
-	// resolve this arg's type into a map of fields to field positions
-	fm, err := getFieldMap(t)
-	if err != nil {
-		return arglist, err
-	}
-
 	// grab the indirected value of arg
 	v := reflect.ValueOf(arg)
 	for v = reflect.ValueOf(arg); v.Kind() == reflect.Ptr; {
 		v = v.Elem()
 	}
 
-	// FIXME: why aren't we using reflect helpers here?
-
-	values := fm.allValues(v)
-
-	for _, name := range names {
-		val, ok := fm[name]
-		if !ok {
-			return arglist, fmt.Errorf("could not find name %s in %v", name, arg)
+	m := mapper()
+	fields := m.TraversalsByName(v.Type(), names)
+	for i, t := range fields {
+		if len(t) == 0 {
+			return arglist, fmt.Errorf("could not find name %s in %v", names[i], arg)
 		}
-		arglist = append(arglist, values[val])
+		val := reflectx.FieldByIndexes(v, t)
+		arglist = append(arglist, val.Interface())
 	}
 
 	return arglist, nil

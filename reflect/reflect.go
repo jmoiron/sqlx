@@ -15,25 +15,6 @@ import (
 
 type fieldMap map[string][]int
 
-// mustBe checks a value against a kind, panicing with a reflect.ValueError
-// if the kind isn't that which is required.
-func mustBe(v reflect.Value, expected reflect.Kind) {
-	k := v.Kind()
-	if k != expected {
-		panic(&reflect.ValueError{methodName(), k})
-	}
-}
-
-// methodName is returns the caller of the function calling methodName
-func methodName() string {
-	pc, _, _, _ := runtime.Caller(2)
-	f := runtime.FuncForPC(pc)
-	if f == nil {
-		return "unknown method"
-	}
-	return f.Name()
-}
-
 // Mapper is a general purpose mapper of names to struct fields.  A Mapper
 // behaves like most marshallers, optionally obeying a field tag for name
 // mapping and a function to provide a basic mapping of fields to names.
@@ -125,13 +106,70 @@ func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {
 	return vals
 }
 
+// Traversals by name returns a slice of int slices which represent the struct
+// traversals for each mapped name.  Panics if t is not a struct or Indirectable
+// to a struct.  Returns empty int slice for each name not found.
+func (m *Mapper) TraversalsByName(t reflect.Type, names []string) [][]int {
+	t = Deref(t)
+	mustBe(t, reflect.Struct)
+	nm := m.TypeMap(t)
+
+	r := make([][]int, 0, len(names))
+	for _, name := range names {
+		traversal, ok := nm[name]
+		if !ok {
+			r = append(r, []int{})
+		} else {
+			r = append(r, traversal)
+		}
+	}
+	return r
+}
+
 // FieldByIndexes returns a value for a particular struct traversal.
 func FieldByIndexes(v reflect.Value, indexes []int) reflect.Value {
-	f := v
 	for _, i := range indexes {
-		f = f.Field(i)
+		v = reflect.Indirect(v).Field(i)
+		// if this is a pointer, it's possible it is nil
+		if v.Kind() == reflect.Ptr && v.IsNil() {
+			alloc := reflect.New(Deref(v.Type()))
+			v.Set(alloc)
+		}
 	}
-	return f
+	return v
+}
+
+// Deref is Indirect for reflect.Types
+func Deref(t reflect.Type) reflect.Type {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return t
+}
+
+// -- helpers & utilities --
+
+type Kinder interface {
+	Kind() reflect.Kind
+}
+
+// mustBe checks a value against a kind, panicing with a reflect.ValueError
+// if the kind isn't that which is required.
+func mustBe(v Kinder, expected reflect.Kind) {
+	k := v.Kind()
+	if k != expected {
+		panic(&reflect.ValueError{methodName(), k})
+	}
+}
+
+// methodName is returns the caller of the function calling methodName
+func methodName() string {
+	pc, _, _, _ := runtime.Caller(2)
+	f := runtime.FuncForPC(pc)
+	if f == nil {
+		return "unknown method"
+	}
+	return f.Name()
 }
 
 type typeQueue struct {
@@ -153,7 +191,7 @@ func apnd(is []int, i int) []int {
 // to determine the canonical names of fields.
 func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) fieldMap {
 	queue := []typeQueue{}
-	queue = append(queue, typeQueue{t, []int{}})
+	queue = append(queue, typeQueue{Deref(t), []int{}})
 	m := fieldMap{}
 	for len(queue) != 0 {
 		// pop the first item off of the queue
@@ -184,7 +222,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) fie
 
 			// bfs search of anonymous embedded structs
 			if f.Anonymous {
-				queue = append(queue, typeQueue{f.Type, apnd(tq.p, fieldPos)})
+				queue = append(queue, typeQueue{Deref(f.Type), apnd(tq.p, fieldPos)})
 				continue
 			}
 

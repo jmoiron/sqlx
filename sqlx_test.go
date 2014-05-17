@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -171,11 +170,6 @@ type PersonPlace struct {
 type PersonPlacePtr struct {
 	*Person
 	*Place
-}
-
-type NonEmbedded struct {
-	Person Person
-	Place  Place
 }
 
 type EmbedConflict struct {
@@ -388,21 +382,6 @@ func TestEmbeddedStructs(t *testing.T) {
 				t.Errorf("Expected non zero lengthed first name.")
 			}
 			if len(pp.Place.Country) == 0 {
-				t.Errorf("Expected non zero lengthed country.")
-			}
-		}
-
-		// test "non embedded" struct namespace collapsing..
-		nes := []NonEmbedded{}
-		err = db.Select(&nes, `select person.*, place.* FROM person natural join place`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, ne := range nes {
-			if len(ne.Person.FirstName) == 0 {
-				t.Errorf("Expected non zero lengthed first name.")
-			}
-			if len(ne.Place.Country) == 0 {
 				t.Errorf("Expected non zero lengthed country.")
 			}
 		}
@@ -1054,27 +1033,5 @@ func BenchmarkRebindBuffer(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		rebindBuff(DOLLAR, q1)
 		rebindBuff(DOLLAR, q2)
-	}
-}
-
-func TestGetFieldMap(t *testing.T) {
-	testingTable := map[reflect.Type]fieldMap{
-		reflect.TypeOf(new(Person)): {"first_name": 0, "last_name": 1, "email": 2, "added_at": 3},
-		reflect.TypeOf(new(Place)):  {"country": 0, "city": 1, "telcode": 2},
-		reflect.TypeOf(new(PersonPlace)): {
-			"first_name": 0, "last_name": 1, "email": 2, "added_at": 3,
-			"country": 4, "city": 5, "telcode": 6},
-		reflect.TypeOf(new(PersonPlacePtr)): {
-			"first_name": 0, "last_name": 1, "email": 2, "added_at": 3,
-			"country": 4, "city": 5, "telcode": 6},
-	}
-	for typ, expected := range testingTable {
-		fields, err := getFieldMap(typ)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(fields, expected) {
-			t.Fatalf("Fieldmap error: got `%v`, expected `%v`", fields, expected)
-		}
 	}
 }

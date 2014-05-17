@@ -3,21 +3,43 @@ package sqlx
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	reflectx "github.com/jmoiron/sqlx/reflect"
 )
 
-// FIXME: I should deprecate this.  It makes it difficult to write libraries
-// which use sqlx, because programs can set this and break them.
+// Although the NameMapper is convenient, in practice it should not
+// be relied on except for application code.  If you are writing a library
+// that uses sqlx, you should be aware that the name mappings you expect
+// can be overridded by your user's application.
 
 // NameMapper is used to map column names to struct field names.  By default,
 // it uses strings.ToLower to lowercase struct field names.  It can be set
 // to whatever you want, but it is encouraged to be set before sqlx is used
 // as field-to-name mappings are cached after first use on a type.
 var NameMapper = strings.ToLower
+var origMapper = reflect.ValueOf(NameMapper)
+
+// Rather than creating on init, this is created when necessary so that
+// importers have time to customize the NameMapper.
+var mpr *reflectx.Mapper
+
+// mapper returns a valid mapper using the configured NameMapper func.
+func mapper() *reflectx.Mapper {
+	if mpr == nil {
+		mpr = reflectx.NewMapperFunc("db", NameMapper)
+	}
+	if origMapper != reflect.ValueOf(NameMapper) {
+		mpr = reflectx.NewMapperFunc("db", NameMapper)
+		origMapper = reflect.ValueOf(NameMapper)
+	}
+	return mpr
+}
 
 // ColScanner is an interface for something which can Scan and return a list
 // of columns (Row, Rows)
@@ -451,11 +473,11 @@ func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
 // during a looped StructScan
 type Rows struct {
 	sql.Rows
+	unsafe bool
+	// these fields cache memory use for a rows during iteration w/ structScan
 	started bool
-	fields  []int
-	base    reflect.Type
+	fields  [][]int
 	values  []interface{}
-	unsafe  bool
 }
 
 // SliceScan using this Rows.
@@ -474,44 +496,31 @@ func (r *Rows) MapScan(dest map[string]interface{}) error {
 // positions to fields to avoid that overhead per scan, which means it is not safe
 // to run StructScan on the same Rows instance with different struct types.
 func (r *Rows) StructScan(dest interface{}) error {
-	var v reflect.Value
-	v = reflect.ValueOf(dest)
+	v := reflect.ValueOf(dest)
+
 	if v.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
 	}
-	base := reflect.Indirect(v)
 
-	fm, err := getFieldMap(base.Type())
-	if err != nil {
-		return err
-	}
+	v = reflect.Indirect(v)
 
 	if !r.started {
-
 		columns, err := r.Columns()
 		if err != nil {
 			return err
 		}
+		m := mapper()
 
-		var ok bool
-		var num int
-
-		r.fields = make([]int, len(columns))
-		r.values = make([]interface{}, len(columns))
-
-		for i, name := range columns {
-			// find that name in the struct
-			num, ok = fm[name]
-			if !ok {
-				return errors.New("Could not find name " + name + " in interface.")
-			}
-			r.fields[i] = num
+		r.fields = m.TraversalsByName(v.Type(), columns)
+		// if we are not unsafe and are missing fields, return an error
+		if f, err := missingFields(r.fields); err != nil && !r.unsafe {
+			return fmt.Errorf("missing destination name %s", columns[f])
 		}
+		r.values = make([]interface{}, len(columns))
 		r.started = true
 	}
 
-	// create a new struct type (which returns PtrTo) and indirect it
-	err = fm.getValues(reflect.Indirect(v), r.fields, r.values, r.unsafe)
+	err := fieldsByTraversal(v, r.fields, r.values, true)
 	if err != nil {
 		return err
 	}
@@ -577,6 +586,7 @@ func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 // reading the file at path.  LoadFile reads the entire file into memory, so it
 // is not suitable for loading large data dumps, but can be useful for initializing
 // schemas or loading indexes.
+//
 // FIXME: this does not really work with multi-statement files for mattn/go-sqlite3
 // or the go-mysql-driver/mysql drivers;  pq seems to be an exception here.  Detecting
 // this by requiring something with DriverName() and then attempting to split the
@@ -621,8 +631,7 @@ func (r *Row) StructScan(dest interface{}) error {
 	}
 	defer r.rows.Close()
 
-	var v reflect.Value
-	v = reflect.ValueOf(dest)
+	v := reflect.ValueOf(dest)
 	if v.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
 	}
@@ -631,12 +640,7 @@ func (r *Row) StructScan(dest interface{}) error {
 	}
 
 	direct := reflect.Indirect(v)
-	base, err := BaseStructType(direct.Type())
-	if err != nil {
-		return err
-	}
-
-	fm, err := getFieldMap(base)
+	_, err := baseType(direct.Type(), reflect.Struct)
 	if err != nil {
 		return err
 	}
@@ -646,14 +650,15 @@ func (r *Row) StructScan(dest interface{}) error {
 		return err
 	}
 
-	indexes, err := fm.getFieldIndexes(columns, r.unsafe)
-	if err != nil {
-		return err
+	m := mapper()
+	fields := m.TraversalsByName(v.Type(), columns)
+	// if we are not unsafe and are missing fields, return an error
+	if f, err := missingFields(fields); err != nil && !r.unsafe {
+		return fmt.Errorf("missing destination name %s", columns[f])
 	}
-
 	values := make([]interface{}, len(columns))
-	// create a new struct type (which returns PtrTo) and indirect it
-	err = fm.getValues(reflect.Indirect(v), indexes, values, r.unsafe)
+
+	err = fieldsByTraversal(v, fields, values, true)
 	if err != nil {
 		return err
 	}
@@ -741,6 +746,8 @@ func StructScan(rows rowsi, dest interface{}) error {
 	var isPtr bool
 
 	value := reflect.ValueOf(dest)
+
+	// json.Unmarshal returns errors for these
 	if value.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
 	}
@@ -750,17 +757,12 @@ func StructScan(rows rowsi, dest interface{}) error {
 
 	direct := reflect.Indirect(value)
 
-	slice, err := BaseSliceType(value.Type())
+	slice, err := baseType(value.Type(), reflect.Slice)
 	if err != nil {
 		return err
 	}
 	isPtr = slice.Elem().Kind() == reflect.Ptr
-	base, err := BaseStructType(slice.Elem())
-	if err != nil {
-		return err
-	}
-
-	fm, err := getFieldMap(base)
+	base, err := baseType(slice.Elem(), reflect.Struct)
 	if err != nil {
 		return err
 	}
@@ -770,12 +772,12 @@ func StructScan(rows rowsi, dest interface{}) error {
 		return err
 	}
 
-	indexes, err := fm.getFieldIndexes(columns, isUnsafe(rows))
-	if err != nil {
-		return err
+	m := mapper()
+	fields := m.TraversalsByName(base, columns)
+	// if we are not unsafe and are missing fields, return an error
+	if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
+		return fmt.Errorf("missing destination name %s", columns[f])
 	}
-
-	// this will hold interfaces which are pointers to each field in the struct
 	values := make([]interface{}, len(columns))
 
 	for rows.Next() {
@@ -783,10 +785,7 @@ func StructScan(rows rowsi, dest interface{}) error {
 		vp = reflect.New(base)
 		v = reflect.Indirect(vp)
 
-		err = fm.getValues(v, indexes, values, isUnsafe(rows))
-		if err != nil {
-			return err
-		}
+		err = fieldsByTraversal(v, fields, values, true)
 
 		// scan into the struct field pointers and append to our results
 		err = rows.Scan(values...)

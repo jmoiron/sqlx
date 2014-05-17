@@ -18,16 +18,18 @@ func TestBasic(t *testing.T) {
 	}
 
 	f := Foo{1, 2, 3}
+	fv := reflect.ValueOf(f)
+	m := NewMapper("")
 
-	v := FieldByName(f, "A")
+	v := m.FieldByName(fv, "A")
 	if ival(v) != f.A {
 		t.Errorf("Expecting %d, got %d", ival(v), f.A)
 	}
-	v = FieldByName(f, "B")
+	v = m.FieldByName(fv, "B")
 	if ival(v) != f.B {
 		t.Errorf("Expecting %d, got %d", f.B, ival(v))
 	}
-	v = FieldByName(f, "C")
+	v = m.FieldByName(fv, "C")
 	if ival(v) != f.C {
 		t.Errorf("Expecting %d, got %d", f.C, ival(v))
 	}
@@ -48,16 +50,19 @@ func TestEmbedded(t *testing.T) {
 		Bar
 	}
 
+	m := NewMapper("")
+
 	z := Baz{}
 	z.A = 1
 	z.B = 2
 	z.Bar.Foo.A = 3
+	zv := reflect.ValueOf(z)
 
-	v := FieldByName(z, "A")
+	v := m.FieldByName(zv, "A")
 	if ival(v) != z.A {
 		t.Errorf("Expecting %d, got %d", ival(v), z.A)
 	}
-	v = FieldByName(z, "B")
+	v = m.FieldByName(zv, "B")
 	if ival(v) != z.B {
 		t.Errorf("Expecting %d, got %d", ival(v), z.B)
 	}
@@ -72,7 +77,8 @@ func TestMapping(t *testing.T) {
 
 	m := NewMapperFunc("db", strings.ToLower)
 	p := Person{1, "Jason", true}
-	mapping := m.MapType(reflect.TypeOf(p))
+	mapping := m.TypeMap(reflect.TypeOf(p))
+
 	for _, key := range []string{"id", "name", "wears_glasses"} {
 		if _, ok := mapping[key]; !ok {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
@@ -85,7 +91,7 @@ func TestMapping(t *testing.T) {
 		Person
 	}
 	s := SportsPerson{Weight: 100, Age: 30, Person: p}
-	mapping = m.MapType(reflect.TypeOf(s))
+	mapping = m.TypeMap(reflect.TypeOf(s))
 	for _, key := range []string{"id", "name", "wears_glasses", "weight", "age"} {
 		if _, ok := mapping[key]; !ok {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
@@ -100,7 +106,7 @@ func TestMapping(t *testing.T) {
 		SportsPerson
 	}
 	r := RugbyPlayer{12, true, false, s}
-	mapping = m.MapType(reflect.TypeOf(r))
+	mapping = m.TypeMap(reflect.TypeOf(r))
 	for _, key := range []string{"id", "name", "wears_glasses", "weight", "age", "position", "is_intense"} {
 		if _, ok := mapping[key]; !ok {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
@@ -184,7 +190,7 @@ func BenchmarkFieldByIndexL4(b *testing.B) {
 	idx := []int{0, 0, 0, 0}
 	for i := 0; i < b.N; i++ {
 		v := reflect.ValueOf(e4)
-		f := fieldByIndexes(v, idx)
+		f := FieldByIndexes(v, idx)
 		if f.Interface().(int) != 1 {
 			b.Fatal("Wrong value.")
 		}

@@ -1,13 +1,38 @@
+// Package reflect implements extensions to the standard reflect lib suitable
+// for implementing marshaling and unmarshaling packages.  The main Mapper type
+// allows for Go-compatible named atribute access, including accessing embedded
+// struct attributes and the ability to use  functions and struct tags to
+// customize field names.
+//
 package reflect
 
+import "sync"
+
 import (
-	"fmt"
-	"sync"
+	"reflect"
+	"runtime"
 )
 
-import "reflect"
-
 type fieldMap map[string][]int
+
+// mustBe checks a value against a kind, panicing with a reflect.ValueError
+// if the kind isn't that which is required.
+func mustBe(v reflect.Value, expected reflect.Kind) {
+	k := v.Kind()
+	if k != expected {
+		panic(&reflect.ValueError{methodName(), k})
+	}
+}
+
+// methodName is returns the caller of the function calling methodName
+func methodName() string {
+	pc, _, _, _ := runtime.Caller(2)
+	f := runtime.FuncForPC(pc)
+	if f == nil {
+		return "unknown method"
+	}
+	return f.Name()
+}
 
 // Mapper is a general purpose mapper of names to struct fields.  A Mapper
 // behaves like most marshallers, optionally obeying a field tag for name
@@ -39,7 +64,9 @@ func NewMapperFunc(tagName string, f func(string) string) *Mapper {
 	}
 }
 
-func (m *Mapper) MapType(t reflect.Type) fieldMap {
+// TypeMap returns a mapping of field strings to int slices representing
+// the traversal down the struct to reach the field.
+func (m *Mapper) TypeMap(t reflect.Type) fieldMap {
 	mapping, ok := m.cache[t]
 	if !ok {
 		mapping = getMapping(t, m.tagName, m.mapFunc)
@@ -48,22 +75,63 @@ func (m *Mapper) MapType(t reflect.Type) fieldMap {
 	return mapping
 }
 
-func fieldByIndexes(v reflect.Value, indexes []int) reflect.Value {
+// Fieldmap returns the mapper's mapping of field names to reflect values.  Panics
+// if v's Kind is not Struct, or v is not Indirectable to a struct kind.
+func (m *Mapper) FieldMap(v reflect.Value) map[string]reflect.Value {
+	v = reflect.Indirect(v)
+	mustBe(v, reflect.Struct)
+
+	r := map[string]reflect.Value{}
+	nm := m.TypeMap(v.Type())
+	for tagName, indexes := range nm {
+		r[tagName] = FieldByIndexes(v, indexes)
+	}
+	return r
+}
+
+// FieldByName returns a field by the its mapped name as a reflect.Value.
+// Panics if v's Kind is not Struct or v is not Indirectable to a struct Kind.
+// Returns zero Value if the name is not found.
+func (m *Mapper) FieldByName(v reflect.Value, name string) reflect.Value {
+	v = reflect.Indirect(v)
+	mustBe(v, reflect.Struct)
+
+	nm := m.TypeMap(v.Type())
+	traversal, ok := nm[name]
+	if !ok {
+		return *new(reflect.Value)
+	}
+	return FieldByIndexes(v, traversal)
+}
+
+// FieldsByName returns a slice of values corresponding to the slice of names
+// for the value.  Panics if v's Kind is not Struct or v is not Indirectable
+// to a struct Kind.  Returns zero Value for each name not found.
+func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {
+	v = reflect.Indirect(v)
+	mustBe(v, reflect.Struct)
+
+	nm := m.TypeMap(v.Type())
+
+	vals := make([]reflect.Value, 0, len(names))
+	for _, name := range names {
+		traversal, ok := nm[name]
+		if !ok {
+			vals = append(vals, *new(reflect.Value))
+		} else {
+			vals = append(vals, FieldByIndexes(v, traversal))
+		}
+	}
+	return vals
+}
+
+// FieldByIndexes returns a value for a particular struct traversal.
+func FieldByIndexes(v reflect.Value, indexes []int) reflect.Value {
 	f := v
 	for _, i := range indexes {
 		f = f.Field(i)
 	}
 	return f
-}
-
-func (m *Mapper) FieldMap(v reflect.Value) map[string]reflect.Value {
-	r := map[string]reflect.Value{}
-	nm := m.MapType(v.Type())
-	fmt.Println(nm)
-	for tagName, indexes := range nm {
-		r[tagName] = fieldByIndexes(v, indexes)
-	}
-	return r
 }
 
 type typeQueue struct {
@@ -81,6 +149,8 @@ func apnd(is []int, i int) []int {
 	return x
 }
 
+// getMapping returns a mapping for the t type, using the tagName and the mapFunc
+// to determine the canonical names of fields.
 func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) fieldMap {
 	queue := []typeQueue{}
 	queue = append(queue, typeQueue{t, []int{}})
@@ -95,7 +165,11 @@ func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) fie
 
 			name := f.Tag.Get(tagName)
 			if len(name) == 0 {
-				name = mapFunc(f.Name)
+				if mapFunc != nil {
+					name = mapFunc(f.Name)
+				} else {
+					name = f.Name
+				}
 			}
 
 			// if the name is "-", disabled via a tag, skip it
@@ -123,13 +197,4 @@ func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) fie
 		}
 	}
 	return m
-}
-
-func noop(s string) string { return s }
-
-func FieldByName(i interface{}, name string) reflect.Value {
-	t := reflect.TypeOf(i)
-	m := getMapping(t, "db", noop)
-	v := reflect.ValueOf(i)
-	return fieldByIndexes(v, m[name])
 }

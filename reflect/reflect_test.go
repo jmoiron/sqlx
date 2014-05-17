@@ -1,7 +1,6 @@
 package reflect
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -74,7 +73,44 @@ func TestMapping(t *testing.T) {
 	m := NewMapperFunc("db", strings.ToLower)
 	p := Person{1, "Jason", true}
 	mapping := m.MapType(reflect.TypeOf(p))
-	fmt.Printf("%#v\n", mapping)
+	for _, key := range []string{"id", "name", "wears_glasses"} {
+		if _, ok := mapping[key]; !ok {
+			t.Errorf("Expecting to find key %s in mapping but did not.", key)
+		}
+	}
+
+	type SportsPerson struct {
+		Weight int
+		Age    int
+		Person
+	}
+	s := SportsPerson{Weight: 100, Age: 30, Person: p}
+	mapping = m.MapType(reflect.TypeOf(s))
+	for _, key := range []string{"id", "name", "wears_glasses", "weight", "age"} {
+		if _, ok := mapping[key]; !ok {
+			t.Errorf("Expecting to find key %s in mapping but did not.", key)
+		}
+
+	}
+
+	type RugbyPlayer struct {
+		Position   int
+		IsIntense  bool `db:"is_intense"`
+		IsAllBlack bool `db:"-"`
+		SportsPerson
+	}
+	r := RugbyPlayer{12, true, false, s}
+	mapping = m.MapType(reflect.TypeOf(r))
+	for _, key := range []string{"id", "name", "wears_glasses", "weight", "age", "position", "is_intense"} {
+		if _, ok := mapping[key]; !ok {
+			t.Errorf("Expecting to find key %s in mapping but did not.", key)
+		}
+	}
+
+	if _, ok := mapping["isallblack"]; ok {
+		t.Errorf("Expecting to ignore `IsAllBlack` field")
+	}
+
 }
 
 type E1 struct {

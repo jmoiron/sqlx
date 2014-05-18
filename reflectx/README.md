@@ -1,4 +1,4 @@
-# reflect
+# reflectx
 
 The sqlx package has special reflect needs.  In particular, it needs to:
 
@@ -9,6 +9,6 @@ The sqlx package has special reflect needs.  In particular, it needs to:
 
 The first two are amply taken care of by `Reflect.Value.FieldByName`, and the third is
 addressed by `Reflect.Value.FieldByNameFunc`, but these don't quite understand struct
-tags in the ways that are vital to most marshalers.
+tags in the ways that are vital to most marshalers, and they are slow.
 
-This reflect package extends reflect to achieve these goals.
+This reflectx package extends reflect to achieve these goals.

@@ -4,7 +4,7 @@
 // struct attributes and the ability to use  functions and struct tags to
 // customize field names.
 //
-package reflect
+package reflectx
 
 import "sync"
 

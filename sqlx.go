@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"strings"
 
-	reflectx "github.com/jmoiron/sqlx/reflect"
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
 // Although the NameMapper is convenient, in practice it should not

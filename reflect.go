@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	reflectx "github.com/jmoiron/sqlx/reflect"
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
 // reflect.go contains extensions to reflect that make it easy to deal with

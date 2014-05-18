@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-// Bindvar types supported by sqlx's Rebind & BindMap/Struct functions.
+// Bindvar types supported by Rebind, BindMap and BindStruct.
 const (
 	UNKNOWN = iota
 	QUESTION
@@ -13,7 +13,7 @@ const (
 	NAMED
 )
 
-// BindType returns the bindtype for a given database given a drivername
+// BindType returns the bindtype for a given database given a drivername.
 func BindType(driverName string) int {
 	switch driverName {
 	case "postgres":
@@ -33,7 +33,7 @@ func BindType(driverName string) int {
 
 // FIXME: this is now produces the wrong results for oracle's NAMED bindtype
 
-// Rebind a query from the default bindtype (QUESTION) to the target bindtype
+// Rebind a query from the default bindtype (QUESTION) to the target bindtype.
 func Rebind(bindType int, query string) string {
 	if bindType != DOLLAR {
 		return query

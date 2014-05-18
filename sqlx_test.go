@@ -870,7 +870,7 @@ func TestBindMap(t *testing.T) {
 		"last":  "Moiron",
 	}
 
-	bq, args, _ := BindMap(QUESTION, q1, am)
+	bq, args, _ := bindMap(QUESTION, q1, am)
 	expect := `INSERT INTO foo (a, b, c, d) VALUES (?, ?, ?, ?)`
 	if bq != expect {
 		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
@@ -917,7 +917,7 @@ func TestBindStruct(t *testing.T) {
 
 	am := tt{"Jason Moiron", 30, "Jason", "Moiron"}
 
-	bq, args, _ := BindStruct(QUESTION, q1, am)
+	bq, args, _ := bindStruct(QUESTION, q1, am)
 	expect := `INSERT INTO foo (a, b, c, d) VALUES (?, ?, ?, ?)`
 	if bq != expect {
 		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
@@ -940,7 +940,7 @@ func TestBindStruct(t *testing.T) {
 	}
 
 	am2 := tt2{"Hello", "World"}
-	bq, args, _ = BindStruct(QUESTION, "INSERT INTO foo (a, b) VALUES (:field_2, :field_1)", am2)
+	bq, args, _ = bindStruct(QUESTION, "INSERT INTO foo (a, b) VALUES (:field_2, :field_1)", am2)
 	expect = `INSERT INTO foo (a, b) VALUES (?, ?)`
 	if bq != expect {
 		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
@@ -957,7 +957,7 @@ func TestBindStruct(t *testing.T) {
 	am3.Field1 = "Hello"
 	am3.Field2 = "World"
 
-	bq, args, err = BindStruct(QUESTION, "INSERT INTO foo (a, b, c) VALUES (:name, :field_1, :field_2)", am3)
+	bq, args, err = bindStruct(QUESTION, "INSERT INTO foo (a, b, c) VALUES (:name, :field_1, :field_2)", am3)
 
 	if err != nil {
 		t.Fatal(err)
@@ -991,7 +991,7 @@ func BenchmarkBindStruct(b *testing.B) {
 	am := t{"Jason Moiron", 30, "Jason", "Moiron"}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		BindStruct(DOLLAR, q1, am)
+		bindStruct(DOLLAR, q1, am)
 		//bindMap(QUESTION, q1, am)
 	}
 }
@@ -1007,7 +1007,7 @@ func BenchmarkBindMap(b *testing.B) {
 	}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		BindMap(DOLLAR, q1, am)
+		bindMap(DOLLAR, q1, am)
 		//bindMap(QUESTION, q1, am)
 	}
 }

@@ -2,16 +2,14 @@ package sqlx
 
 // Named Query Support
 //
-//  * BindStruct, BindMap - bind query bindvars to map/struct args
+//  * BindMap - bind query bindvars to map/struct args
 //	* NamedExec, NamedQuery - named query w/ struct or map
-//  * NamedExecMap, NamedQueryMap - named query w/ maps (DEPRECATED)
 //  * NamedStmt - a pre-compiled named query which is a prepared statement
 //
 // Internal Interfaces:
 //
 //  * compileNamedQuery - rebind a named query, returning a query and list of names
 //  * bindArgs, bindMapArgs, bindAnyArgs - given a list of names, return an arglist
-//  * bindAny - call BindStruct or BindMap depending on the type of the argument
 //
 import (
 	"database/sql"
@@ -111,7 +109,7 @@ func (n *NamedStmt) Get(dest interface{}, arg interface{}) error {
 // named statements (as the bindtype must be determined).
 type namedPreparer interface {
 	Preparer
-	Binder
+	binder
 }
 
 func prepareNamed(p namedPreparer, query string) (*NamedStmt, error) {
@@ -177,10 +175,10 @@ func bindMapArgs(names []string, arg map[string]interface{}) ([]interface{}, err
 	return arglist, nil
 }
 
-// BindStruct binds a named parameter query with fields from a struct argument.
+// bindStruct binds a named parameter query with fields from a struct argument.
 // The rules for binding field names to parameter names follow the same
 // conventions as for StructScan, including obeying the `db` struct tags.
-func BindStruct(bindType int, query string, arg interface{}) (string, []interface{}, error) {
+func bindStruct(bindType int, query string, arg interface{}) (string, []interface{}, error) {
 	bound, names, err := compileNamedQuery([]byte(query), bindType)
 	if err != nil {
 		return "", []interface{}{}, err
@@ -194,8 +192,8 @@ func BindStruct(bindType int, query string, arg interface{}) (string, []interfac
 	return bound, arglist, nil
 }
 
-// BindMap binds a named parameter query with a map of arguments.
-func BindMap(bindType int, query string, args map[string]interface{}) (string, []interface{}, error) {
+// bindMap binds a named parameter query with a map of arguments.
+func bindMap(bindType int, query string, args map[string]interface{}) (string, []interface{}, error) {
 	bound, names, err := compileNamedQuery([]byte(query), bindType)
 	if err != nil {
 		return "", []interface{}{}, err
@@ -285,19 +283,19 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 	return string(rebound), names, err
 }
 
-// bindAny binds a struct or a map by inspecting the arg interface.
-func bindAny(e Ext, query string, arg interface{}) (string, []interface{}, error) {
+// Bind binds a struct or a map to a query with named parameters.
+func BindNamed(bindType int, query string, arg interface{}) (string, []interface{}, error) {
 	if maparg, ok := arg.(map[string]interface{}); ok {
-		return e.BindMap(query, maparg)
+		return bindMap(bindType, query, maparg)
 	}
-	return e.BindStruct(query, arg)
+	return bindStruct(bindType, query, arg)
 }
 
 // NamedQuery binds a named query and then runs Query on the result using the
 // provided Ext (sqlx.Tx, sqlx.Db).  It works with both structs and with
 // map[string]interface{} types.
 func NamedQuery(e Ext, query string, arg interface{}) (*Rows, error) {
-	q, args, err := bindAny(e, query, arg)
+	q, args, err := BindNamed(BindType(e.DriverName()), query, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +306,7 @@ func NamedQuery(e Ext, query string, arg interface{}) (*Rows, error) {
 // then runs Exec on the result.  Returns an error from the binding
 // or the query excution itself.
 func NamedExec(e Ext, query string, arg interface{}) (sql.Result, error) {
-	q, args, err := bindAny(e, query, arg)
+	q, args, err := BindNamed(BindType(e.DriverName()), query, arg)
 	if err != nil {
 		return nil, err
 	}

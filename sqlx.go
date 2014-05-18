@@ -21,7 +21,7 @@ import (
 // NameMapper is used to map column names to struct field names.  By default,
 // it uses strings.ToLower to lowercase struct field names.  It can be set
 // to whatever you want, but it is encouraged to be set before sqlx is used
-// as field-to-name mappings are cached after first use on a type.
+// as name-to-field mappings are cached after first use on a type.
 var NameMapper = strings.ToLower
 var origMapper = reflect.ValueOf(NameMapper)
 
@@ -33,51 +33,49 @@ var mpr *reflectx.Mapper
 func mapper() *reflectx.Mapper {
 	if mpr == nil {
 		mpr = reflectx.NewMapperFunc("db", NameMapper)
-	}
-	if origMapper != reflect.ValueOf(NameMapper) {
+	} else if origMapper != reflect.ValueOf(NameMapper) {
+		// if NameMapper has changed, create a new mapper
 		mpr = reflectx.NewMapperFunc("db", NameMapper)
 		origMapper = reflect.ValueOf(NameMapper)
 	}
 	return mpr
 }
 
-// ColScanner is an interface for something which can Scan and return a list
-// of columns (Row, Rows)
+// ColScanner is an interface used by MapScan and SliceScan
 type ColScanner interface {
 	Columns() ([]string, error)
 	Scan(dest ...interface{}) error
 	Err() error
 }
 
-// Queryer is an interface for something which can Query (Tx, DB, Stmt)
+// Queryer is an interface used by Get and Select
 type Queryer interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	Queryx(query string, args ...interface{}) (*Rows, error)
 	QueryRowx(query string, args ...interface{}) *Row
 }
 
-// Execer is an interface for something which can Exec (Tx, DB, Stmt)
+// Execer is an interface used by MustExec and LoadFile
 type Execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
 // Binder is an interface for something which can bind queries (Tx, DB)
-type Binder interface {
+type binder interface {
 	DriverName() string
 	Rebind(string) string
-	BindMap(string, map[string]interface{}) (string, []interface{}, error)
-	BindStruct(string, interface{}) (string, []interface{}, error)
+	BindNamed(string, interface{}) (string, []interface{}, error)
 }
 
-// Ext is a union interface which can bind, query, and exec (Tx, DB), used for
-// NamedQuery and NamedExec, which requires exec/query and BindMap/Struct
+// Ext is a union interface which can bind, query, and exec, used by
+// NamedQuery and NamedExec.
 type Ext interface {
-	Binder
+	binder
 	Queryer
 	Execer
 }
 
-// Preparer is an interface for something which can prepare sql statements (Tx, DB)
+// Preparer is an interface used by Preparex.
 type Preparer interface {
 	Prepare(query string) (*sql.Stmt, error)
 }
@@ -192,7 +190,7 @@ func (db *DB) DriverName() string {
 	return db.driverName
 }
 
-// Open is the same as database/sql's Open, but returns an *sqlx.DB instead.
+// Open is the same as sql.Open, but returns an *sqlx.DB instead.
 func Open(driverName, dataSourceName string) (*DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
@@ -214,14 +212,9 @@ func (db *DB) Unsafe() *DB {
 	return &DB{DB: db.DB, driverName: db.driverName, unsafe: true}
 }
 
-// BindMap binds a query using the DB driver's bindvar type.
-func (db *DB) BindMap(query string, argmap map[string]interface{}) (string, []interface{}, error) {
-	return BindMap(BindType(db.driverName), query, argmap)
-}
-
-// BindStruct binds a query using the DB driver's bindvar type.
-func (db *DB) BindStruct(query string, arg interface{}) (string, []interface{}, error) {
-	return BindStruct(BindType(db.driverName), query, arg)
+// BindNamed binds a query using the DB driver's bindvar type.
+func (db *DB) BindNamed(query string, arg interface{}) (string, []interface{}, error) {
+	return BindNamed(BindType(db.driverName), query, arg)
 }
 
 // NamedQuery using this DB.
@@ -293,7 +286,7 @@ func (db *DB) PrepareNamed(query string) (*NamedStmt, error) {
 	return prepareNamed(db, query)
 }
 
-// Tx is an sqlx wrapper around database/sql's Tx with extra functionality
+// Tx is an sqlx wrapper around sql.Tx with extra functionality
 type Tx struct {
 	*sql.Tx
 	driverName string
@@ -316,14 +309,9 @@ func (tx *Tx) Unsafe() *Tx {
 	return &Tx{Tx: tx.Tx, driverName: tx.driverName, unsafe: true}
 }
 
-// BindMap binds a query within a transaction's bindvar type.
-func (tx *Tx) BindMap(query string, argmap map[string]interface{}) (string, []interface{}, error) {
-	return BindMap(BindType(tx.driverName), query, argmap)
-}
-
-// BindStruct binds a query within a transaction's bindvar type.
-func (tx *Tx) BindStruct(query string, arg interface{}) (string, []interface{}, error) {
-	return BindStruct(BindType(tx.driverName), query, arg)
+// BindNamed binds a query within a transaction's bindvar type.
+func (tx *Tx) BindNamed(query string, arg interface{}) (string, []interface{}, error) {
+	return BindNamed(BindType(tx.driverName), query, arg)
 }
 
 // NamedQuery within a transaction.
@@ -404,7 +392,7 @@ func (tx *Tx) PrepareNamed(query string) (*NamedStmt, error) {
 	return prepareNamed(tx, query)
 }
 
-// Stmt is an sqlx wrapper around database/sql's Stmt with extra functionality
+// Stmt is an sqlx wrapper around sql.Stmt with extra functionality
 type Stmt struct {
 	*sql.Stmt
 	unsafe bool

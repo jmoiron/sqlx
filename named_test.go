@@ -123,13 +123,13 @@ func TestNamedQueries(t *testing.T) {
 			var p2 Person
 			rows.StructScan(&p2)
 			if p.FirstName != p2.FirstName {
-				t.Error("got %s, expected %s", p.FirstName, p2.FirstName)
+				t.Errorf("got %s, expected %s", p.FirstName, p2.FirstName)
 			}
 			if p.LastName != p2.LastName {
-				t.Error("got %s, expected %s", p.LastName, p2.LastName)
+				t.Errorf("got %s, expected %s", p.LastName, p2.LastName)
 			}
 			if p.Email != p2.Email {
-				t.Error("got %s, expected %s", p.Email, p2.Email)
+				t.Errorf("got %s, expected %s", p.Email, p2.Email)
 			}
 		}
 
@@ -142,13 +142,13 @@ func TestNamedQueries(t *testing.T) {
 			t.Errorf("got %d results, expected %d", len(people), 1)
 		}
 		if p.FirstName != people[0].FirstName {
-			t.Error("got %s, expected %s", p.FirstName, people[0].FirstName)
+			t.Errorf("got %s, expected %s", p.FirstName, people[0].FirstName)
 		}
 		if p.LastName != people[0].LastName {
-			t.Error("got %s, expected %s", p.LastName, people[0].LastName)
+			t.Errorf("got %s, expected %s", p.LastName, people[0].LastName)
 		}
 		if p.Email != people[0].Email {
-			t.Error("got %s, expected %s", p.Email, people[0].Email)
+			t.Errorf("got %s, expected %s", p.Email, people[0].Email)
 		}
 
 		// test Exec

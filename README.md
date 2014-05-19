@@ -53,6 +53,37 @@ used in any exported functions, will no longer be exported.
 
 #### Reflect
 
+The `BaseStructType` and `BaseSliceType`, which are no longer really used, are
+removed.  Much of the reflect work done by sqlx has been offloaded to a new
+package, `sqlx/reflectx`, which exposes a lot more than sqlx did and is a lot
+more correct, better tested, more solidly benchmarked, and more reusable.
+
+### Behavioral Changes
+
+I am somewhat more willing to make changes that will be caught at the build
+step by the Go compiler.  I very much try to avoid behavioral changes that
+are more subtle, but in my opinion the following changes fall in line with 
+the [Go1 compatibility expectations](http://golang.org/doc/go1compat):
+
+* Non-embedded struct fields are no longer descended into.  If you relied
+  on this behavior, you will have to embed those structs instead.  This is
+  ostensibly due to [Issue 60: StructScan infinite loop](https://github.com/jmoiron/sqlx/issues/60),
+  but the cycle could have been detected;  The reality is that the current
+  behavior makes very little sense and removing it simplified the code greatly.
+  
+* `MapScan` and `SliceScan` will no longer have return guarantees of either
+  a string value or `nil`; instead, they will return values with type
+  `interface{}`.  This is due to [Issue 59: pq Map/SliceScan error with time.Time destination](https://github.com/jmoiron/sqlx/issues/59),
+  but generally we cannot guarantee that a driver will give us any particular type.
+
+### Going Forward
+
+There is no Go1-like promise of absolute stability, but I take the issue
+seriously and will maintain the library in a compatible state unless vital
+bugs prevent me from doing so.  Since #59 and #60 presented me with an
+opportunity, I decided to perform the API cleanup at the same time.
+
+## SQLX
 
 sqlx is a library which provides a set of extensions on go's standard
 `database/sql` library.  The sqlx versions of `sql.DB`, `sql.TX`, `sql.Stmt`,

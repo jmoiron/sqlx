@@ -27,19 +27,79 @@ from the way that it interacts with real code and taken in bug reports.
 There have been very minor breaking changes in the past, many of which would
 not have affected most code.
 
-However, the API is very large, and there's little evidence that some of the
-repeated "convenience" verbs deserve to be so widely distributed amongst the
-nouns of DB, Tx, and Stmt.  Removing these methods but preserving the base
-convenience functions (which take any of these via an interface) would reduce
-the surface of the API a lot and make it easier to understand.
+The API of database/sql is impressively succinct, something which is currently
+*not* mirrored by sqlx.  While the goals were obviously to create extensions,
+a lot of noise has crept in as well.  Much of the API bloat is due to the
+proliferation of functions which do not save programmers much time and energy.
 
-In addition to this, there are some functions which were exported with the
-intent to facilitate building richer ORM libraries on top of sqlx, but after
-having [built one myself](http://github.com/jmoiron/modl), I'm not convinced
-that this is possible given the limited exposure of the name mapping that is
-revealed in the public API.  If it's a choice between exposing more of it or
-exposing none of it, I'd rather expose none of it in the `sqlx` namespace.
+In addition to this is the fact that several behavioral or design mistakes have
+crept into sqlx:
 
+* the way that non-embedded structs are *also* used for field scanning opens
+  us up to cycles and infinite loops and is odd behavior
+* the global NameMapper function makes it difficult for code that is intended
+  to be a library to rely on any particular behavior of sqlx.
+* separating named bind/exec/query functions by map/struct was unnecessary
+  type safety pandering;  it buys so little and costs a lot of API noise.
+* reflection helpers are exposed as part of the `sqlx` namespace but are
+  essentially useless to anyone not building ORMs.
+
+To address this, there will be a **breaking API release** coming up.  This will
+likely break some existing code, but it should be the last major API change that
+is at least 99% backwards compatible.
+
+It should be known that a release will be made for the "current" version of
+sqlx, to ease vendoring where it is desired.
+
+### API Changes
+
+#### Mnemonics
+
+The mnemonic error handling Exec family, `Execl`, `Execf`, `Execv`, will all
+be removed without replacement.  Likewise, `Selectf` and `Selectv` are also
+removed without replacement.  These are 3 line functions and have little use
+in real code.  `Execp` will be removed but its alias, `MustExec`, remains.
+
+#### Named Queries
+
+`BindMap` and `BindStruct` are replaced with a single `BindNamed`, which will
+handle structs or maps. `NamedExec` and `NamedQuery` are renamed to `QueryNamed`
+and `ExecNamed` to fit in with the rest of the VerbNamed API (eg. `PrepareNamed`,
+`BindNamed`). `NamedExecMap` and `NamedQueryMap` are removed as `ExecNamed` and
+`QueryNamed` now support both structs and maps.  The `Binder` interface, not
+used in any exported functions, will no longer be exported.
+
+#### Reflect
+
+The `BaseStructType` and `BaseSliceType`, which are no longer really used, are
+removed.  Much of the reflect work done by sqlx has been offloaded to a new
+package, `sqlx/reflectx`, which exposes a lot more than sqlx did and is a lot
+more correct, better tested, more solidly benchmarked, and more reusable.
+
+### Behavioral Changes
+
+I am somewhat more willing to make changes that will be caught at the build
+step by the Go compiler.  I very much try to avoid behavioral changes that
+are more subtle, but in my opinion the following changes fall in line with 
+the [Go1 compatibility expectations](http://golang.org/doc/go1compat):
+
+* Non-embedded struct fields are no longer descended into.  If you relied
+  on this behavior, you will have to embed those structs instead.  This is
+  ostensibly due to [Issue 60: StructScan infinite loop](https://github.com/jmoiron/sqlx/issues/60),
+  but the cycle could have been detected;  The reality is that the current
+  behavior makes very little sense and removing it simplified the code greatly.
+  
+* `MapScan` and `SliceScan` will no longer have return guarantees of either
+  a string value or `nil`; instead, they will return values with type
+  `interface{}`.  This is due to [Issue 59: pq Map/SliceScan error with time.Time destination](https://github.com/jmoiron/sqlx/issues/59),
+  but generally we cannot guarantee that a driver will give us any particular type.
+
+### Going Forward
+
+There is no Go1-like promise of absolute stability, but I take the issue
+seriously and will maintain the library in a compatible state unless vital
+bugs prevent me from doing so.  Since #59 and #60 presented me with an
+opportunity, I decided to perform the API cleanup at the same time.
 
 ## install
 

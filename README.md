@@ -2,6 +2,58 @@
 
 [![Build Status](https://drone.io/github.com/jmoiron/sqlx/status.png)](https://drone.io/github.com/jmoiron/sqlx/latest)
 
+## Important API Stability Note
+
+The sqlx API has been stable for a long time as I have attempted to learn
+from the way that it interacts with real code and taken in bug reports.
+There have been very minor breaking changes in the past, many of which would
+not have affected most code.
+
+The API of database/sql is impressively succinct, something which is currently
+*not* mirrored by sqlx.  While the goals were obviously to create extensions,
+a lot of noise has crept in as well.  Much of the API bloat is due to the
+proliferation of functions which do not save programmers much time and energy.
+
+In addition to this is the fact that several behavioral or design mistakes have
+crept into sqlx:
+
+* the way that non-embedded structs are *also* used for field scanning opens
+  us up to cycles and infinite loops and is odd behavior
+* the global NameMapper function makes it difficult for code that is intended
+  to be a library to rely on any particular behavior of sqlx.
+* separating named bind/exec/query functions by map/struct was unnecessary
+  type safety pandering;  it buys so little and costs a lot of API noise.
+* reflection helpers are exposed as part of the `sqlx` namespace but are
+  essentially useless to anyone not building ORMs.
+
+To address this, there will be a **breaking API release** coming up.  This will
+likely break some existing code, but it should be the last major API change that
+is at least 99% backwards compatible.
+
+It should be known that a release will be made for the "current" version of
+sqlx, to ease vendoring where it is desired.
+
+### API Changes
+
+#### Mnemonics
+
+The mnemonic error handling Exec family, `Execl`, `Execf`, `Execv`, will all
+be removed without replacement.  Likewise, `Selectf` and `Selectv` are also
+removed without replacement.  These are 3 line functions and have little use
+in real code.  `Execp` will be removed but its alias, `MustExec`, remains.
+
+#### Named Queries
+
+`BindMap` and `BindStruct` are replaced with a single `BindNamed`, which will
+handle structs or maps. `NamedExec` and `NamedQuery` are renamed to `QueryNamed`
+and `ExecNamed` to fit in with the rest of the VerbNamed API (eg. `PrepareNamed`,
+`BindNamed`). `NamedExecMap` and `NamedQueryMap` are removed as `ExecNamed` and
+`QueryNamed` now support both structs and maps.  The `Binder` interface, not
+used in any exported functions, will no longer be exported.
+
+#### Reflect
+
+
 sqlx is a library which provides a set of extensions on go's standard
 `database/sql` library.  The sqlx versions of `sql.DB`, `sql.TX`, `sql.Stmt`,
 et al. all leave the underlying interfaces untouched, so that their interfaces

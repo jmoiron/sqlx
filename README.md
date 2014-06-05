@@ -2,89 +2,6 @@
 
 [![Build Status](https://drone.io/github.com/jmoiron/sqlx/status.png)](https://drone.io/github.com/jmoiron/sqlx/latest)
 
-## Important API Stability Note
-
-The sqlx API has been stable for a long time as I have attempted to learn
-from the way that it interacts with real code and taken in bug reports.
-There have been very minor breaking changes in the past, many of which would
-not have affected most code.
-
-The API of database/sql is impressively succinct, something which is currently
-*not* mirrored by sqlx.  While the goals were obviously to create extensions,
-a lot of noise has crept in as well.  Much of the API bloat is due to the
-proliferation of functions which do not save programmers much time and energy.
-
-In addition to this is the fact that several behavioral or design mistakes have
-crept into sqlx:
-
-* the way that non-embedded structs are *also* used for field scanning opens
-  us up to cycles and infinite loops and is odd behavior
-* the global NameMapper function makes it difficult for code that is intended
-  to be a library to rely on any particular behavior of sqlx.
-* separating named bind/exec/query functions by map/struct was unnecessary
-  type safety pandering;  it buys so little and costs a lot of API noise.
-* reflection helpers are exposed as part of the `sqlx` namespace but are
-  essentially useless to anyone not building ORMs.
-
-To address this, there will be a **breaking API release** coming up.  This will
-likely break some existing code, but it should be the last major API change that
-is at least 99% backwards compatible.
-
-It should be known that a release will be made for the "current" version of
-sqlx, to ease vendoring where it is desired.
-
-### API Changes
-
-#### Mnemonics
-
-The mnemonic error handling Exec family, `Execl`, `Execf`, `Execv`, will all
-be removed without replacement.  Likewise, `Selectf` and `Selectv` are also
-removed without replacement.  These are 3 line functions and have little use
-in real code.  `Execp` will be removed but its alias, `MustExec`, remains.
-
-#### Named Queries
-
-`BindMap` and `BindStruct` are replaced with a single `BindNamed`, which will
-handle structs or maps. `NamedExec` and `NamedQuery` are renamed to `QueryNamed`
-and `ExecNamed` to fit in with the rest of the VerbNamed API (eg. `PrepareNamed`,
-`BindNamed`). `NamedExecMap` and `NamedQueryMap` are removed as `ExecNamed` and
-`QueryNamed` now support both structs and maps.  The `Binder` interface, not
-used in any exported functions, will no longer be exported.
-
-#### Reflect
-
-The `BaseStructType` and `BaseSliceType`, which are no longer really used, are
-removed.  Much of the reflect work done by sqlx has been offloaded to a new
-package, `sqlx/reflectx`, which exposes a lot more than sqlx did and is a lot
-more correct, better tested, more solidly benchmarked, and more reusable.
-
-### Behavioral Changes
-
-I am somewhat more willing to make changes that will be caught at the build
-step by the Go compiler.  I very much try to avoid behavioral changes that
-are more subtle, but in my opinion the following changes fall in line with 
-the [Go1 compatibility expectations](http://golang.org/doc/go1compat):
-
-* Non-embedded struct fields are no longer descended into.  If you relied
-  on this behavior, you will have to embed those structs instead.  This is
-  ostensibly due to [Issue 60: StructScan infinite loop](https://github.com/jmoiron/sqlx/issues/60),
-  but the cycle could have been detected;  The reality is that the current
-  behavior makes very little sense and removing it simplified the code greatly.
-  
-* `MapScan` and `SliceScan` will no longer have return guarantees of either
-  a string value or `nil`; instead, they will return values with type
-  `interface{}`.  This is due to [Issue 59: pq Map/SliceScan error with time.Time destination](https://github.com/jmoiron/sqlx/issues/59),
-  but generally we cannot guarantee that a driver will give us any particular type.
-
-### Going Forward
-
-There is no Go1-like promise of absolute stability, but I take the issue
-seriously and will maintain the library in a compatible state unless vital
-bugs prevent me from doing so.  Since #59 and #60 presented me with an
-opportunity, I decided to perform the API cleanup at the same time.
-
-## SQLX
-
 sqlx is a library which provides a set of extensions on go's standard
 `database/sql` library.  The sqlx versions of `sql.DB`, `sql.TX`, `sql.Stmt`,
 et al. all leave the underlying interfaces untouched, so that their interfaces
@@ -102,79 +19,41 @@ There is now some [fairly comprehensive documentation](http://jmoiron.github.io/
 You can also read the usage below for a quick sample on how sqlx works, or check out the [API
 documentation on godoc](http://godoc.org/github.com/jmoiron/sqlx).
 
-## Important API Stability Note
+## Recent Changes
 
-The sqlx API has been stable for a long time as I have attempted to learn
-from the way that it interacts with real code and taken in bug reports.
-There have been very minor breaking changes in the past, many of which would
-not have affected most code.
+There have been some recent changes to the sqlx API after a long period of
+API stability.  These changes were made for a number of reasons:
 
-The API of database/sql is impressively succinct, something which is currently
-*not* mirrored by sqlx.  While the goals were obviously to create extensions,
-a lot of noise has crept in as well.  Much of the API bloat is due to the
-proliferation of functions which do not save programmers much time and energy.
+* the API surface area was way too large
+* descending non-embedded structs was confusing and problematic
+* separating map/struct for binding added lots of noise and little value
+* reflect helpers didn't belong in the API of `sqlx`
 
-In addition to this is the fact that several behavioral or design mistakes have
-crept into sqlx:
+Towards this end, the following public API has been removed or altered:
 
-* the way that non-embedded structs are *also* used for field scanning opens
-  us up to cycles and infinite loops and is odd behavior
-* the global NameMapper function makes it difficult for code that is intended
-  to be a library to rely on any particular behavior of sqlx.
-* separating named bind/exec/query functions by map/struct was unnecessary
-  type safety pandering;  it buys so little and costs a lot of API noise.
-* reflection helpers are exposed as part of the `sqlx` namespace but are
-  essentially useless to anyone not building ORMs.
+* **Execl**, **Execf**, **Execv**, **Selectf**, and **Selectv** removed.
+* **Execp** removed in favor of `MustExec`, which remains.
+* **BindMap**, **BindStruct** removed in favor of **BindNamed** which handles
+  both maps and structs.
+* **NamedExecMap**, **NamedQueryMap**, **NamedExec**, **NamedQuery** removed 
+  in favor of `ExecNamed` and `QueryNamed`, whose naming follows others.
+* **Binder** interface no longer exported.
+* **BaseStructType** and **BaseSliceType** removed;  see `sqlx/reflectx` for
+  reflect helpers.
 
-To address this, there will be a **breaking API release** coming up.  This will
-likely break some existing code, but it should be the last major API change that
-is at least 99% backwards compatible.
+The above changes will all be caught by a build step.  The following changes
+to *behavior* in sqlx might require significant changes to client code.  If
+these are a problem, please vendor the git tag @sqlx-v1.0.
 
-It should be known that a release will be made for the "current" version of
-sqlx, to ease vendoring where it is desired.
-
-### API Changes
-
-#### Mnemonics
-
-The mnemonic error handling Exec family, `Execl`, `Execf`, `Execv`, will all
-be removed without replacement.  Likewise, `Selectf` and `Selectv` are also
-removed without replacement.  These are 3 line functions and have little use
-in real code.  `Execp` will be removed but its alias, `MustExec`, remains.
-
-#### Named Queries
-
-`BindMap` and `BindStruct` are replaced with a single `BindNamed`, which will
-handle structs or maps. `NamedExec` and `NamedQuery` are renamed to `QueryNamed`
-and `ExecNamed` to fit in with the rest of the VerbNamed API (eg. `PrepareNamed`,
-`BindNamed`). `NamedExecMap` and `NamedQueryMap` are removed as `ExecNamed` and
-`QueryNamed` now support both structs and maps.  The `Binder` interface, not
-used in any exported functions, will no longer be exported.
-
-#### Reflect
-
-The `BaseStructType` and `BaseSliceType`, which are no longer really used, are
-removed.  Much of the reflect work done by sqlx has been offloaded to a new
-package, `sqlx/reflectx`, which exposes a lot more than sqlx did and is a lot
-more correct, better tested, more solidly benchmarked, and more reusable.
-
-### Behavioral Changes
-
-I am somewhat more willing to make changes that will be caught at the build
-step by the Go compiler.  I very much try to avoid behavioral changes that
-are more subtle, but in my opinion the following changes fall in line with 
-the [Go1 compatibility expectations](http://golang.org/doc/go1compat):
-
-* Non-embedded struct fields are no longer descended into.  If you relied
-  on this behavior, you will have to embed those structs instead.  This is
-  ostensibly due to [Issue 60: StructScan infinite loop](https://github.com/jmoiron/sqlx/issues/60),
-  but the cycle could have been detected;  The reality is that the current
-  behavior makes very little sense and removing it simplified the code greatly.
-  
-* `MapScan` and `SliceScan` will no longer have return guarantees of either
-  a string value or `nil`; instead, they will return values with type
-  `interface{}`.  This is due to [Issue 59: pq Map/SliceScan error with time.Time destination](https://github.com/jmoiron/sqlx/issues/59),
-  but generally we cannot guarantee that a driver will give us any particular type.
+* Non-embedded structs no longer probed for fields as more scan targets.
+  This was causing #60, but also made little sense.  Embed these structs
+  instead.
+* `MapScan` and `SliceScan` previously returned values which, while `interface{}`,
+  were guaranteed to be a `string` or `nil`.  This guarantee no longer exists,
+  as `sql.NullString` and `sql.RawBytes` are *not* safe targets for all types.
+  This is related to #59, but the problem could pop up in future as well.
+* Using the global `NameMapper` to change the behavior of sqlx is discouraged as
+  this will no longer impact `sqlx.DB` structs created before the change.
 
 ### Going Forward
 

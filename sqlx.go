@@ -112,12 +112,28 @@ func isUnsafe(i interface{}) bool {
 	}
 }
 
+func mapperFor(i Preparer) *reflectx.Mapper {
+	switch i.(type) {
+	case DB:
+		return i.(DB).Mapper
+	case *DB:
+		return i.(*DB).Mapper
+	case Tx:
+		return i.(Tx).Mapper
+	case *Tx:
+		return i.(*Tx).Mapper
+	default:
+		return mapper()
+	}
+}
+
 // Row is a reimplementation of sql.Row in order to gain access to the underlying
 // sql.Rows.Columns() data, necessary for StructScan.
 type Row struct {
 	err    error
 	unsafe bool
 	rows   *sql.Rows
+	Mapper *reflectx.Mapper
 }
 
 // Scan is a fixed implementation of sql.Row.Scan, which does not discard the
@@ -177,12 +193,13 @@ type DB struct {
 	*sql.DB
 	driverName string
 	unsafe     bool
+	Mapper     *reflectx.Mapper
 }
 
 // NewDb returns a new sqlx DB wrapper for a pre-existing *sql.DB.  The
 // driverName of the original database is required for named query support.
 func NewDb(db *sql.DB, driverName string) *DB {
-	return &DB{DB: db, driverName: driverName}
+	return &DB{DB: db, driverName: driverName, Mapper: mapper()}
 }
 
 // DriverName returns the driverName passed to the Open function for this DB.
@@ -196,7 +213,13 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DB{DB: db, driverName: driverName}, err
+	return &DB{DB: db, driverName: driverName, Mapper: mapper()}, err
+}
+
+// MapperFunc sets a new mapper for this db using the default sqlx struct tag
+// and the provided mapper function.
+func (db *DB) MapperFunc(mf func(string) string) {
+	db.Mapper = reflectx.NewMapperFunc("db", mf)
 }
 
 // Rebind transforms a query from QUESTION to the DB driver's bindvar type.
@@ -209,7 +232,7 @@ func (db *DB) Rebind(query string) string {
 // sqlx.Stmt and sqlx.Tx which are created from this DB will inherit its
 // safety behavior.
 func (db *DB) Unsafe() *DB {
-	return &DB{DB: db.DB, driverName: db.driverName, unsafe: true}
+	return &DB{DB: db.DB, driverName: db.driverName, unsafe: true, Mapper: db.Mapper}
 }
 
 // BindNamed binds a query using the DB driver's bindvar type.
@@ -253,7 +276,7 @@ func (db *DB) Beginx() (*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Tx{Tx: tx, driverName: db.driverName, unsafe: db.unsafe}, err
+	return &Tx{Tx: tx, driverName: db.driverName, unsafe: db.unsafe, Mapper: db.Mapper}, err
 }
 
 // Queryx queries the database and returns an *sqlx.Rows.
@@ -262,13 +285,13 @@ func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rows{Rows: *r, unsafe: db.unsafe}, err
+	return &Rows{Rows: *r, unsafe: db.unsafe, Mapper: db.Mapper}, err
 }
 
 // QueryRowx queries the database and returns an *sqlx.Row.
 func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
 	rows, err := db.DB.Query(query, args...)
-	return &Row{rows: rows, err: err, unsafe: db.unsafe}
+	return &Row{rows: rows, err: err, unsafe: db.unsafe, Mapper: db.Mapper}
 }
 
 // MustExec (panic) runs MustExec using this database.
@@ -291,6 +314,7 @@ type Tx struct {
 	*sql.Tx
 	driverName string
 	unsafe     bool
+	Mapper     *reflectx.Mapper
 }
 
 // DriverName returns the driverName used by the DB which began this transaction.
@@ -306,7 +330,7 @@ func (tx *Tx) Rebind(query string) string {
 // Unsafe returns a version of Tx which will silently succeed to scan when
 // columns in the SQL result have no fields in the destination struct.
 func (tx *Tx) Unsafe() *Tx {
-	return &Tx{Tx: tx.Tx, driverName: tx.driverName, unsafe: true}
+	return &Tx{Tx: tx.Tx, driverName: tx.driverName, unsafe: true, Mapper: tx.Mapper}
 }
 
 // BindNamed binds a query within a transaction's bindvar type.
@@ -335,13 +359,13 @@ func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rows{Rows: *r, unsafe: tx.unsafe}, err
+	return &Rows{Rows: *r, unsafe: tx.unsafe, Mapper: tx.Mapper}, err
 }
 
 // QueryRowx within a transaction.
 func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
 	rows, err := tx.Tx.Query(query, args...)
-	return &Row{rows: rows, err: err, unsafe: tx.unsafe}
+	return &Row{rows: rows, err: err, unsafe: tx.unsafe, Mapper: tx.Mapper}
 }
 
 // Get within a transaction.
@@ -375,7 +399,7 @@ func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
 	case *sql.Stmt:
 		s = stmt.(*sql.Stmt)
 	}
-	return &Stmt{Stmt: tx.Stmt(s)}
+	return &Stmt{Stmt: tx.Stmt(s), Mapper: tx.Mapper}
 }
 
 // NamedStmt returns a version of the prepared statement which runs within a transaction.
@@ -396,12 +420,13 @@ func (tx *Tx) PrepareNamed(query string) (*NamedStmt, error) {
 type Stmt struct {
 	*sql.Stmt
 	unsafe bool
+	Mapper *reflectx.Mapper
 }
 
 // Unsafe returns a version of Stmt which will silently succeed to scan when
 // columns in the SQL result have no fields in the destination struct.
 func (s *Stmt) Unsafe() *Stmt {
-	return &Stmt{Stmt: s.Stmt, unsafe: true}
+	return &Stmt{Stmt: s.Stmt, unsafe: true, Mapper: s.Mapper}
 }
 
 // Select using the prepared statement.
@@ -445,12 +470,12 @@ func (q *qStmt) Queryx(query string, args ...interface{}) (*Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rows{Rows: *r, unsafe: q.Stmt.unsafe}, err
+	return &Rows{Rows: *r, unsafe: q.Stmt.unsafe, Mapper: q.Stmt.Mapper}, err
 }
 
 func (q *qStmt) QueryRowx(query string, args ...interface{}) *Row {
 	rows, err := q.Stmt.Query(args...)
-	return &Row{rows: rows, err: err, unsafe: q.Stmt.unsafe}
+	return &Row{rows: rows, err: err, unsafe: q.Stmt.unsafe, Mapper: q.Stmt.Mapper}
 }
 
 func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
@@ -462,6 +487,7 @@ func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
 type Rows struct {
 	sql.Rows
 	unsafe bool
+	Mapper *reflectx.Mapper
 	// these fields cache memory use for a rows during iteration w/ structScan
 	started bool
 	fields  [][]int
@@ -497,7 +523,7 @@ func (r *Rows) StructScan(dest interface{}) error {
 		if err != nil {
 			return err
 		}
-		m := mapper()
+		m := r.Mapper
 
 		r.fields = m.TraversalsByName(v.Type(), columns)
 		// if we are not unsafe and are missing fields, return an error
@@ -545,7 +571,7 @@ func Preparex(p Preparer, query string) (*Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Stmt{Stmt: s, unsafe: isUnsafe(p)}, err
+	return &Stmt{Stmt: s, unsafe: isUnsafe(p), Mapper: mapperFor(p)}, err
 }
 
 // Select executes a query using the provided Queryer, and StructScans each row
@@ -638,7 +664,8 @@ func (r *Row) StructScan(dest interface{}) error {
 		return err
 	}
 
-	m := mapper()
+	m := r.Mapper
+
 	fields := m.TraversalsByName(v.Type(), columns)
 	// if we are not unsafe and are missing fields, return an error
 	if f, err := missingFields(fields); err != nil && !r.unsafe {
@@ -729,6 +756,7 @@ type rowsi interface {
 // StructScan all rows from an sql.Rows or an sqlx.Rows into the dest slice.
 // StructScan will scan in the entire rows result, so if you need do not want to
 // allocate structs for the entire result, use Queryx and see sqlx.Rows.StructScan.
+// If rowsi is sqlx.Rows, it will use its mapper, otherwise it will use the default.
 func StructScan(rows rowsi, dest interface{}) error {
 	var v, vp reflect.Value
 	var isPtr bool
@@ -760,7 +788,14 @@ func StructScan(rows rowsi, dest interface{}) error {
 		return err
 	}
 
-	m := mapper()
+	var m *reflectx.Mapper
+	switch rows.(type) {
+	case *Rows:
+		m = rows.(*Rows).Mapper
+	default:
+		m = mapper()
+	}
+
 	fields := m.TraversalsByName(base, columns)
 	// if we are not unsafe and are missing fields, return an error
 	if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
@@ -789,4 +824,50 @@ func StructScan(rows rowsi, dest interface{}) error {
 	}
 
 	return rows.Err()
+}
+
+// reflect helpers
+
+func baseType(t reflect.Type, expected reflect.Kind) (reflect.Type, error) {
+	t = reflectx.Deref(t)
+	if t.Kind() != expected {
+		return nil, fmt.Errorf("expected %s but got %s", expected, t.Kind())
+	}
+	return t, nil
+}
+
+// fieldsByName fills a values interface with fields from the passed value based
+// on the traversals in int.  If ptrs is true, return addresses instead of values.
+// We write this instead of using FieldsByName to save allocations and map lookups
+// when iterating over many rows.  Empty traversals will get an interface pointer.
+// Because of the necessity of requesting ptrs or values, it's considered a bit too
+// specialized for inclusion in reflectx itself.
+func fieldsByTraversal(v reflect.Value, traversals [][]int, values []interface{}, ptrs bool) error {
+	v = reflect.Indirect(v)
+	if v.Kind() != reflect.Struct {
+		return errors.New("argument not a struct")
+	}
+
+	for i, traversal := range traversals {
+		if len(traversal) == 0 {
+			values[i] = new(interface{})
+			continue
+		}
+		f := reflectx.FieldByIndexes(v, traversal)
+		if ptrs {
+			values[i] = f.Addr().Interface()
+		} else {
+			values[i] = f.Interface()
+		}
+	}
+	return nil
+}
+
+func missingFields(transversals [][]int) (field int, err error) {
+	for i, t := range transversals {
+		if len(t) == 0 {
+			return i, errors.New("missing field")
+		}
+	}
+	return 0, nil
 }

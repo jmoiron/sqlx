@@ -820,14 +820,29 @@ func TestUsage(t *testing.T) {
 		}
 
 		// test name mapping
-		NameMapper = strings.ToUpper
+		// THIS USED TO WORK BUT WILL NO LONGER WORK.
+		db.MapperFunc(strings.ToUpper)
 		rsa := CPlace{}
 		err = db.Get(&rsa, "SELECT * FROM capplace;")
+		if err != nil {
+			t.Error(err, "in db:", db.DriverName())
+		}
+		db.MapperFunc(strings.ToLower)
+
+		// create a copy and change the mapper, then verify the copy behaves
+		// differently from the original.
+		dbCopy := NewDb(db.DB, db.DriverName())
+		dbCopy.MapperFunc(strings.ToUpper)
+		err = dbCopy.Get(&rsa, "SELECT * FROM capplace;")
 		if err != nil {
 			fmt.Println(db.DriverName())
 			t.Error(err)
 		}
-		NameMapper = strings.ToLower
+
+		err = db.Get(&rsa, "SELECT * FROM cappplace;")
+		if err == nil {
+			t.Error("Expected no error, got ", err)
+		}
 	})
 
 }

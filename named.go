@@ -79,7 +79,7 @@ func (n *NamedStmt) Queryx(arg interface{}) (*Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rows{Rows: *r}, err
+	return &Rows{Rows: *r, Mapper: n.Stmt.Mapper}, err
 }
 
 // QueryRowx this NamedStmt.  Because of limitations with QueryRow, this is

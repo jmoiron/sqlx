@@ -46,12 +46,12 @@ to *behavior* in sqlx might require significant changes to client code.  If
 these are a problem, please vendor the git tag @sqlx-v1.0.
 
 * Non-embedded structs no longer probed for fields as more scan targets.
-  This was causing #60, but also made little sense.  Embed these structs
+  This was causing [#60](https://github.com/jmoiron/sqlx/issues/60), but also made little sense.  Embed these structs
   instead.
 * `MapScan` and `SliceScan` previously returned values which, while `interface{}`,
   were guaranteed to be a `string` or `nil`.  This guarantee no longer exists,
   as `sql.NullString` and `sql.RawBytes` are *not* safe targets for all types.
-  This is related to #59, but the problem could pop up in future as well.
+  This is related to [#59](https://github.com/jmoiron/sqlx/issues/59), but the problem could pop up in future as well.
 * Using the global `NameMapper` to change the behavior of sqlx is discouraged as
   this will no longer impact `sqlx.DB` structs created before the change.
 
@@ -59,8 +59,8 @@ these are a problem, please vendor the git tag @sqlx-v1.0.
 
 There is no Go1-like promise of absolute stability, but I take the issue
 seriously and will maintain the library in a compatible state unless vital
-bugs prevent me from doing so.  Since #59 and #60 presented me with an
-opportunity, I decided to perform the API cleanup at the same time.
+bugs prevent me from doing so.  Since [#59](https://github.com/jmoiron/sqlx/issues/59) and [#60](https://github.com/jmoiron/sqlx/issues/60) necessitated
+breaking behavior, I decided to perform the API cleanup at the same time.
 
 ## install
 

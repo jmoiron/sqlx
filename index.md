@@ -2,7 +2,7 @@
 
 <a href="https://github.com/jmoiron/sqlx/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"></a>
 
-`sqlx` is a package for Go which provides a set of extentions on top of the excellent built-in `database/sql` package.  
+`sqlx` is a package for Go which provides a set of extensions on top of the excellent built-in `database/sql` package.  
 
 Examining *Go* idioms is the focus of this document, so there is no presumption being made that any *SQL* herein is actually a recommended way to use a database.  It will not cover setting up a Go development environment, basic Go information about syntax or semantics, or SQL itself. 
 

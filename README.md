@@ -35,8 +35,8 @@ Towards this end, the following public API has been removed or altered:
 * **Execp** removed in favor of `MustExec`, which remains.
 * **BindMap**, **BindStruct** removed in favor of **BindNamed** which handles
   both maps and structs.
-* **NamedExecMap**, **NamedQueryMap**, **NamedExec**, **NamedQuery** removed 
-  in favor of `ExecNamed` and `QueryNamed`, whose naming follows others.
+* **NamedExecMap**, **NamedQueryMap** removed in favor of **NamedExec** and
+  **NamedQuery**, respectively, which both handle structs & maps.
 * **Binder** interface no longer exported.
 * **BaseStructType** and **BaseSliceType** removed;  see `sqlx/reflectx` for
   reflect helpers.

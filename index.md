@@ -26,7 +26,7 @@ $ go get github.com/jmoiron/sqlx
 $ go get github.com/mattn/go-sqlite3
 ```
 
-## Handle Types <a href="#handleTypes" class="permalink" id="handleTypes">&para;</a>
+## Handle Types <a href="#handles" class="permalink" id="handles">&para;</a>
 
 `sqlx` is intended to have the same *feel* as `databse/sql`.  There are 4 main **handle** types:
 
@@ -157,7 +157,7 @@ for rows.Next() {
 }
 ```
 
-The primary extension on sqlx.Rows is `StructScan()`, which automatically scans results into struct fields.  Note that the fields must be [exported](http://golang.org/doc/effective_go.html#names) in order for sqlx to be able to write into them, something true of *all* marshallers in Go.  You can use the `db` struct tag to specify which column name maps to each struct field, or set `sqlx.NameMapper` to a `func(string) string` to define a mapping.  The default mapping is to use `strings.Lower`.  For more information about `StructScan` and the additional extensions `SliceScan` and `MapScan`, see the [section on advanced scanning](#advancedScanning).
+The primary extension on sqlx.Rows is `StructScan()`, which automatically scans results into struct fields.  Note that the fields must be [exported](http://golang.org/doc/effective_go.html#names) in order for sqlx to be able to write into them, something true of *all* marshallers in Go.  You can use the `db` struct tag to specify which column name maps to each struct field, or set a new default mapping with [db.MapperFunc()](#mapping).  The default mapping is to use `strings.Lower` on the field name to match against the column names.  For more information about `StructScan` and the additional extensions `SliceScan` and `MapScan`, see the [section on advanced scanning](#advancedScanning).
 
 ### QueryRow <a href="#queryrow" class="permalink" id="queryrow">&para;</a>
 
@@ -331,6 +331,46 @@ type PersonPlace struct {
 ```
 
 A StructScan will set an `id` column result in `Person.AutoIncr.ID`, also accessible as `Person.ID`.  To avoid confusion, it's suggested that you use `AS` to create column aliases in your SQL instead.
+
+### Scan Destination Safety <a href="#safety" class="permalink" id="safety">&para</a>
+
+By default, StructScan will return an error if a column does not map to a field in the destination struct.  This mimics the treatment for things like unused variables in Go, but does *not* match the way that standard library marshallers like `encoding/json` behave.  Because it is assumed that the programmer will have rather more control over the SQL that gets executed than what a json service might return, the decision was made to return errors by default.
+
+In addition, like unused variables, columns which you ignore are a waste of network and database resources, and detecting things like an incompatible mapping or a typo in a struct tag early can be difficult without the mapper letting you know something wasn't found.
+
+Despite this, there are some cases where ignoring columns with no destination might be desired.  For this, there is the `Unsafe` method on each [Handle type](#handles) which returns a new copy of that handle whith this safety turned off:
+
+```go
+var p Person
+// err here is not nil because there are no field destinations for columns in `place`
+err = db.Get(&p, "SELECT * FROM person, place LIMIT 1;")
+udb := db.Unsafe()
+// this will NOT return an error, even though place columns have no destination
+err = udb.Get(&p, "SELECT * FROM person, place LIMIT 1;")
+```
+
+### Controlling Name Mapping <a href="#mapping" class="permalink" id="mapping">&para</a>
+
+Struct fields used as targets for StructScans *must* be capitalized in order to be accessible by sqlx. Because of this, sqlx uses a *NameMapper* which applies `strings.ToLower` to field names to map them to columns in your rows result.  This isn't always desirable, depending on your schema, so sqlx allows the mapping to be customized a number of ways.
+
+The simplest of these ways is to set it for a db handle by using `sqlx.DB.MapperFunc`, which receives an argument of type `func(string) string`.  If your library requires a particular mapper, and you don't want to poison the `sqlx.DB` you receive, you can create a copy for use in the library to ensure a particular default mapping:
+
+```go
+// if our db schema uses ALLCAPS columns, we can use normal fields
+db.MapperFunc(strings.ToUpper)
+// suppose a library uses lowercase columns, we can create a copy
+copy := sqlx.NewDb(db.DB, db.DriverName())
+copy.MapperFunc(strings.ToLower)
+```
+
+Each `sqlx.DB` uses the `sqlx/reflectx` package's [Mapper](http://godoc.org/github.com/jmoiron/sqlx/reflectx#Mapper) to achieve this mapping underneath, and exposes the active mapper as `sqlx.DB.Mapper`.  You can further customize the mapping on a DB by setting it directly:
+
+```go
+import "github.com/jmoiron/sqlx/reflectx"
+
+// Create a new mapper which will use the struct field tag "json" instead of "db"
+db.Mapper = reflectx.NewMapperFunc("json", strings.ToLower)
+```
 
 ### Alternate Scan Types <a href="#altScanning" class="permalink" id="altScanning">&para;</a>
 

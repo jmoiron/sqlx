@@ -156,21 +156,28 @@ func (r *Row) Scan(dest ...interface{}) error {
 	// from Next will not be modified again." (for instance, if
 	// they were obtained from the network anyway) But for now we
 	// don't care.
+	defer r.rows.Close()
 	for _, dp := range dest {
 		if _, ok := dp.(*sql.RawBytes); ok {
 			return errors.New("sql: RawBytes isn't allowed on Row.Scan")
 		}
 	}
 
-	defer r.rows.Close()
 	if !r.rows.Next() {
-		if r.rows.Err() != nil {
-			r.err = r.rows.Err()
-			return r.err
+		if err := r.rows.Err(); err != nil {
+			return err
 		}
 		return sql.ErrNoRows
 	}
-	return r.rows.Scan(dest...)
+	err := r.rows.Scan(dest...)
+	if err != nil {
+		return err
+	}
+	// Make sure the query can be processed to completion with no errors.
+	if err := r.rows.Close(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Columns returns the underlying sql.Rows.Columns(), or the deferred error usually

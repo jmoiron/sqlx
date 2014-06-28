@@ -504,6 +504,51 @@ func TestNamedQuery(t *testing.T) {
 	})
 }
 
+func TestNilInserts(t *testing.T) {
+	var schema = Schema{
+		create: `
+			CREATE TABLE tt (
+				id integer,
+				value text NULL DEFAULT NULL
+			);`,
+		drop: "drop table tt;",
+	}
+
+	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+		type TT struct {
+			Id    int
+			Value *string
+		}
+		var v, v2 TT
+		r := db.Rebind
+
+		db.MustExec(r(`INSERT INTO tt (id) VALUES (1)`))
+		db.Get(&v, r(`SELECT * FROM tt`))
+		if v.Id != 1 {
+			t.Errorf("Expecting id of 1, got %v", v.Id)
+		}
+		if v.Value != nil {
+			t.Errorf("Expecting NULL to map to nil, got %s", v.Value)
+		}
+
+		v.Id = 2
+		// NOTE: this incidentally uncovered a bug which was that named queries with
+		// pointer destinations would not work if the passed value here was not addressable,
+		// as reflectx.FieldByIndexes attempts to allocate nil pointer receivers for
+		// writing.  This was fixed by creating & using the reflectx.FieldByIndexesReadOnly
+		// function.  This next line is important as it provides the only coverage for this.
+		db.NamedExec(`INSERT INTO tt (id, value) VALUES (:id, :value)`, v)
+
+		db.Get(&v2, r(`SELECT * FROM tt WHERE id=2`))
+		if v.Id != v2.Id {
+			t.Errorf("%v != %v", v.Id, v2.Id)
+		}
+		if v2.Value != nil {
+			t.Errorf("Expecting NULL to map to nil, got %s", v.Value)
+		}
+	})
+}
+
 func TestScanError(t *testing.T) {
 	var schema = Schema{
 		create: `

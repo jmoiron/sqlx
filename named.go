@@ -154,7 +154,7 @@ func bindArgs(names []string, arg interface{}) ([]interface{}, error) {
 		if len(t) == 0 {
 			return arglist, fmt.Errorf("could not find name %s in %v", names[i], arg)
 		}
-		val := reflectx.FieldByIndexes(v, t)
+		val := reflectx.FieldByIndexesReadOnly(v, t)
 		arglist = append(arglist, val.Interface())
 	}
 

@@ -139,6 +139,16 @@ func FieldByIndexes(v reflect.Value, indexes []int) reflect.Value {
 	return v
 }
 
+// FieldByIndexesReadOnly returns a value for a particular struct traversal,
+// but is not concerned with allocating nil pointers because the value is
+// going to be used for reading and not setting.
+func FieldByIndexesReadOnly(v reflect.Value, indexes []int) reflect.Value {
+	for _, i := range indexes {
+		v = reflect.Indirect(v).Field(i)
+	}
+	return v
+}
+
 // Deref is Indirect for reflect.Types
 func Deref(t reflect.Type) reflect.Type {
 	if t.Kind() == reflect.Ptr {

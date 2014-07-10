@@ -168,7 +168,7 @@ type Kinder interface {
 func mustBe(v Kinder, expected reflect.Kind) {
 	k := v.Kind()
 	if k != expected {
-		panic(&reflect.ValueError{methodName(), k})
+		panic(&reflect.ValueError{Method: methodName(), Kind: k})
 	}
 }
 

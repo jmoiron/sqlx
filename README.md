@@ -2,7 +2,7 @@
 
 [![Build
 Status](https://drone.io/github.com/jmoiron/sqlx/status.png)](https://drone.io/github.com/jmoiron/sqlx/latest)
-[![Godoc](http://img.shields.io/badge/godoc-documentation-blue.svg?style=flat)](https://godoc.org/github.com/jmoiron/sqlx)
+[![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/jmoiron/sqlx)
 
 sqlx is a library which provides a set of extensions on go's standard
 `database/sql` library.  The sqlx versions of `sql.DB`, `sql.TX`, `sql.Stmt`,

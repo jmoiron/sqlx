@@ -112,7 +112,7 @@ func isUnsafe(i interface{}) bool {
 	}
 }
 
-func mapperFor(i Preparer) *reflectx.Mapper {
+func mapperFor(i interface{}) *reflectx.Mapper {
 	switch i.(type) {
 	case DB:
 		return i.(DB).Mapper
@@ -292,7 +292,7 @@ func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rows{Rows: *r, unsafe: db.unsafe, Mapper: db.Mapper}, err
+	return &Rows{Rows: r, unsafe: db.unsafe, Mapper: db.Mapper}, err
 }
 
 // QueryRowx queries the database and returns an *sqlx.Row.
@@ -366,7 +366,7 @@ func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rows{Rows: *r, unsafe: tx.unsafe, Mapper: tx.Mapper}, err
+	return &Rows{Rows: r, unsafe: tx.unsafe, Mapper: tx.Mapper}, err
 }
 
 // QueryRowx within a transaction.
@@ -477,7 +477,7 @@ func (q *qStmt) Queryx(query string, args ...interface{}) (*Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rows{Rows: *r, unsafe: q.Stmt.unsafe, Mapper: q.Stmt.Mapper}, err
+	return &Rows{Rows: r, unsafe: q.Stmt.unsafe, Mapper: q.Stmt.Mapper}, err
 }
 
 func (q *qStmt) QueryRowx(query string, args ...interface{}) *Row {
@@ -492,7 +492,7 @@ func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
 // Rows is a wrapper around sql.Rows which caches costly reflect operations
 // during a looped StructScan
 type Rows struct {
-	sql.Rows
+	*sql.Rows
 	unsafe bool
 	Mapper *reflectx.Mapper
 	// these fields cache memory use for a rows during iteration w/ structScan

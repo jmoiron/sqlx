@@ -20,6 +20,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -461,8 +462,16 @@ func TestNamedQuery(t *testing.T) {
 				first_name text NULL,
 				last_name text NULL,
 				email text NULL
+			);
+			CREATE TABLE jsperson (
+				"FIRST" text NULL,
+				last_name text NULL,
+				"EMAIL" text NULL
 			);`,
-		drop: `drop table person;`,
+		drop: `
+			drop table person;
+			drop table jsperson;
+			`,
 	}
 
 	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
@@ -501,6 +510,97 @@ func TestNamedQuery(t *testing.T) {
 				t.Error("Expected first name of `doe`, got " + p2.LastName.String)
 			}
 		}
+
+		// these are tests for #73;  they verify that named queries work if you've
+		// changed the db mapper.  This code checks both NamedQuery "ad-hoc" style
+		// queries and NamedStmt queries, which use different code paths internally.
+		old := *db.Mapper
+
+		type JsonPerson struct {
+			FirstName sql.NullString `json:"FIRST"`
+			LastName  sql.NullString `json:"last_name"`
+			Email     sql.NullString
+		}
+
+		jp := JsonPerson{
+			FirstName: sql.NullString{"ben", true},
+			LastName:  sql.NullString{"smith", true},
+			Email:     sql.NullString{"ben@smith.com", true},
+		}
+
+		db.Mapper = reflectx.NewMapperFunc("json", strings.ToUpper)
+
+		// prepare queries for case sensitivity to test our ToUpper function.
+		// postgres and sqlite accept "", but mysql uses ``;  since Go's multi-line
+		// strings are `` we use "" by default and swap out for MySQL
+		pdb := func(s string, db *DB) string {
+			if db.DriverName() == "mysql" {
+				return strings.Replace(s, `"`, "`", -1)
+			}
+			return s
+		}
+
+		q1 = `INSERT INTO jsperson ("FIRST", last_name, "EMAIL") VALUES (:FIRST, :last_name, :EMAIL)`
+		_, err = db.NamedExec(pdb(q1, db), jp)
+		if err != nil {
+			t.Fatal(err, db.DriverName())
+		}
+
+		// Checks that a person pulled out of the db matches the one we put in
+		check := func(t *testing.T, rows *Rows) {
+			jp = JsonPerson{}
+			for rows.Next() {
+				err = rows.StructScan(&jp)
+				if err != nil {
+					t.Error(err)
+				}
+				if jp.FirstName.String != "ben" {
+					t.Errorf("Expected first name of `ben`, got `%s` (%s) ", jp.FirstName.String, db.DriverName())
+				}
+				if jp.LastName.String != "smith" {
+					t.Errorf("Expected LastName of `smith`, got `%s` (%s)", jp.LastName.String, db.DriverName())
+				}
+				if jp.Email.String != "ben@smith.com" {
+					t.Errorf("Expected first name of `doe`, got `%s` (%s)", jp.Email.String, db.DriverName())
+				}
+			}
+		}
+
+		ns, err := db.PrepareNamed(pdb(`
+			SELECT * FROM jsperson
+			WHERE
+				"FIRST"=:FIRST AND
+				last_name=:last_name AND
+				"EMAIL"=:EMAIL
+		`, db))
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows, err = ns.Queryx(jp)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		check(t, rows)
+
+		// Check exactly the same thing, but with db.NamedQuery, which does not go
+		// through the PrepareNamed/NamedStmt path.
+		rows, err = db.NamedQuery(pdb(`
+			SELECT * FROM jsperson
+			WHERE
+				"FIRST"=:FIRST AND
+				last_name=:last_name AND
+				"EMAIL"=:EMAIL
+		`, db), jp)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		check(t, rows)
+
+		db.Mapper = &old
+
 	})
 }
 
@@ -977,7 +1077,7 @@ func TestBindStruct(t *testing.T) {
 
 	am := tt{"Jason Moiron", 30, "Jason", "Moiron"}
 
-	bq, args, _ := bindStruct(QUESTION, q1, am)
+	bq, args, _ := bindStruct(QUESTION, q1, am, mapper())
 	expect := `INSERT INTO foo (a, b, c, d) VALUES (?, ?, ?, ?)`
 	if bq != expect {
 		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
@@ -1000,7 +1100,7 @@ func TestBindStruct(t *testing.T) {
 	}
 
 	am2 := tt2{"Hello", "World"}
-	bq, args, _ = bindStruct(QUESTION, "INSERT INTO foo (a, b) VALUES (:field_2, :field_1)", am2)
+	bq, args, _ = bindStruct(QUESTION, "INSERT INTO foo (a, b) VALUES (:field_2, :field_1)", am2, mapper())
 	expect = `INSERT INTO foo (a, b) VALUES (?, ?)`
 	if bq != expect {
 		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
@@ -1017,7 +1117,7 @@ func TestBindStruct(t *testing.T) {
 	am3.Field1 = "Hello"
 	am3.Field2 = "World"
 
-	bq, args, err = bindStruct(QUESTION, "INSERT INTO foo (a, b, c) VALUES (:name, :field_1, :field_2)", am3)
+	bq, args, err = bindStruct(QUESTION, "INSERT INTO foo (a, b, c) VALUES (:name, :field_1, :field_2)", am3, mapper())
 
 	if err != nil {
 		t.Fatal(err)
@@ -1051,7 +1151,7 @@ func BenchmarkBindStruct(b *testing.B) {
 	am := t{"Jason Moiron", 30, "Jason", "Moiron"}
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		bindStruct(DOLLAR, q1, am)
+		bindStruct(DOLLAR, q1, am, mapper())
 		//bindMap(QUESTION, q1, am)
 	}
 }

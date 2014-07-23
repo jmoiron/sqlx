@@ -114,6 +114,8 @@ func (m *Mapper) TraversalsByName(t reflect.Type, names []string) [][]int {
 	mustBe(t, reflect.Struct)
 	nm := m.TypeMap(t)
 
+	//	fmt.Printf("%#v\n", nm)
+
 	r := make([][]int, 0, len(names))
 	for _, name := range names {
 		traversal, ok := nm[name]

@@ -1139,6 +1139,49 @@ func TestBindStruct(t *testing.T) {
 	}
 }
 
+func TestEmbeddedLiterals(t *testing.T) {
+	var schema = Schema{
+		create: `
+			CREATE TABLE x (
+				k text
+			);`,
+		drop: `drop table x;`,
+	}
+
+	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+		type t1 struct {
+			K string
+		}
+		type t2 struct {
+			Inline struct {
+				F string
+			}
+			K string
+		}
+
+		db.MustExec(db.Rebind("INSERT INTO x (k) VALUES (?), (?), (?);"), "one", "two", "three")
+
+		target := t1{}
+		err := db.Get(&target, db.Rebind("SELECT * FROM x WHERE k=?"), "one")
+		if err != nil {
+			t.Error(err)
+		}
+		if target.K != "one" {
+			t.Error("Expected target.K to be `one`, got ", target.K)
+		}
+
+		target2 := t2{}
+		err = db.Get(&target, db.Rebind("SELECT * FROM x WHERE k=?"), "one")
+		if err != nil {
+			t.Error(err)
+		}
+		if target2.K != "one" {
+			t.Error("Expected target2.K to be `one`, got ", target.K)
+		}
+
+	})
+}
+
 func BenchmarkBindStruct(b *testing.B) {
 	b.StopTimer()
 	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`

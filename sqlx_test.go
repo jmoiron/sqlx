@@ -1171,12 +1171,12 @@ func TestEmbeddedLiterals(t *testing.T) {
 		}
 
 		target2 := t2{}
-		err = db.Get(&target, db.Rebind("SELECT * FROM x WHERE k=?"), "one")
+		err = db.Get(&target2, db.Rebind("SELECT * FROM x WHERE k=?"), "one")
 		if err != nil {
 			t.Error(err)
 		}
 		if target2.K != "one" {
-			t.Error("Expected target2.K to be `one`, got ", target.K)
+			t.Errorf("Expected target2.K to be `one`, got `%v`", target2.K)
 		}
 
 	})

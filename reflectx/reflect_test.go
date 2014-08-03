@@ -1,6 +1,7 @@
 package reflectx
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -116,6 +117,24 @@ func TestMapping(t *testing.T) {
 	if _, ok := mapping["isallblack"]; ok {
 		t.Errorf("Expecting to ignore `IsAllBlack` field")
 	}
+
+	type EmbeddedLiteral struct {
+		Embedded struct {
+			Person   string
+			Position int
+		}
+		IsIntense bool
+	}
+
+	e := EmbeddedLiteral{}
+	mapping = m.TypeMap(reflect.TypeOf(e))
+	fmt.Printf("Mapping: %#v\n", mapping)
+
+	f := FieldByIndexes(reflect.ValueOf(e), mapping["isintense"])
+	fmt.Println(f, f.Interface())
+
+	tbn := m.TraversalsByName(reflect.TypeOf(e), []string{"isintense"})
+	fmt.Printf("%#v\n", tbn)
 
 }
 

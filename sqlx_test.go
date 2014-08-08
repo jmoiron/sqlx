@@ -1150,13 +1150,13 @@ func TestEmbeddedLiterals(t *testing.T) {
 
 	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
 		type t1 struct {
-			K string
+			K *string
 		}
 		type t2 struct {
 			Inline struct {
 				F string
 			}
-			K string
+			K *string
 		}
 
 		db.MustExec(db.Rebind("INSERT INTO x (k) VALUES (?), (?), (?);"), "one", "two", "three")
@@ -1166,7 +1166,7 @@ func TestEmbeddedLiterals(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if target.K != "one" {
+		if *target.K != "one" {
 			t.Error("Expected target.K to be `one`, got ", target.K)
 		}
 
@@ -1175,7 +1175,7 @@ func TestEmbeddedLiterals(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if target2.K != "one" {
+		if *target2.K != "one" {
 			t.Errorf("Expected target2.K to be `one`, got `%v`", target2.K)
 		}
 

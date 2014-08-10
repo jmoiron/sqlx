@@ -1,8 +1,6 @@
 #sqlx
 
-[![Build
-Status](https://drone.io/github.com/jmoiron/sqlx/status.png)](https://drone.io/github.com/jmoiron/sqlx/latest)
-[![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/jmoiron/sqlx)
+[![Build Status](https://drone.io/github.com/jmoiron/sqlx/status.png)](https://drone.io/github.com/jmoiron/sqlx/latest) [![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/jmoiron/sqlx) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/jmoiron/sqlx/master/LICENSE)
 
 sqlx is a library which provides a set of extensions on go's standard
 `database/sql` library.  The sqlx versions of `sql.DB`, `sql.TX`, `sql.Stmt`,
@@ -209,15 +207,9 @@ func main() {
 
 ## embedded structs
 
-Structs which do not implement the [sql.Scanner](http://golang.org/pkg/database/sql/#Scanner)
-interface will be inspected and their fields used as possible targets for a scan.  This includes
-embedded and non-embedded structs.
+Scan targets obey Go attribute rules directly, including nested embedded structs.  Older versions of sqlx would attempt to also descend into non-embedded structs, but this is no longer supported.
 
-Go makes '[ambiguous selectors](http://play.golang.org/p/MGRxdjLaUc)' a compile time error,
-but does not make structs with possible ambiguous selectors errors.  Sqlx will decide
-which field to use on a struct based on a breadth first search of the struct and any
-structs it contains or embeds, as specified by the order of the fields as accessible
-by `reflect`, which generally means in source-order.
+Go makes *accessing* '[ambiguous selectors](http://play.golang.org/p/MGRxdjLaUc)' a compile time error, defining structs with ambiguous selectors is legal.  Sqlx will decide which field to use on a struct based on a breadth first search of the struct and any structs it embeds, as specified by the order of the fields as accessible by `reflect`, which generally means in source-order.  This means that sqlx chooses the outer-most, top-most matching name for targets, even when the selector might technically be ambiguous.
 
 ## scan safety
 

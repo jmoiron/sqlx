@@ -722,12 +722,9 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 // Use this to get results for SQL that might not be under your control
 // (for instance, if you're building an interface for an SQL server that
 // executes SQL from input).  Please do not use this as a primary interface!
-// This will modify the map sent to it in place, so do not reuse the same one
-// on different queries or you may end up with something odd!  Columns which
-// occur more than once in the result will overwrite eachother!
-//
-// The resultant map values will be string representations of the various
-// SQL datatypes for existing values and a nil for null values.
+// This will modify the map sent to it in place, so reuse the same map with
+// care.  COlumns which occur more than once in the result will overwrite
+// eachother!
 func MapScan(r ColScanner, dest map[string]interface{}) error {
 	// ignore r.started, since we needn't use reflect for anything.
 	columns, err := r.Columns()

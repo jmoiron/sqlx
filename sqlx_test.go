@@ -683,6 +683,9 @@ func TestScanError(t *testing.T) {
 	})
 }
 
+// FIXME: this function is kinda big but it slows things down to be constantly
+// loading and reloading the schema..
+
 func TestUsage(t *testing.T) {
 	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
 		loadDefaultFixture(db, t)
@@ -900,6 +903,7 @@ func TestUsage(t *testing.T) {
 
 		ben.FirstName = "Ben"
 		ben.LastName = "Smith"
+		ben.Email = "binsmuth@allblacks.nz"
 
 		// Insert via a named query using the struct
 		_, err = db.NamedExec("INSERT INTO person (first_name, last_name, email) VALUES (:first_name, :last_name, :email)", ben)
@@ -988,8 +992,62 @@ func TestUsage(t *testing.T) {
 		if err == nil {
 			t.Error("Expected no error, got ", err)
 		}
-	})
 
+		// test base type slices
+		var sdest []string
+		rows, err = db.Queryx("SELECT email FROM person ORDER BY email ASC;")
+		if err != nil {
+			t.Error(err)
+		}
+		err = scanAll(rows, &sdest, false)
+		if err != nil {
+			t.Error(err)
+		}
+
+		// test Get with base types
+		var count int
+		err = db.Get(&count, "SELECT count(*) FROM person;")
+		if err != nil {
+			t.Error(err)
+		}
+		if count != len(sdest) {
+			t.Errorf("Expected %d == %d (count(*) vs len(SELECT ..)", count, len(sdest))
+		}
+
+		// test it on a double pointer
+		var pcount *int
+		err = db.Get(&pcount, "SELECT count(*) FROM person;")
+		if err != nil {
+			t.Error(err)
+		}
+		if *pcount != count {
+			t.Error("expected %d = %d", *pcount, count)
+		}
+
+		// test Select...
+		sdest = []string{}
+		err = db.Select(&sdest, "SELECT first_name FROM person ORDER BY first_name ASC;")
+		if err != nil {
+			t.Error(err)
+		}
+		expected := []string{"Ben", "Bin", "Jason", "John"}
+		for i, got := range sdest {
+			if got != expected[i] {
+				t.Errorf("Expected %d result to be %s, but got %s", i, expected[i], got)
+			}
+		}
+
+		var nsdest []sql.NullString
+		err = db.Select(&nsdest, "SELECT city FROM place ORDER BY city ASC")
+		if err != nil {
+			t.Error(err)
+		}
+		for _, val := range nsdest {
+			if val.Valid && val.String != "New York" {
+				t.Errorf("expected single valid result to be `New York`, but got %s", val.String)
+			}
+		}
+	})
 }
 
 type Product struct {

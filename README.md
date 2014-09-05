@@ -21,46 +21,25 @@ documentation on godoc](http://godoc.org/github.com/jmoiron/sqlx).
 
 ## Recent Changes
 
-There have been some recent changes to the sqlx API after a long period of
-API stability.  These changes were made for a number of reasons:
+The ability to use basic types as Select and Get destinations was added.  This
+is only valid when there is one column in the result set, and both functions
+return an error if this isn't the case.  This allows for much simpler patterns
+of access for single column results:
 
-* the API surface area was way too large
-* descending non-embedded structs was confusing and problematic
-* separating map/struct for binding added lots of noise and little value
-* reflect helpers didn't belong in the API of `sqlx`
+```go
+var count int
+err := db.Get(&count, "SELECT count(*) FROM person;")
 
-Towards this end, the following public API has been removed or altered:
+var names []string
+err := db.Select(&names, "SELECT email FROM person;")
+```
 
-* **Execl**, **Execf**, **Execv**, **Selectf**, and **Selectv** removed.
-* **Execp** removed in favor of `MustExec`, which remains.
-* **BindMap**, **BindStruct** removed in favor of **BindNamed** which handles
-  both maps and structs.
-* **NamedExecMap**, **NamedQueryMap** removed in favor of **NamedExec** and
-  **NamedQuery**, respectively, which both handle structs & maps.
-* **Binder** interface no longer exported.
-* **BaseStructType** and **BaseSliceType** removed;  see `sqlx/reflectx` for
-  reflect helpers.
-
-The above changes will all be caught by a build step.  The following changes
-to *behavior* in sqlx might require significant changes to client code.  If
-these are a problem, please vendor the git tag @sqlx-v1.0.
-
-* Non-embedded structs no longer probed for fields as more scan targets.
-  This was causing [#60](https://github.com/jmoiron/sqlx/issues/60), but also made little sense.  Embed these structs
-  instead.
-* `MapScan` and `SliceScan` previously returned values which, while `interface{}`,
-  were guaranteed to be a `string` or `nil`.  This guarantee no longer exists,
-  as `sql.NullString` and `sql.RawBytes` are *not* safe targets for all types.
-  This is related to [#59](https://github.com/jmoiron/sqlx/issues/59), but the problem could pop up in future as well.
-* Using the global `NameMapper` to change the behavior of sqlx is discouraged as
-  this will no longer impact `sqlx.DB` structs created before the change.
-
-### Going Forward
+### Backwards Compatibility
 
 There is no Go1-like promise of absolute stability, but I take the issue
 seriously and will maintain the library in a compatible state unless vital
 bugs prevent me from doing so.  Since [#59](https://github.com/jmoiron/sqlx/issues/59) and [#60](https://github.com/jmoiron/sqlx/issues/60) necessitated
-breaking behavior, I decided to perform the API cleanup at the same time.
+breaking behavior, a wider API cleanup was done at the time of fixing.
 
 ## install
 

@@ -96,13 +96,13 @@ func (n *NamedStmt) Select(dest interface{}, arg interface{}) error {
 	}
 	// if something happens here, we want to make sure the rows are Closed
 	defer rows.Close()
-	return StructScan(rows, dest)
+	return scanAll(rows, dest, false)
 }
 
 // Get using this NamedStmt
 func (n *NamedStmt) Get(dest interface{}, arg interface{}) error {
 	r := n.QueryRowx(arg)
-	return r.StructScan(dest)
+	return r.scanAny(dest, false)
 }
 
 // A union interface of preparer and binder, required to be able to prepare

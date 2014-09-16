@@ -225,13 +225,28 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 	rebound := make([]byte, 0, len(qs))
 
 	inName := false
+	inQuote := false
 	last := len(qs) - 1
 	currentVar := 1
 	name := make([]byte, 0, 10)
 
 	for i, b := range qs {
-		// a ':' while we're in a name is an error
-		if b == ':' && inName {
+
+		// quote handling
+		if b == '\'' && !inQuote {
+			// quote started
+			inQuote = true
+			rebound = append(rebound, b)
+		} else if b == '\'' && inQuote {
+			// quote ended
+			inQuote = false
+			rebound = append(rebound, b)
+		} else if inQuote {
+			// this is a normal byte inside a quote and should just go onto the rebound query
+			rebound = append(rebound, b)
+
+		} else if b == ':' && inName {
+			// a ':' while we're in a name is an error
 			err = errors.New("unexpected `:` while reading named param at " + strconv.Itoa(i))
 			return query, names, err
 			// if we encounter a ':' and we aren't in a name, it's a new parameter

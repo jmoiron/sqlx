@@ -226,19 +226,22 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 
 	inName := false
 	inQuote := false
+	var quoteChar byte
 	last := len(qs) - 1
 	currentVar := 1
 	name := make([]byte, 0, 10)
 
 	for i, b := range qs {
 
-		// quote handling
-		if b == '\'' {
-			// open/close quote
-			inQuote = !inQuote
+		// quote handling, do not try to parse named bind params inside quoted strings
+		if !inQuote && (b == '\'' || b == '"') {
+			inQuote = true
+			quoteChar = b
 			rebound = append(rebound, b)
 		} else if inQuote {
-			// this is a normal byte inside a quote and should just go onto the rebound query
+			if b == quoteChar {
+				inQuote = false
+			}
 			rebound = append(rebound, b)
 
 		} else if b == ':' && inName {

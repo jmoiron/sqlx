@@ -586,8 +586,9 @@ func Preparex(p Preparer, query string) (*Stmt, error) {
 }
 
 // Select executes a query using the provided Queryer, and StructScans each row
-// into dest, which must be a slice of structs. The *sql.Rows are closed
-// automatically.
+// into dest, which must be a slice.  If the slice elements are scannable, then
+// the result set must have only one column.  Otherwise, StructScan is used.
+// The *sql.Rows are closed automatically.
 func Select(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	rows, err := q.Queryx(query, args...)
 	if err != nil {
@@ -598,9 +599,9 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	return scanAll(rows, dest, false)
 }
 
-// Get does a QueryRow using the provided Queryer, and StructScan the resulting
-// row into dest, which must be a pointer to a struct.  If there was no row,
-// Get will return sql.ErrNoRows like row.Scan would.
+// Get does a QueryRow using the provided Queryer, and scans the resulting row
+// to dest.  If dest is scannable, the result must only have one column.  Otherwise,
+// StructScan is used.  Get will return sql.ErrNoRows like row.Scan would.
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	r := q.QueryRowx(query, args...)
 	return r.scanAny(dest, false)

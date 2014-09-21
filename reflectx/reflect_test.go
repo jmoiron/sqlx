@@ -1,7 +1,6 @@
 package reflectx
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -128,13 +127,13 @@ func TestMapping(t *testing.T) {
 
 	e := EmbeddedLiteral{}
 	mapping = m.TypeMap(reflect.TypeOf(e))
-	fmt.Printf("Mapping: %#v\n", mapping)
+	//fmt.Printf("Mapping: %#v\n", mapping)
 
-	f := FieldByIndexes(reflect.ValueOf(e), mapping["isintense"])
-	fmt.Println(f, f.Interface())
+	//f := FieldByIndexes(reflect.ValueOf(e), mapping["isintense"])
+	//fmt.Println(f, f.Interface())
 
-	tbn := m.TraversalsByName(reflect.TypeOf(e), []string{"isintense"})
-	fmt.Printf("%#v\n", tbn)
+	//tbn := m.TraversalsByName(reflect.TypeOf(e), []string{"isintense"})
+	//fmt.Printf("%#v\n", tbn)
 
 }
 

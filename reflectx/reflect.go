@@ -22,7 +22,7 @@ type Mapper struct {
 	cache   map[reflect.Type]fieldMap
 	tagName string
 	mapFunc func(string) string
-	sync.RWMutex
+	mutex   sync.Mutex
 }
 
 // NewMapper returns a new mapper which optionally obeys the field tag given
@@ -48,11 +48,13 @@ func NewMapperFunc(tagName string, f func(string) string) *Mapper {
 // TypeMap returns a mapping of field strings to int slices representing
 // the traversal down the struct to reach the field.
 func (m *Mapper) TypeMap(t reflect.Type) fieldMap {
+	m.mutex.Lock()
 	mapping, ok := m.cache[t]
 	if !ok {
 		mapping = getMapping(t, m.tagName, m.mapFunc)
 		m.cache[t] = mapping
 	}
+	m.mutex.Unlock()
 	return mapping
 }
 

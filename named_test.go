@@ -109,6 +109,12 @@ func TestNamedQueries(t *testing.T) {
 		err = ns.Close()
 		test.Error(err)
 
+		// Check if quoted strings are excluded from named bind param parsing
+		ns, err = db.PrepareNamed(`
+			SELECT 'a:b:c' || first_name, '::ABC::', ':a'':b', ":x:y'z", ":a"""":b"
+			FROM person WHERE first_name=:first_name AND last_name=:last_name`)
+		test.Error(err)
+
 		ns, err = db.PrepareNamed(`
 			SELECT first_name, last_name, email 
 			FROM person WHERE first_name=:first_name AND email=:email`)

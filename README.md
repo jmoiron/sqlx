@@ -34,6 +34,8 @@ var names []string
 err := db.Select(&names, "SELECT email FROM person;")
 ```
 
+See the note on Scannability at the bottom of this README for some more info.
+
 ### Backwards Compatibility
 
 There is no Go1-like promise of absolute stability, but I take the issue

@@ -231,12 +231,16 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 
 	for i, b := range qs {
 		// a ':' while we're in a name is an error
-		if b == ':' && inName {
-			err = errors.New("unexpected `:` while reading named param at " + strconv.Itoa(i))
-			return query, names, err
-			// if we encounter a ':' and we aren't in a name, it's a new parameter
-			// FIXME: escaping?
-		} else if b == ':' {
+		if b == ':' {
+			// if this is the second ':' in a '::' escape sequence, append a ':'
+			if inName && i > 0 && qs[i-1] == ':' {
+				rebound = append(rebound, ':')
+				inName = false
+				continue
+			} else if inName {
+				err = errors.New("unexpected `:` while reading named param at " + strconv.Itoa(i))
+				return query, names, err
+			}
 			inName = true
 			name = []byte{}
 			// if we're in a name, and this is an allowed character, continue

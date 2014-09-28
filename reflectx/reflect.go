@@ -58,7 +58,7 @@ func (m *Mapper) TypeMap(t reflect.Type) fieldMap {
 	return mapping
 }
 
-// Fieldmap returns the mapper's mapping of field names to reflect values.  Panics
+// FieldMap returns the mapper's mapping of field names to reflect values.  Panics
 // if v's Kind is not Struct, or v is not Indirectable to a struct kind.
 func (m *Mapper) FieldMap(v reflect.Value) map[string]reflect.Value {
 	v = reflect.Indirect(v)

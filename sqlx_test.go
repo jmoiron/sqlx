@@ -1014,6 +1014,19 @@ func TestUsage(t *testing.T) {
 			t.Errorf("Expected %d == %d (count(*) vs len(SELECT ..)", count, len(sdest))
 		}
 
+		// test Get and Select with time.Time, #84
+		var addedAt time.Time
+		err = db.Get(&addedAt, "SELECT added_at FROM person LIMIT 1;")
+		if err != nil {
+			t.Error(err)
+		}
+
+		var addedAts []time.Time
+		err = db.Select(&addedAts, "SELECT added_at FROM person;")
+		if err != nil {
+			t.Error(err)
+		}
+
 		// test it on a double pointer
 		var pcount *int
 		err = db.Get(&pcount, "SELECT count(*) FROM person;")

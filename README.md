@@ -184,6 +184,26 @@ func main() {
 }
 ```
 
+## Scannability
+
+Get and Select are able to take base types, so the following is now possible:
+
+```go
+var name string
+db.Get(&name, "SELECT first_name FROM person WHERE id=$1", 10)
+
+var ids []int64
+db.Select(&ids, "SELECT id FROM person LIMIT 20;")
+```
+
+This can get complicated with destination types which are structs, like `sql.NullString`.  Because of this, straightforward rules for *scannability* had to be developed.  Iff something is "Scannable", then it is used directly in `rows.Scan`;  if it's not, then the standard sqlx struct rules apply.
+
+Something is scannable if any of the following are true:
+
+* It is not a struct, ie. `reflect.ValueOf(v).Kind() != reflect.Struct`
+* It implements the `sql.Scanner` interface
+* It has no exported fields (eg. `time.Time`)
+
 ## embedded structs
 
 Scan targets obey Go attribute rules directly, including nested embedded structs.  Older versions of sqlx would attempt to also descend into non-embedded structs, but this is no longer supported.

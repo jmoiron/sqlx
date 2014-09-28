@@ -42,6 +42,28 @@ func mapper() *reflectx.Mapper {
 	return mpr
 }
 
+// isScannable takes the reflect.Type and the actual dest value and returns
+// whether or not it's Scannable.  Something is scannable if:
+//   * it is not a struct
+//   * it implements sql.Scanner
+//   * it has no exported fields
+func isScannable(t reflect.Type) bool {
+	if reflect.PtrTo(t).Implements(_scannerInterface) {
+		return true
+	}
+	if t.Kind() != reflect.Struct {
+		return true
+	}
+
+	// it's not important that we use the right mapper for this particular object,
+	// we're only concerned on how many exported fields this struct has
+	m := mapper()
+	if len(m.TypeMap(t)) == 0 {
+		return true
+	}
+	return false
+}
+
 // ColScanner is an interface used by MapScan and SliceScan
 type ColScanner interface {
 	Columns() ([]string, error)
@@ -665,22 +687,10 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 	}
 
 	base := reflectx.Deref(v.Type())
-	// We have a serious thing to consider here;  if this struct is a Scanner,
-	// I think we should scan into it directly as a type and not a struct.  This
-	// brings back some "isScanner" detection we got rid of previously, and makes
-	// things a little bit more confusing, but it allows for use of NullString
-	// and its ilk
-	isStruct := base.Kind() == reflect.Struct
-	_, isScanner := dest.(sql.Scanner)
+	scannable := isScannable(base)
 
-	// only error out here if we require a struct but didn't get one
-	if structOnly {
-		if !isStruct {
-			return fmt.Errorf("expected %s but got %s", reflect.Struct, base.Kind())
-		}
-		if isScanner {
-			return fmt.Errorf("structscan expects a struct dest but the provided struct type %s implements scanner", base.Name())
-		}
+	if structOnly && scannable {
+		return structOnlyError(base)
 	}
 
 	columns, err := r.Columns()
@@ -688,11 +698,11 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 		return err
 	}
 
-	if !isStruct && len(columns) > 1 {
-		return fmt.Errorf("non-struct or Scanner dest type %s with >1 columns (%d) in result", base.Kind(), len(columns))
+	if scannable && len(columns) > 1 {
+		return fmt.Errorf("scannable dest type %s with >1 columns (%d) in result", base.Kind(), len(columns))
 	}
 
-	if !isStruct || isScanner {
+	if scannable {
 		return r.Scan(dest)
 	}
 
@@ -787,6 +797,20 @@ type rowsi interface {
 	Scan(...interface{}) error
 }
 
+// structOnlyError returns an error appropriate for type when a non-scannable
+// struct is expected but something else is given
+func structOnlyError(t reflect.Type) error {
+	isStruct := t.Kind() == reflect.Struct
+	isScanner := reflect.PtrTo(t).Implements(_scannerInterface)
+	if !isStruct {
+		return fmt.Errorf("expected %s but got %s", reflect.Struct, t.Kind())
+	}
+	if isScanner {
+		return fmt.Errorf("structscan expects a struct dest but the provided struct type %s implements scanner", t.Name())
+	}
+	return fmt.Errorf("expected a struct, but struct %s has no exported fields", t.Name())
+}
+
 // scanAll scans all rows into a destination, which must be a slice of any
 // type.  If the destination slice type is a Struct, then StructScan will be
 // used on each row.  If the destination is some other kind of base type, then
@@ -823,23 +847,10 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 
 	isPtr := slice.Elem().Kind() == reflect.Ptr
 	base := reflectx.Deref(slice.Elem())
-	isStruct := base.Kind() == reflect.Struct
-	// check if a pointer to the slice type implements sql.Scanner; if it does, we
-	// will treat this as a base type slice rather than a struct slice;  eg, we will
-	// treat []sql.NullString as a single row rather than a struct with 2 scan targets.
-	isScanner := reflect.PtrTo(base).Implements(_scannerInterface)
+	scannable := isScannable(base)
 
-	// if we must have a struct and the base type isn't a struct, return an error.
-	// this maintains API compatibility for StructScan, which is only important
-	// because StructScan should involve structs and it feels gross to add more
-	// weird junk to it.
-	if structOnly {
-		if !isStruct {
-			return fmt.Errorf("expected %s but got %s", reflect.Struct, base.Kind())
-		}
-		if isScanner {
-			return fmt.Errorf("structscan expects a struct dest but the provided struct type %s implements scanner", base.Name())
-		}
+	if structOnly && scannable {
+		return structOnlyError(base)
 	}
 
 	columns, err := rows.Columns()
@@ -848,11 +859,11 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 	}
 
 	// if it's a base type make sure it only has 1 column;  if not return an error
-	if !isStruct && len(columns) > 1 {
+	if scannable && len(columns) > 1 {
 		return fmt.Errorf("non-struct dest type %s with >1 columns (%d)", base.Kind(), len(columns))
 	}
 
-	if isStruct && !isScanner {
+	if !scannable {
 		var values []interface{}
 		var m *reflectx.Mapper
 

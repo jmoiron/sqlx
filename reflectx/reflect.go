@@ -19,10 +19,11 @@ type fieldMap map[string][]int
 // behaves like most marshallers, optionally obeying a field tag for name
 // mapping and a function to provide a basic mapping of fields to names.
 type Mapper struct {
-	cache   map[reflect.Type]fieldMap
-	tagName string
-	mapFunc func(string) string
-	mutex   sync.Mutex
+	cache          map[reflect.Type]fieldMap
+	tagName        string
+	mapTagNameFunc func(string, string) string
+	mapFunc        func(string) string
+	mutex          sync.Mutex
 }
 
 // NewMapper returns a new mapper which optionally obeys the field tag given
@@ -31,6 +32,16 @@ func NewMapper(tagName string) *Mapper {
 	return &Mapper{
 		cache:   make(map[reflect.Type]fieldMap),
 		tagName: tagName,
+	}
+}
+
+// NewMapper returns a new mapper which optionally obeys the field tag given
+// by tagName.  If tagName is the empty string, it is ignored.
+func NewMapperTagNameFunc(tagName string, f func(string, string) string) *Mapper {
+	return &Mapper{
+		cache:          make(map[reflect.Type]fieldMap),
+		tagName:        tagName,
+		mapTagNameFunc: f,
 	}
 }
 
@@ -51,7 +62,7 @@ func (m *Mapper) TypeMap(t reflect.Type) fieldMap {
 	m.mutex.Lock()
 	mapping, ok := m.cache[t]
 	if !ok {
-		mapping = getMapping(t, m.tagName, m.mapFunc)
+		mapping = getMapping(t, m.tagName, m.mapTagNameFunc, m.mapFunc)
 		m.cache[t] = mapping
 	}
 	m.mutex.Unlock()
@@ -201,7 +212,7 @@ func apnd(is []int, i int) []int {
 
 // getMapping returns a mapping for the t type, using the tagName and the mapFunc
 // to determine the canonical names of fields.
-func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) fieldMap {
+func getMapping(t reflect.Type, tagName string, mapTagNameFunc func(string, string) string, mapFunc func(string) string) fieldMap {
 	queue := []typeQueue{}
 	queue = append(queue, typeQueue{Deref(t), []int{}})
 	m := fieldMap{}
@@ -219,6 +230,10 @@ func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) fie
 					name = mapFunc(f.Name)
 				} else {
 					name = f.Name
+				}
+			} else {
+				if mapTagNameFunc != nil {
+					name = mapTagNameFunc(tagName, name)
 				}
 			}
 

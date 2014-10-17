@@ -21,7 +21,7 @@ type fieldMap map[string][]int
 type Mapper struct {
 	cache          map[reflect.Type]fieldMap
 	tagName        string
-	mapTagNameFunc func(string, string) string
+	tagNameMapFunc func(string, string) string
 	mapFunc        func(string) string
 	mutex          sync.Mutex
 }
@@ -41,7 +41,7 @@ func NewMapperTagNameFunc(tagName string, f func(string, string) string) *Mapper
 	return &Mapper{
 		cache:          make(map[reflect.Type]fieldMap),
 		tagName:        tagName,
-		mapTagNameFunc: f,
+		tagNameMapFunc: f,
 	}
 }
 
@@ -62,7 +62,7 @@ func (m *Mapper) TypeMap(t reflect.Type) fieldMap {
 	m.mutex.Lock()
 	mapping, ok := m.cache[t]
 	if !ok {
-		mapping = getMapping(t, m.tagName, m.mapTagNameFunc, m.mapFunc)
+		mapping = getMapping(t, m.tagName, m.tagNameMapFunc, m.mapFunc)
 		m.cache[t] = mapping
 	}
 	m.mutex.Unlock()
@@ -212,7 +212,7 @@ func apnd(is []int, i int) []int {
 
 // getMapping returns a mapping for the t type, using the tagName and the mapFunc
 // to determine the canonical names of fields.
-func getMapping(t reflect.Type, tagName string, mapTagNameFunc func(string, string) string, mapFunc func(string) string) fieldMap {
+func getMapping(t reflect.Type, tagName string, tagNameMapFunc func(string, string) string, mapFunc func(string) string) fieldMap {
 	queue := []typeQueue{}
 	queue = append(queue, typeQueue{Deref(t), []int{}})
 	m := fieldMap{}
@@ -231,10 +231,8 @@ func getMapping(t reflect.Type, tagName string, mapTagNameFunc func(string, stri
 				} else {
 					name = f.Name
 				}
-			} else {
-				if mapTagNameFunc != nil {
-					name = mapTagNameFunc(tagName, name)
-				}
+			} else if tagNameMapFunc != nil {
+				name = tagNameMapFunc(tagName, name)
 			}
 
 			// if the name is "-", disabled via a tag, skip it

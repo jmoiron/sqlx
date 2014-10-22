@@ -31,7 +31,7 @@ var count int
 err := db.Get(&count, "SELECT count(*) FROM person;")
 
 var names []string
-err := db.Select(&names, "SELECT email FROM person;")
+err := db.Select(&names, "SELECT name FROM person;")
 ```
 
 See the note on Scannability at the bottom of this README for some more info.

@@ -223,6 +223,15 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	return &DB{DB: db, driverName: driverName, Mapper: mapper()}, err
 }
 
+// MustOpen is the same as sql.Open, but returns an *sqlx.DB instead and panics on error.
+func MustOpen(driverName, dataSourceName string) *DB {
+	db, err := Open(driverName, dataSourceName)
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
 // MapperFunc sets a new mapper for this db using the default sqlx struct tag
 // and the provided mapper function.
 func (db *DB) MapperFunc(mf func(string) string) {

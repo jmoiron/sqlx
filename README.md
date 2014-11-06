@@ -143,7 +143,7 @@ func main() {
     places := []Place{}
     err := db.Select(&places, "SELECT * FROM place ORDER BY telcode ASC")
     if err != nil {
-        fmt.Printf(err)
+        fmt.Println(err)
         return
     }
     usa, singsing, honkers = places[0], places[1], places[2]

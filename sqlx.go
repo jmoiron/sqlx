@@ -297,6 +297,11 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(db, dest, query, args...)
 }
 
+// Select using this DB, and panic on error.
+func (db *DB) MustSelect(dest interface{}, query string, args ...interface{}) {
+	MustSelect(db, dest, query, args...)
+}
+
 // Get using this DB.
 func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
@@ -628,6 +633,14 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	// if something happens here, we want to make sure the rows are Closed
 	defer rows.Close()
 	return scanAll(rows, dest, false)
+}
+
+// Same as Select() except it panics on error.
+func MustSelect(q Queryer, dest interface{}, query string, args ...interface{}) {
+	err := Select(q, dest, query, args...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Get does a QueryRow using the provided Queryer, and scans the resulting row

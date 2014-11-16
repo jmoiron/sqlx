@@ -307,6 +307,15 @@ func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
 }
 
+// Get using this DB. Result will be stored in a newly allocated struct.
+func (db *DB) GetAlloc(destpp interface{}, query string, args ...interface{}) error {
+	return GetAlloc(db, destpp, query, args...)
+}
+
+func (db *DB) MustGetAlloc(destpp interface{}, query string, args ...interface{}) {
+	MustGetAlloc(db, destpp, query, args...)
+}
+
 // MustBegin starts a transaction, and panics on error.  Returns an *sqlx.Tx instead
 // of an *sql.Tx.
 func (db *DB) MustBegin() *Tx {
@@ -649,6 +658,41 @@ func MustSelect(q Queryer, dest interface{}, query string, args ...interface{}) 
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	r := q.QueryRowx(query, args...)
 	return r.scanAny(dest, false)
+}
+
+// Same as Get(), but instead of pointer to interface, duoble pointer should be
+// be passed. Results of the query is stored in newly allocated struct, and
+// passed pointer is updated to point to the data. If query results no rows
+// pointer is changed to point to nil.
+func GetAlloc(q Queryer, destpp interface{}, query string, args ...interface{}) error {
+	t := reflect.TypeOf(destpp)
+
+	if t.Kind() != reflect.Ptr {
+		return errors.New("must pass a double pointer to destination value, not a value")
+	}
+	if t.Elem().Kind() != reflect.Ptr {
+		return errors.New("must pass a double pointer to destination value, not a pointer to value")
+	}
+
+	destp := reflect.New(t.Elem().Elem())
+	err := Get(q, destp.Interface(), query, args...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			reflect.ValueOf(destpp).Elem().Set(reflect.Zero(t.Elem()))
+			return nil
+		}
+		return err
+	}
+	reflect.ValueOf(destpp).Elem().Set(destp)
+	return nil
+}
+
+// Same as GetAlloc() except panics on error.
+func MustGetAlloc(q Queryer, destpp interface{}, query string, args ...interface{}) {
+	err := GetAlloc(q, destpp, query, args...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // LoadFile exec's every statement in a file (as a single call to Exec).

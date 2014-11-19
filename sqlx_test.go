@@ -1286,7 +1286,7 @@ func TestGetAlloc(t *testing.T) {
 	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
 		// Returns SQL syntax error
 		err := db.GetAlloc(&sp, errQuery)
-			if err == nil {
+		if err == nil {
 			t.Error("Using invalid SQL should produce an error.")
 		}
 		// Normal request
@@ -1296,8 +1296,8 @@ func TestGetAlloc(t *testing.T) {
 		}
 		// Request with empty result set
 		err = db.GetAlloc(&sp, emptyQuery)
-		if sp != nil {
-			t.Errorf("Got %v, expected %v.", sp, nil)
+		if err != nil || sp != nil {
+			t.Errorf("Got %v (%v), expected %v (%v).", sp, err, nil, nil)
 		}
 	})
 }

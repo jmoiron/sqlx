@@ -1253,6 +1253,55 @@ func TestEmbeddedLiterals(t *testing.T) {
 	})
 }
 
+func TestGetAllocErrors(t *testing.T) {
+	var s  =  struct {A int; B int}{}
+	var sp = &struct {A int; B int}{}
+
+	// Returns error without executing the query, wrong destination type
+	err := GetAlloc(nil, s, "")
+	if err == nil {
+		t.Error("Passing struct should produce an error.")
+	}
+	// Returns error without executing the query, wrong destination type
+	err = GetAlloc(nil, &s, "")
+	if err == nil {
+		t.Error("Passing pointer to struct should produce an error.")
+	}
+	// Returns error without executing the query, wrong destination type
+	err = GetAlloc(nil, sp, "")
+	if err == nil {
+		t.Error("Passing pointer to struct should produce an error.")
+	}
+}
+
+func TestGetAlloc(t *testing.T) {
+	var schema = Schema{create: "", drop: ""}
+	var query = "SELECT 1 AS a, 2 AS b"
+	var emptyQuery = "SELECT 1 AS a, 2 AS b LIMIT 0"
+	var errQuery = "SELECT 1 AS a, 2 AS b FIXME"
+
+	var sp     = &struct {A int; B int}{}
+	var result =  struct {A int; B int}{A: 1, B: 2}
+
+	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+		// Returns SQL syntax error
+		err := db.GetAlloc(&sp, errQuery)
+			if err == nil {
+			t.Error("Using invalid SQL should produce an error.")
+		}
+		// Normal request
+		err = db.GetAlloc(&sp, query)
+		if err != nil || *sp != result {
+			t.Errorf("Got %v (%v), expected %v (%v).", sp, err, &result, nil)
+		}
+		// Request with empty result set
+		err = db.GetAlloc(&sp, emptyQuery)
+		if sp != nil {
+			t.Errorf("Got %v, expected %v.", sp, nil)
+		}
+	})
+}
+
 func BenchmarkBindStruct(b *testing.B) {
 	b.StopTimer()
 	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`

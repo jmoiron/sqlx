@@ -664,6 +664,20 @@ func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 // be passed. Results of the query is stored in newly allocated struct, and
 // passed pointer is updated to point to the data. If query results no rows
 // pointer is changed to point to nil.
+//
+// Usage example:
+//   ...
+//   var query = "SELECT ..."
+//   var person *Person
+//
+//   GetAlloc(db, &person, query)
+//
+//   if person == nil {
+//       log.Print("Person not found")
+//   } else {
+//       log.Person("Person is: ", person)
+//   }
+//   ...
 func GetAlloc(q Queryer, destpp interface{}, query string, args ...interface{}) error {
 	t := reflect.TypeOf(destpp)
 

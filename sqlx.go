@@ -312,6 +312,7 @@ func (db *DB) GetAlloc(destpp interface{}, query string, args ...interface{}) er
 	return GetAlloc(db, destpp, query, args...)
 }
 
+// Call GetAlloc(), and panic on error
 func (db *DB) MustGetAlloc(destpp interface{}, query string, args ...interface{}) {
 	MustGetAlloc(db, destpp, query, args...)
 }
@@ -429,9 +430,32 @@ func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(tx, dest, query, args...)
 }
 
+// GetAlloc within a transaction.
+func (tx *Tx) GetAlloc(dest interface{}, query string, args ...interface{}) error {
+	return GetAlloc(tx, dest, query, args...)
+}
+
 // MustExec runs MustExec within a transaction.
 func (tx *Tx) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(tx, query, args...)
+}
+
+// MustExecOrRollback runs Exec within a transaction. On error it rollbacks the
+// transaction and panics.
+func (tx *Tx) MustExecOrRollback(query string, args ...interface{}) sql.Result {
+	res, err := tx.Exec(query, args...)
+	if err != nil {
+		tx.Rollback()
+		panic(err)
+	}
+	return res
+}
+
+func (tx *Tx) MustCommit() {
+	err := tx.Commit()
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Preparex  a statement within a transaction.

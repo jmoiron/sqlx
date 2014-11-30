@@ -146,7 +146,7 @@ func main() {
         fmt.Println(err)
         return
     }
-    usa, singsing, honkers = places[0], places[1], places[2]
+    usa, singsing, honkers := places[0], places[1], places[2]
     
     fmt.Printf("%#v\n%#v\n%#v\n", usa, singsing, honkers)
     // Place{Country:"United States", City:sql.NullString{String:"New York", Valid:true}, TelCode:1}

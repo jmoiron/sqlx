@@ -141,7 +141,7 @@ func main() {
 
     // if you have null fields and use SELECT *, you must use sql.Null* in your struct
     places := []Place{}
-    err := db.Select(&places, "SELECT * FROM place ORDER BY telcode ASC")
+    err = db.Select(&places, "SELECT * FROM place ORDER BY telcode ASC")
     if err != nil {
         fmt.Println(err)
         return
@@ -177,12 +177,12 @@ func main() {
     })
 
     // Selects Mr. Smith from the database
-    rows, err := db.NamedQuery(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Bin"})
+    rows, err = db.NamedQuery(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Bin"})
 
     // Named queries can also use structs.  Their bind names follow the same rules
     // as the name -> db mapping, so struct fields are lowercased and the `db` tag
     // is taken into consideration.
-    rows, err := db.NamedQuery(`SELECT * FROM person WHERE first_name=:first_name`, jason)
+    rows, err = db.NamedQuery(`SELECT * FROM person WHERE first_name=:first_name`, jason)
 }
 ```
 

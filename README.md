@@ -159,7 +159,7 @@ func main() {
     for rows.Next() {
         err := rows.StructScan(&place)
         if err != nil {
-            log.Fataln(err)
+            log.Fatalln(err)
         } 
         fmt.Printf("%#v\n", place)
     }

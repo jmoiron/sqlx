@@ -356,6 +356,16 @@ func (db *DB) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(db, query, args...)
 }
 
+// ExecGetId runs ExecGetId using this database.
+func (db *DB) ExecGetId(query string, args ...interface{}) (int64, error) {
+	return ExecGetId(db, query, args...)
+}
+
+// MustExecGetId (panic) runs MustExecGetId using this database.
+func (db *DB) MustExecGetId(query string, args ...interface{}) int64 {
+	return MustExecGetId(db, query, args...)
+}
+
 // Preparex returns an sqlx.Stmt instead of a sql.Stmt
 func (db *DB) Preparex(query string) (*Stmt, error) {
 	return Preparex(db, query)
@@ -440,6 +450,27 @@ func (tx *Tx) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(tx, query, args...)
 }
 
+// ExecGetId runs ExecGetId within a transaction.
+func (tx *Tx) ExecGetId(query string, args ...interface{}) (int64, error) {
+	return ExecGetId(tx, query, args...)
+}
+
+// MustExecGetId (panic) runs ExecGetId within a transaction.
+func (tx *Tx) MustExecGetId(query string, args ...interface{}) int64 {
+	return MustExecGetId(tx, query, args...)
+}
+
+// MustExecGetIdOrRollback (panic) runs ExecGetId and panics on error. In
+// addition it will rollback current transaction before panicing.
+func (tx *Tx) MustExecGetIdOrRollback(query string, args ...interface{}) int64 {
+	id, err := ExecGetId(tx, query, args...)
+	if err != nil {
+		tx.Rollback()
+		panic(err)
+	}
+	return id
+}
+
 // MustExecOrRollback runs Exec within a transaction. On error it rollbacks the
 // transaction and panics.
 func (tx *Tx) MustExecOrRollback(query string, args ...interface{}) sql.Result {
@@ -451,6 +482,7 @@ func (tx *Tx) MustExecOrRollback(query string, args ...interface{}) sql.Result {
 	return res
 }
 
+// MustCommit (panic) calls Commit on a transaction and panics on error.
 func (tx *Tx) MustCommit() {
 	err := tx.Commit()
 	if err != nil {
@@ -764,6 +796,29 @@ func MustExec(e Execer, query string, args ...interface{}) sql.Result {
 		panic(err)
 	}
 	return res
+}
+
+// ExecGetId runs Exec, but returns the result from LastInsertId() call instead
+// of normal sql.Result.
+func ExecGetId(e Execer, query string, args ...interface{}) (int64, error) {
+	r, err := e.Exec(query, args...)
+	if err != nil {
+		return 0, err
+	}
+	id, err := r.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// MustExecGetId (panic) runs ExecGetId but panics on error.
+func MustExecGetId(e Execer, query string, args ...interface{}) int64 {
+	id, err := ExecGetId(e, query, args...)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 // SliceScan using this Rows.

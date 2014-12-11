@@ -307,6 +307,11 @@ func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
 }
 
+// MustGet using this DB.
+func (db *DB) MustGet(dest interface{}, query string, args ...interface{}) {
+	MustGet(db, dest, query, args...)
+}
+
 // Get using this DB. Result will be stored in a newly allocated struct.
 func (db *DB) GetAlloc(destpp interface{}, query string, args ...interface{}) error {
 	return GetAlloc(db, destpp, query, args...)
@@ -714,6 +719,14 @@ func MustSelect(q Queryer, dest interface{}, query string, args ...interface{}) 
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	r := q.QueryRowx(query, args...)
 	return r.scanAny(dest, false)
+}
+
+// MustGet is same as Get but panics on error.
+func MustGet(q Queryer, dest interface{}, query string, args ...interface{}) {
+	err := Get(q, dest, query, args...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Same as Get(), but instead of pointer to interface, duoble pointer should be

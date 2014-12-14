@@ -35,8 +35,9 @@ func NewMapper(tagName string) *Mapper {
 	}
 }
 
-// NewMapper returns a new mapper which optionally obeys the field tag given
-// by tagName.  If tagName is the empty string, it is ignored.
+// NewMapperTagNameFunc returns a new mapper which optionally obeys a field tag and
+// a tag name mapper func given by f. For each field, the mapped name will be f(tagName, extraParam )
+// if function f is not nil.
 func NewMapperTagNameFunc(tagName string, f func(string, string) string) *Mapper {
 	return &Mapper{
 		cache:          make(map[reflect.Type]fieldMap),
@@ -210,7 +211,7 @@ func apnd(is []int, i int) []int {
 	return x
 }
 
-// getMapping returns a mapping for the t type, using the tagName and the mapFunc
+// getMapping returns a mapping for the t type, using the tagName, tagNameMapFunc and the mapFunc
 // to determine the canonical names of fields.
 func getMapping(t reflect.Type, tagName string, tagNameMapFunc func(string, string) string, mapFunc func(string) string) fieldMap {
 	queue := []typeQueue{}

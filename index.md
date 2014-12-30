@@ -270,7 +270,7 @@ And one extra handle type:
 ```go
 p := Place{Country: "South Africa"}
 rows, err := db.NamedQuery(`SELECT * FROM place WHERE country=:country`, p)
-m := map[string]string{"city": "Johannesburg"}
+m := map[string]interface{}{"city": "Johannesburg"}
 result, err := db.NamedExec(`SELECT * FROM place WHERE city=:city`, m)
 ```
 

@@ -137,6 +137,9 @@ func FieldByIndexes(v reflect.Value, indexes []int) reflect.Value {
 			alloc := reflect.New(Deref(v.Type()))
 			v.Set(alloc)
 		}
+		if v.Kind() == reflect.Map && v.IsNil() {
+			v.Set(reflect.MakeMap(v.Type()))
+		}
 	}
 	return v
 }

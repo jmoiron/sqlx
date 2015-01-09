@@ -12,9 +12,12 @@ package sqlx
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1122,6 +1125,75 @@ func TestBindMap(t *testing.T) {
 	if args[3].(string) != "Moiron" {
 		t.Errorf("Expected Moiron, got %v\n", args[3])
 	}
+}
+
+// Test for #117, embedded nil maps
+
+type Message struct {
+	Text       string      `db:"string"`
+	Properties PropertyMap // Stored as JSON in the database
+}
+type PropertyMap map[string]string
+
+// Implement driver.Valuer and sql.Scanner interfaces on PropertyMap
+func (p PropertyMap) Value() (driver.Value, error) {
+	if len(p) == 0 {
+		return nil, nil
+	}
+	return json.Marshal(p)
+}
+
+func (p PropertyMap) Scan(src interface{}) error {
+	v := reflect.ValueOf(src)
+	if !v.IsValid() || v.IsNil() {
+		return nil
+	}
+	if data, ok := src.([]byte); ok {
+		return json.Unmarshal(data, &p)
+	}
+	return fmt.Errorf("Could not not decode type %T -> %T", src, p)
+}
+
+func TestEmbeddedMaps(t *testing.T) {
+	var schema = Schema{
+		create: `
+			CREATE TABLE message (
+				string text,
+				properties text
+			);`,
+		drop: `drop table message;`,
+	}
+
+	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+		messages := []Message{
+			{"Hello, World", PropertyMap{"one": "1", "two": "2"}},
+			{"Thanks, Joy", PropertyMap{"pull": "request"}},
+		}
+		q1 := `INSERT INTO message (string, properties) VALUES (:string, :properties)`
+		for _, m := range messages {
+			_, err := db.NamedExec(q1, m)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+		var count int
+		err := db.Get(&count, "SELECT count(*) FROM message")
+		if err != nil {
+			t.Error(err)
+		}
+		if count != len(messages) {
+			t.Errorf("Expected %d messages in DB, found %d", len(messages), count)
+		}
+
+		var m Message
+		err = db.Get(&m, "SELECT * FROM message LIMIT 1")
+		if err != nil {
+			t.Error(err)
+		}
+		if m.Properties == nil {
+			t.Error("Expected m.Properties to not be nil, but it was.")
+		}
+	})
 }
 
 func TestBindStruct(t *testing.T) {

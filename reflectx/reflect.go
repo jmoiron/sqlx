@@ -19,10 +19,11 @@ type fieldMap map[string][]int
 // behaves like most marshallers, optionally obeying a field tag for name
 // mapping and a function to provide a basic mapping of fields to names.
 type Mapper struct {
-	cache   map[reflect.Type]fieldMap
-	tagName string
-	mapFunc func(string) string
-	mutex   sync.Mutex
+	cache      map[reflect.Type]fieldMap
+	tagName    string
+	tagMapFunc func(string) string
+	mapFunc    func(string) string
+	mutex      sync.Mutex
 }
 
 // NewMapper returns a new mapper which optionally obeys the field tag given
@@ -31,6 +32,18 @@ func NewMapper(tagName string) *Mapper {
 	return &Mapper{
 		cache:   make(map[reflect.Type]fieldMap),
 		tagName: tagName,
+	}
+}
+
+// NewMapperTagFunc returns a new mapper which contains a mapper for field names
+// AND a mapper for tag values.  This is useful for tags like json which can
+// have values like "name,omitempty".
+func NewMapperTagFunc(tagName string, mapFunc, tagMapFunc func(string) string) *Mapper {
+	return &Mapper{
+		cache:      make(map[reflect.Type]fieldMap),
+		tagName:    tagName,
+		mapFunc:    mapFunc,
+		tagMapFunc: tagMapFunc,
 	}
 }
 
@@ -51,7 +64,7 @@ func (m *Mapper) TypeMap(t reflect.Type) fieldMap {
 	m.mutex.Lock()
 	mapping, ok := m.cache[t]
 	if !ok {
-		mapping = getMapping(t, m.tagName, m.mapFunc)
+		mapping = getMapping(t, m.tagName, m.mapFunc, m.tagMapFunc)
 		m.cache[t] = mapping
 	}
 	m.mutex.Unlock()
@@ -202,9 +215,9 @@ func apnd(is []int, i int) []int {
 	return x
 }
 
-// getMapping returns a mapping for the t type, using the tagName and the mapFunc
-// to determine the canonical names of fields.
-func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) fieldMap {
+// getMapping returns a mapping for the t type, using the tagName, mapFunc and
+// tagMapFunc to determine the canonical names of fields.
+func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string) string) fieldMap {
 	queue := []typeQueue{}
 	queue = append(queue, typeQueue{Deref(t), []int{}})
 	m := fieldMap{}
@@ -223,6 +236,8 @@ func getMapping(t reflect.Type, tagName string, mapFunc func(string) string) fie
 				} else {
 					name = f.Name
 				}
+			} else if tagMapFunc != nil {
+				name = tagMapFunc(name)
 			}
 
 			// if the name is "-", disabled via a tag, skip it

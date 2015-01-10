@@ -74,7 +74,7 @@ func TestTagNameMapping(t *testing.T) {
 		StrategyName string
 	}
 
-	m := NewMapperTagNameFunc("json", func(tagName string, value string) string {
+	m := NewMapperTagFunc("json", strings.ToUpper, func(value string) string {
 		if strings.Contains(value, ",") {
 			return strings.Split(value, ",")[0]
 		} else {
@@ -84,7 +84,7 @@ func TestTagNameMapping(t *testing.T) {
 	strategy := Strategy{"1", "Alpah"}
 	mapping := m.TypeMap(reflect.TypeOf(strategy))
 
-	for _, key := range []string{"strategy_id", "StrategyName"} {
+	for _, key := range []string{"strategy_id", "STRATEGYNAME"} {
 		if _, ok := mapping[key]; !ok {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}

@@ -31,7 +31,7 @@ var count int
 err := db.Get(&count, "SELECT count(*) FROM person;")
 
 var names []string
-err := db.Select(&names, "SELECT email FROM person;")
+err := db.Select(&names, "SELECT name FROM person;")
 ```
 
 See the note on Scannability at the bottom of this README for some more info.
@@ -141,12 +141,12 @@ func main() {
 
     // if you have null fields and use SELECT *, you must use sql.Null* in your struct
     places := []Place{}
-    err := db.Select(&places, "SELECT * FROM place ORDER BY telcode ASC")
+    err = db.Select(&places, "SELECT * FROM place ORDER BY telcode ASC")
     if err != nil {
-        fmt.Printf(err)
+        fmt.Println(err)
         return
     }
-    usa, singsing, honkers = places[0], places[1], places[2]
+    usa, singsing, honkers := places[0], places[1], places[2]
     
     fmt.Printf("%#v\n%#v\n%#v\n", usa, singsing, honkers)
     // Place{Country:"United States", City:sql.NullString{String:"New York", Valid:true}, TelCode:1}
@@ -159,7 +159,7 @@ func main() {
     for rows.Next() {
         err := rows.StructScan(&place)
         if err != nil {
-            log.Fataln(err)
+            log.Fatalln(err)
         } 
         fmt.Printf("%#v\n", place)
     }
@@ -177,12 +177,12 @@ func main() {
     })
 
     // Selects Mr. Smith from the database
-    rows, err := db.NamedQuery(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Bin"})
+    rows, err = db.NamedQuery(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Bin"})
 
     // Named queries can also use structs.  Their bind names follow the same rules
     // as the name -> db mapping, so struct fields are lowercased and the `db` tag
     // is taken into consideration.
-    rows, err := db.NamedQuery(`SELECT * FROM person WHERE first_name=:first_name`, jason)
+    rows, err = db.NamedQuery(`SELECT * FROM person WHERE first_name=:first_name`, jason)
 }
 ```
 

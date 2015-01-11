@@ -48,6 +48,8 @@ func (g *GzippedText) Scan(src interface{}) error {
 // implements `Unmarshal`, which unmarshals the json within to an interface{}
 type JsonText json.RawMessage
 
+var _EMPTY_JSON = []byte("{}")
+
 // Returns the *j as the JSON encoding of j.
 func (j *JsonText) MarshalJSON() ([]byte, error) {
 	return *j, nil
@@ -77,11 +79,13 @@ func (j JsonText) Value() (driver.Value, error) {
 // Scan stores the src in *j.  No validation is done.
 func (j *JsonText) Scan(src interface{}) error {
 	var source []byte
-	switch src.(type) {
+	switch t := src.(type) {
 	case string:
-		source = []byte(src.(string))
+		source = []byte(t)
 	case []byte:
-		source = src.([]byte)
+		source = t
+	case nil:
+		*j = _EMPTY_JSON
 	default:
 		return errors.New("Incompatible type for JsonText")
 	}
@@ -91,5 +95,8 @@ func (j *JsonText) Scan(src interface{}) error {
 
 // Unmarshal unmarshal's the json in j to v, as in json.Unmarshal.
 func (j *JsonText) Unmarshal(v interface{}) error {
+	if len(*j) == 0 {
+		*j = _EMPTY_JSON
+	}
 	return json.Unmarshal([]byte(*j), v)
 }

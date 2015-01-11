@@ -39,4 +39,26 @@ func TestJsonText(t *testing.T) {
 	if err == nil {
 		t.Errorf("Was expecting invalid json to fail!")
 	}
+
+	j = JsonText("")
+	v, err = j.Value()
+	if err != nil {
+		t.Errorf("Was not expecting an error")
+	}
+
+	err = (&j).Scan(v)
+	if err != nil {
+		t.Errorf("Was not expecting an error")
+	}
+
+	j = JsonText(nil)
+	v, err = j.Value()
+	if err != nil {
+		t.Errorf("Was not expecting an error")
+	}
+
+	err = (&j).Scan(v)
+	if err != nil {
+		t.Errorf("Was not expecting an error")
+	}
 }

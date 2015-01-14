@@ -48,10 +48,13 @@ func (g *GzippedText) Scan(src interface{}) error {
 // implements `Unmarshal`, which unmarshals the json within to an interface{}
 type JsonText json.RawMessage
 
-var _EMPTY_JSON = []byte("{}")
+var _EMPTY_JSON = JsonText("{}")
 
 // Returns the *j as the JSON encoding of j.
 func (j *JsonText) MarshalJSON() ([]byte, error) {
+	if len(*j) == 0 {
+		*j = _EMPTY_JSON
+	}
 	return *j, nil
 }
 
@@ -83,7 +86,11 @@ func (j *JsonText) Scan(src interface{}) error {
 	case string:
 		source = []byte(t)
 	case []byte:
-		source = t
+		if len(t) == 0 {
+			source = _EMPTY_JSON
+		} else {
+			source = t
+		}
 	case nil:
 		*j = _EMPTY_JSON
 	default:

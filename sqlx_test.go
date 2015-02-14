@@ -1196,6 +1196,74 @@ func TestEmbeddedMaps(t *testing.T) {
 	})
 }
 
+func TestIn(t *testing.T) {
+	// some quite normal situations
+	type tr struct {
+		q    string
+		args []interface{}
+		c    int
+	}
+	tests := []tr{
+		{"SELECT * FROM foo WHERE x = ? AND v in (?) AND y = ?",
+			[]interface{}{"foo", []int{0, 5, 7, 2, 9}, "bar"},
+			7},
+		{"SELECT * FROM foo WHERE x in (?)",
+			[]interface{}{[]int{1, 2, 3, 4, 5, 6, 7, 8}},
+			8},
+	}
+	for _, test := range tests {
+		q, a, err := in(test.q, test.args...)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(a) != test.c {
+			t.Errorf("Expected %d args, but got %d (%+v)", len(a), test.c, a)
+		}
+		if strings.Count(q, "?") != test.c {
+			t.Errorf("Expected %d bindVars, got %d", test.c, strings.Count(q, "?"))
+		}
+	}
+
+	// too many bindVars, but no slices, so short circuits parsing
+	// i'm not sure if this is the right behavior;  this query/arg combo
+	// might not work, but we shouldn't parse if we don't need to
+	{
+		orig := "SELECT * FROM foo WHERE x = ? AND y = ?"
+		q, a, err := in(orig, "foo", "bar", "baz")
+		if err != nil {
+			t.Error(err)
+		}
+		if len(a) != 3 {
+			t.Errorf("Expected 3 args, but got %d (%+v)", len(a), a)
+		}
+		if q != orig {
+			t.Error("Expected unchanged query.")
+		}
+	}
+
+	tests = []tr{
+		// too many bindvars;  slice present so should return error during parse
+		{"SELECT * FROM foo WHERE x = ? and y = ?",
+			[]interface{}{"foo", []int{1, 2, 3}, "bar"},
+			0},
+		// empty slice, should return error before parse
+		{"SELECT * FROM foo WHERE x = ?",
+			[]interface{}{[]int{}},
+			0},
+		// too *few* bindvars, should return an error
+		{"SELECT * FROM foo WHERE x = ? AND y in (?)",
+			[]interface{}{[]int{1, 2, 3}},
+			0},
+	}
+	for _, test := range tests {
+		_, _, err := in(test.q, test.args...)
+		if err == nil {
+			t.Error("Expected an error, but got nil.")
+		}
+
+	}
+}
+
 func TestBindStruct(t *testing.T) {
 	var err error
 

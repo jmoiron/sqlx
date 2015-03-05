@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>Illustrated guide to SQLX</title>
+        <title>Illustrated Guide to SQLX</title>
         <link href='http://fonts.googleapis.com/css?family=PT+Sans:400,700' rel='stylesheet' type='text/css'>
         
         <link href="assets/css/prettify.css" rel="stylesheet">
@@ -51,8 +51,7 @@
     
     <h1>Illustrated guide to SQLX</h1>
 <p><a href="https://github.com/jmoiron/sqlx/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"></a></p>
-<p><code>sqlx</code> is a package for Go which provides a set of extensions on top of the excellent built-in <code>database/sql</code> package.<br />
-</p>
+<p><code>sqlx</code> is a package for Go which provides a set of extensions on top of the excellent built-in <code>database/sql</code> package.  </p>
 <p>Examining <em>Go</em> idioms is the focus of this document, so there is no presumption being made that any <em>SQL</em> herein is actually a recommended way to use a database.  It will not cover setting up a Go development environment, basic Go information about syntax or semantics, or SQL itself. </p>
 <p>Finally, the standard <code>err</code> variable will be used to indicate that errors are being returned, but for brevity they will be ignored.  You should make sure to check all errors in an actual program.</p>
 <h2>Resources <a href="#resources" class="permalink" id="resources">&para;</a></h2>
@@ -148,7 +147,7 @@ db.MustExec(cityState, "Singapore", 65)
 db.MustExec(countryCity, "South Africa", "Johannesburg", 27)
 </pre>
 
-<p>The <a href="http://golang.org/pkg/database/sql/#Result">result</a> has two possible pieces of data: <code>LastCreatedId()</code> or <code>RowsAffected()</code>, the availability of which is driver dependent.  In MySQL, for instance, <code>LastCreatedId()</code> will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a row cursor with the <code>RETURNING</code> clause.</p>
+<p>The <a href="http://golang.org/pkg/database/sql/#Result">result</a> has two possible pieces of data: <code>LastInsertedId()</code> or <code>RowsAffected()</code>, the availability of which is driver dependent.  In MySQL, for instance, <code>LastInsertedId()</code> will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the <code>RETURNING</code> clause.</p>
 <p>The <code>?</code> query placeholders, called <code>bindvars</code> internally, are important;  you should <em>always</em> use these to send values to the database, as they will prevent <a href="http://en.wikipedia.org/wiki/SQL_injection">SQL injection</a> attacks.  databse/sql does not attempt <em>any</em> validation on the query text;  it is sent to the server as is, along with the encoded parameters; and in fact, unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific;  MySQL uses the <code>?</code> variant shown above, PostgreSQL requires an enumerated <code>$1</code>, <code>$2</code>, etc bindvar syntax, and SQLite accepts either.  Oracle uses a <code>:name</code> syntax, and still other databases may vary.  You can use the <code>sqlx.DB.Rebind(string) string</code> function with the <code>?</code> bindvar syntax to get a query which is suitable for execution on your current database type.</p>
 <h3>Query <a href="#query" class="permalink" id="query">&para;</a></h3>
 <p>Query is the primary interface in database/sql to run queries which return row results.  It returns an <code>sql.Rows</code> object and an error:</p>
@@ -164,8 +163,7 @@ for rows.Next() {
 }
 </pre>
 
-<p>The Rows type is more like a database cursor than a materialized list of results.  Although the driver may buffer the actual network traffic on its own, iterating via <code>Next()</code> is a good way to bound the memory usage of large queries return results, as you're only scanning a single row at a time.  <code>Scan()</code> uses <a href="http://golang.org/pkg/reflect">reflect</a> to map sql column return types to Go types like <code>string</code>, <code>[]byte</code>, et al.<br />
-</p>
+<p>The Rows type is more like a database cursor than a materialized list of results.  Although the driver may buffer the actual network traffic on its own, iterating via <code>Next()</code> is a good way to bound the memory usage of large queries return results, as you're only scanning a single row at a time.  <code>Scan()</code> uses <a href="http://golang.org/pkg/reflect">reflect</a> to map sql column return types to Go types like <code>string</code>, <code>[]byte</code>, et al.  </p>
 <p>The error returned by Query is any error that might have happened while preparing or executing on the server.  This can include grabbing a bad connection from the pool, although database/sql will <a href="http://golang.org/src/pkg/database/sql/sql.go?s=23888:23957#L885">retry 10 times</a> to attempt to find or create a working connection.  Generally, the error will be due to bad SQL syntax, type mismatches, or incorrect field and table names.</p>
 <p>In most cases, Rows.Scan will copy the data it gets from the driver, as it is not aware of how the driver may reuse its buffers.  The special type <code>sql.RawBytes</code> can be used to get a <em>zero-copy</em> slice of bytes from the actual data returned by the driver.  After the next call to Next(), such a value is no longer valid, as that memory might have been overwritten by the driver.</p>
 <p>The connection used by the Query remains active until <em>either</em> all rows are exhausted by the iteration via Next, or <code>rows.Close()</code> is called, at which point it is released.  For more information, see the section on <a href="#connectionPool">the connection pool</a>.</p>
@@ -193,8 +191,7 @@ var telcode int
 err = row.Scan(&telcode)
 </pre>
 
-<p>Unlike Query, QueryRow returns a Row type result with no error, making it safe to chain the Scan off of the return.  If there was an error executing the query, that error is returned by Scan.  If there are no rows, Scan returns <code>sql.ErrNoRows</code>.  If the scan itself fails (eg. due to type mismatch), that error is also returned.<br />
-</p>
+<p>Unlike Query, QueryRow returns a Row type result with no error, making it safe to chain the Scan off of the return.  If there was an error executing the query, that error is returned by Scan.  If there are no rows, Scan returns <code>sql.ErrNoRows</code>.  If the scan itself fails (eg. due to type mismatch), that error is also returned.  </p>
 <p>The Rows struct internal to the Row result is Closed upon Scan, meaning that the connection used by QueryRow is kept open until the result is scanned.  It also means that <code>sql.RawBytes</code> is not usable here, since the referenced memory belongs to the driver and may already be invalid by the time control is returned to the caller.</p>
 <p>The sqlx extension <code>QueryRowx</code> will return an sqlx.Row instead of an sql.Row, and it implements the same scanning extensions as Rows, outlined above and in the <a href="#advancedScanning">advanced scanning section</a>:</p>
 <pre class="prettyprint linenums">

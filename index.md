@@ -114,7 +114,7 @@ db.MustExec(cityState, "Singapore", 65)
 db.MustExec(countryCity, "South Africa", "Johannesburg", 27)
 ```
 
-The [result](http://golang.org/pkg/database/sql/#Result) has two possible pieces of data: `LastCreatedId()` or `RowsAffected()`, the availability of which is driver dependent.  In MySQL, for instance, `LastCreatedId()` will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a row cursor with the `RETURNING` clause.
+The [result](http://golang.org/pkg/database/sql/#Result) has two possible pieces of data: `LastInsertedId()` or `RowsAffected()`, the availability of which is driver dependent.  In MySQL, for instance, `LastInsertedId()` will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the `RETURNING` clause.
 
 The `?` query placeholders, called `bindvars` internally, are important;  you should *always* use these to send values to the database, as they will prevent [SQL injection](http://en.wikipedia.org/wiki/SQL_injection) attacks.  databse/sql does not attempt *any* validation on the query text;  it is sent to the server as is, along with the encoded parameters; and in fact, unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific;  MySQL uses the `?` variant shown above, PostgreSQL requires an enumerated `$1`, `$2`, etc bindvar syntax, and SQLite accepts either.  Oracle uses a `:name` syntax, and still other databases may vary.  You can use the `sqlx.DB.Rebind(string) string` function with the `?` bindvar syntax to get a query which is suitable for execution on your current database type.
 

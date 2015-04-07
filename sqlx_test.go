@@ -1275,7 +1275,6 @@ func TestIn(t *testing.T) {
 		if err == nil {
 			t.Error("Expected an error, but got nil.")
 		}
-
 	}
 }
 
@@ -1404,7 +1403,6 @@ func TestEmbeddedLiterals(t *testing.T) {
 		if *target2.K != "one" {
 			t.Errorf("Expected target2.K to be `one`, got `%v`", target2.K)
 		}
-
 	})
 }
 
@@ -1421,7 +1419,6 @@ func BenchmarkBindStruct(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		bindStruct(DOLLAR, q1, am, mapper())
-		//bindMap(QUESTION, q1, am)
 	}
 }
 
@@ -1437,7 +1434,6 @@ func BenchmarkBindMap(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		bindMap(DOLLAR, q1, am)
-		//bindMap(QUESTION, q1, am)
 	}
 }
 

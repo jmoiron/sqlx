@@ -33,11 +33,10 @@ func BindType(driverName string) int {
 // FIXME: this should be able to be tolerant of escaped ?'s in queries without
 // losing much speed, and should be to avoid confusion.
 
-// FIXME: this is now produces the wrong results for oracle's NAMED bindtype
-
 // Rebind a query from the default bindtype (QUESTION) to the target bindtype.
 func Rebind(bindType int, query string) string {
-	if bindType != DOLLAR {
+	switch bindType {
+	case QUESTION, UNKNOWN:
 		return query
 	}
 
@@ -47,7 +46,12 @@ func Rebind(bindType int, query string) string {
 	j := 1
 	for _, b := range qb {
 		if b == '?' {
-			rqb = append(rqb, '$')
+			switch bindType {
+			case DOLLAR:
+				rqb = append(rqb, '$')
+			case NAMED:
+				rqb = append(rqb, ':', 'a', 'r', 'g')
+			}
 			for _, b := range strconv.Itoa(j) {
 				rqb = append(rqb, byte(b))
 			}
@@ -63,7 +67,6 @@ func Rebind(bindType int, query string) string {
 // much simpler and should be more resistant to odd unicode, but it is twice as
 // slow.  Kept here for benchmarking purposes and to possibly replace Rebind if
 // problems arise with its somewhat naive handling of unicode.
-
 func rebindBuff(bindType int, query string) string {
 	if bindType != DOLLAR {
 		return query
@@ -85,10 +88,10 @@ func rebindBuff(bindType int, query string) string {
 	return rqb.String()
 }
 
-// in expands query parms in args, returning the modified query string and
-// a new list of args passable to Exec/Query/etc
-
-func in(query string, args ...interface{}) (string, []interface{}, error) {
+// In expands slice query params in args, returning the modified query string
+// and a new list of args passable to Exec/Query/etc.  It requires queries using
+// the '?' bindvar and returns queries using the '?' bindvar.
+func In(query string, args ...interface{}) (string, []interface{}, error) {
 	// TODO: validate this short circuit as actually saving any time..
 	type slice struct {
 		v reflect.Value

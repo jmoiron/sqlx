@@ -1078,6 +1078,7 @@ func TestDoNotPanicOnConnect(t *testing.T) {
 		t.Errorf("Should return error when using bogus driverName")
 	}
 }
+
 func TestRebind(t *testing.T) {
 	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
@@ -1091,6 +1092,20 @@ func TestRebind(t *testing.T) {
 
 	if s2 != `INSERT INTO foo (a, b, c) VALUES ($1, $2, "foo"), ("Hi", $3, $4)` {
 		t.Errorf("q2 failed")
+	}
+
+	s1 = Rebind(NAMED, q1)
+	s2 = Rebind(NAMED, q2)
+
+	ex1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES ` +
+		`(:arg1, :arg2, :arg3, :arg4, :arg5, :arg6, :arg7, :arg8, :arg9, :arg10)`
+	if s1 != ex1 {
+		t.Error("q1 failed on Named params")
+	}
+
+	ex2 := `INSERT INTO foo (a, b, c) VALUES (:arg1, :arg2, "foo"), ("Hi", :arg3, :arg4)`
+	if s2 != ex2 {
+		t.Error("q2 failed on Named params")
 	}
 }
 
@@ -1212,7 +1227,7 @@ func TestIn(t *testing.T) {
 			8},
 	}
 	for _, test := range tests {
-		q, a, err := in(test.q, test.args...)
+		q, a, err := In(test.q, test.args...)
 		if err != nil {
 			t.Error(err)
 		}
@@ -1229,7 +1244,7 @@ func TestIn(t *testing.T) {
 	// might not work, but we shouldn't parse if we don't need to
 	{
 		orig := "SELECT * FROM foo WHERE x = ? AND y = ?"
-		q, a, err := in(orig, "foo", "bar", "baz")
+		q, a, err := In(orig, "foo", "bar", "baz")
 		if err != nil {
 			t.Error(err)
 		}
@@ -1256,7 +1271,7 @@ func TestIn(t *testing.T) {
 			0},
 	}
 	for _, test := range tests {
-		_, _, err := in(test.q, test.args...)
+		_, _, err := In(test.q, test.args...)
 		if err == nil {
 			t.Error("Expected an error, but got nil.")
 		}

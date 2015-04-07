@@ -287,8 +287,8 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 }
 
 // Bind binds a struct or a map to a query with named parameters.
-func BindNamed(bindType int, query string, arg interface{}) (string, []interface{}, error) {
-	return bindNamedMapper(bindType, query, arg, mapper())
+func BindNamed(query string, arg interface{}) (string, []interface{}, error) {
+	return bindNamedMapper(QUESTION, query, arg, mapper())
 }
 
 func bindNamedMapper(bindType int, query string, arg interface{}, m *reflectx.Mapper) (string, []interface{}, error) {

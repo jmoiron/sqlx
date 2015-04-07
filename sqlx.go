@@ -279,7 +279,8 @@ func (db *DB) Unsafe() *DB {
 
 // BindNamed binds a query using the DB driver's bindvar type.
 func (db *DB) BindNamed(query string, arg interface{}) (string, []interface{}, error) {
-	return BindNamed(BindType(db.driverName), query, arg)
+	q, a, err := BindNamed(query, arg)
+	return db.Rebind(q), a, err
 }
 
 // NamedQuery using this DB.
@@ -377,7 +378,8 @@ func (tx *Tx) Unsafe() *Tx {
 
 // BindNamed binds a query within a transaction's bindvar type.
 func (tx *Tx) BindNamed(query string, arg interface{}) (string, []interface{}, error) {
-	return BindNamed(BindType(tx.driverName), query, arg)
+	q, a, err := BindNamed(query, arg)
+	return tx.Rebind(q), a, err
 }
 
 // NamedQuery within a transaction.

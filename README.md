@@ -239,7 +239,7 @@ simply shown in an example:
         log.Fatal(err)
     }
 
-    type Person {
+    type Person struct {
         Name string
     }
     var p Person

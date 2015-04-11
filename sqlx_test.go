@@ -1276,6 +1276,33 @@ func TestIn(t *testing.T) {
 			t.Error("Expected an error, but got nil.")
 		}
 	}
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		//tx.MustExec(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
+		//tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
+		//tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
+		telcodes := []int{852, 65}
+		q := "SELECT * FROM place WHERE telcode IN(?) ORDER BY telcode"
+		query, args, err := In(q, telcodes)
+		if err != nil {
+			t.Error(err)
+		}
+		query = db.Rebind(query)
+		places := []Place{}
+		err = db.Select(&places, query, args...)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(places) != 2 {
+			t.Fatal("Expecting 2 results, got %d", len(places))
+		}
+		if places[0].TelCode != 65 {
+			t.Errorf("Expecting singapore first, but got %#v", places[0])
+		}
+		if places[1].TelCode != 852 {
+			t.Errorf("Expecting hong kong second, but got %#v", places[1])
+		}
+	})
 }
 
 func TestBindStruct(t *testing.T) {

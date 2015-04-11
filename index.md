@@ -300,7 +300,40 @@ err = stmt.Get(&p, 852)
 
 The standard sql.Tx object also has a `Stmt()` method which returns a transaction-specific statement from a pre-existing one.  sqlx.Tx has a `Stmtx` version which will create a new transaction specific `sqlx.Stmt` from an existing sql.Stmt *or* sqlx.Stmt.
 
-## Named Queries <a href="#namedParams" class="permalink" id="namedParams">&para;</a>
+## Query Helpers
+
+The `database/sql` package does not do anything with your actual query text.  This makes it trivial to use backend-specific features in your code;  you can write queries just as you would write them in your database prompt.  While this is very flexible, it makes writing certain kinds of queries difficult.
+
+### "In" Queries <a href="#inQueries" class="permalink" id="inQueries">&para;</a>
+
+Because `database/sql` does not inspect your query and it passes your arguments directly to the driver, it makes it makes dealing with queries with IN clauses difficult:
+
+```sql
+SELECT * FROM users WHERE level IN (?);
+```
+
+When this gets prepared as a statement on the backend, the bindvar `?` will only correspond to a *single* argument, but what is often desired is for that to be a variable number of arguments depending on the length of some slice, eg:
+
+```go
+var levels = []int{4, 6, 7}
+rows, err := db.Query("SELECT * FROM users WHERE level IN (?);", levels)
+```
+
+This pattern is possible by first processing the query with `sqlx.In`:
+
+```go
+var levels = []int{4, 6, 7}
+query, args, err := sqlx.In("SELECT * FROM users WHERE level IN (?);", levels)
+
+// sqlx.In returns queries with the `?` bindvar, we can rebind it for our backend
+query = db.Rebind(query)
+rows, err := db.Query(query, args...)
+```
+
+What `sqlx.In` does is expand any bindvars in the query passed to it that correspond to a slice in the arguments to the length of that slice, and then append those slice elements to a new arglist.  It does this with the `?` bindvar only;  you can use `db.Rebind` to get a query suitable for your backend.
+
+
+### Named Queries <a href="#namedParams" class="permalink" id="namedParams">&para;</a>
 
 Named queries are common to many other database packages.  They allow you to use a bindvar syntax which refers to the names of struct fields or map keys to bind variables a query, rather than having to refer to everything positionally.  The struct field naming conventions follow that of `StructScan`, using the `NameMapper` and the `db` struct tag.  There are two extra query verbs related to named queries:
 
@@ -332,8 +365,18 @@ nstmt, err := db.PrepareNamed(`SELECT * FROM place WHERE telcode > :telcode`)
 err = nstmt.Select(&pp, p)
 ```
 
-Named query support is implemented by parsing the query for the `:param` syntax and replacing it with the bindvar supported by the underlying database, then performing the mapping at execution, so it is usable on any database that sqlx supports.
+Named query support is implemented by parsing the query for the `:param` syntax and replacing it with the bindvar supported by the underlying database, then performing the mapping at execution, so it is usable on any database that sqlx supports.  You can also use `sqlx.Named`, which uses the `?` bindvar, and can be composed with `sqlx.In`:
 
+```go
+arg := map[string]interface{}{
+    "published": true,
+    "authors": []{8, 19, 32, 44},
+}
+query, args, err := sqlx.Named("SELECT * FROM articles WHERE published=:published AND author_id IN (:authors)", arg)
+query, args, err := sqlx.In(query, args...)
+query = db.Rebind(query)
+db.Query(query, args...)
+```
 
 ## Advanced Scanning <a href="#advancedScanning" class="permalink" id="advancedScanning">&para;</a>
 

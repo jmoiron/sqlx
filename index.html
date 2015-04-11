@@ -301,7 +301,32 @@ err = stmt.Get(&p, 852)
 </pre>
 
 <p>The standard sql.Tx object also has a <code>Stmt()</code> method which returns a transaction-specific statement from a pre-existing one.  sqlx.Tx has a <code>Stmtx</code> version which will create a new transaction specific <code>sqlx.Stmt</code> from an existing sql.Stmt <em>or</em> sqlx.Stmt.</p>
-<h2>Named Queries <a href="#namedParams" class="permalink" id="namedParams">&para;</a></h2>
+<h2>Query Helpers</h2>
+<p>The <code>database/sql</code> package does not do anything with your actual query text.  This makes it trivial to use backend-specific features in your code;  you can write queries just as you would write them in your database prompt.  While this is very flexible, it makes writing certain kinds of queries difficult.</p>
+<h3>"In" Queries <a href="#inQueries" class="permalink" id="inQueries">&para;</a></h3>
+<p>Because <code>database/sql</code> does not inspect your query and it passes your arguments directly to the driver, it makes it makes dealing with queries with IN clauses difficult:</p>
+<pre class="prettyprint linenums">
+SELECT * FROM users WHERE level IN (?);
+</pre>
+
+<p>When this gets prepared as a statement on the backend, the bindvar <code>?</code> will only correspond to a <em>single</em> argument, but what is often desired is for that to be a variable number of arguments depending on the length of some slice, eg:</p>
+<pre class="prettyprint linenums">
+var levels = []int{4, 6, 7}
+rows, err := db.Query("SELECT * FROM users WHERE level IN (?);", levels)
+</pre>
+
+<p>This pattern is possible by first processing the query with <code>sqlx.In</code>:</p>
+<pre class="prettyprint linenums">
+var levels = []int{4, 6, 7}
+query, args, err := sqlx.In("SELECT * FROM users WHERE level IN (?);", levels)
+
+// sqlx.In returns queries with the `?` bindvar, we can rebind it for our backend
+query = db.Rebind(query)
+rows, err := db.Query(query, args...)
+</pre>
+
+<p>What <code>sqlx.In</code> does is expand any bindvars in the query passed to it that correspond to a slice in the arguments to the length of that slice, and then append those slice elements to a new arglist.  It does this with the <code>?</code> bindvar only;  you can use <code>db.Rebind</code> to get a query suitable for your backend.</p>
+<h3>Named Queries <a href="#namedParams" class="permalink" id="namedParams">&para;</a></h3>
 <p>Named queries are common to many other database packages.  They allow you to use a bindvar syntax which refers to the names of struct fields or map keys to bind variables a query, rather than having to refer to everything positionally.  The struct field naming conventions follow that of <code>StructScan</code>, using the <code>NameMapper</code> and the <code>db</code> struct tag.  There are two extra query verbs related to named queries:</p>
 <ul>
 <li><code>NamedQuery(...) (*sqlx.Rows, error)</code> - like Queryx, but with named bindvars</li>
@@ -331,7 +356,18 @@ nstmt, err := db.PrepareNamed(`SELECT * FROM place WHERE telcode > :telcode`)
 err = nstmt.Select(&pp, p)
 </pre>
 
-<p>Named query support is implemented by parsing the query for the <code>:param</code> syntax and replacing it with the bindvar supported by the underlying database, then performing the mapping at execution, so it is usable on any database that sqlx supports.</p>
+<p>Named query support is implemented by parsing the query for the <code>:param</code> syntax and replacing it with the bindvar supported by the underlying database, then performing the mapping at execution, so it is usable on any database that sqlx supports.  You can also use <code>sqlx.Named</code>, which uses the <code>?</code> bindvar, and can be composed with <code>sqlx.In</code>:</p>
+<pre class="prettyprint linenums">
+arg := map[string]interface{}{
+    "published": true,
+    "authors": []{8, 19, 32, 44},
+}
+query, args, err := sqlx.Named("SELECT * FROM articles WHERE published=:published AND author_id IN (:authors)", arg)
+query, args, err := sqlx.In(query, args...)
+query = db.Rebind(query)
+db.Query(query, args...)
+</pre>
+
 <h2>Advanced Scanning <a href="#advancedScanning" class="permalink" id="advancedScanning">&para;</a></h2>
 <p><code>StructScan</code> is deceptively sophisticated.  It supports embedded structs, and assigns to fields using the same precedence rules that Go uses for embedded attribute and method access.  A common use of this is sharing common parts of a table model among many tables, eg:</p>
 <pre class="prettyprint linenums">

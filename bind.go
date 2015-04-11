@@ -88,61 +88,62 @@ func rebindBuff(bindType int, query string) string {
 	return rqb.String()
 }
 
-// In expands slice query params in args, returning the modified query string
-// and a new list of args passable to Exec/Query/etc.  It requires queries using
-// the '?' bindvar and returns queries using the '?' bindvar.
+// In expands slice values in args, returning the modified query string
+// and a new arg list that can be executed by a database. The `query` should
+// use the `?` bindVar.  The return value uses the `?` bindVar.
 func In(query string, args ...interface{}) (string, []interface{}, error) {
-	// TODO: validate this short circuit as actually saving any time..
-	type slice struct {
-		v reflect.Value
-		t reflect.Type
-		l int
+	type ra struct {
+		v       reflect.Value
+		t       reflect.Type
+		isSlice bool
 	}
-	slices := make([]*slice, 0, len(args))
+	ras := make([]ra, 0, len(args))
 	for _, arg := range args {
 		v := reflect.ValueOf(arg)
 		t, _ := baseType(v.Type(), reflect.Slice)
-		if t != nil {
-			slices = append(slices, &slice{v, t, v.Len()})
-		} else {
-			slices = append(slices, nil)
-		}
+		ras = append(ras, ra{v, t, t != nil})
 	}
-	numArgs := 0
+
 	anySlices := false
-	for _, s := range slices {
-		if s != nil {
+	for _, s := range ras {
+		if s.isSlice {
 			anySlices = true
-			numArgs += s.l
-			if s.l == 0 {
+			if s.v.Len() == 0 {
 				return "", nil, errors.New("empty slice passed to 'in' query")
 			}
-		} else {
-			numArgs++
 		}
 	}
 
-	// if there's no slice kind args at all, just return the original query & args
+	// don't do any parsing if there aren't any slices;  note that this means
+	// some errors that we might have caught below will not be returned.
 	if !anySlices {
 		return query, args, nil
 	}
 
-	a := make([]interface{}, 0, numArgs)
+	var a []interface{}
 	var buf bytes.Buffer
 	var pos int
+
 	for _, r := range query {
 		if r == '?' {
-			// XXX: we have probably done something quite wrong here
-			if pos >= len(slices) {
+			if pos >= len(ras) {
+				// if this argument wasn't passed, lets return an error;  this is
+				// not actually how database/sql Exec/Query works, but since we are
+				// creating an argument list programmatically, we want to be able
+				// to catch these programmer errors earlier.
 				return "", nil, errors.New("number of bindVars exceeds arguments")
-			} else if slices[pos] != nil {
-				for i := 0; i < slices[pos].l-1; i++ {
+			} else if ras[pos].isSlice {
+				// if this argument is a slice, expand the slice into arguments and
+				// assume that the bindVars should be comma separated.
+				length := ras[pos].v.Len()
+				for i := 0; i < length-1; i++ {
 					buf.Write([]byte("?, "))
-					a = append(a, slices[pos].v.Index(i).Interface())
+					a = append(a, ras[pos].v.Index(i).Interface())
 				}
-				a = append(a, slices[pos].v.Index(slices[pos].l-1).Interface())
+				a = append(a, ras[pos].v.Index(length-1).Interface())
 				buf.WriteRune('?')
 			} else {
+				// a normal argument, procede as normal.
 				a = append(a, args[pos])
 				buf.WriteRune(r)
 			}
@@ -152,7 +153,7 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		}
 	}
 
-	if pos != len(slices) {
+	if pos != len(ras) {
 		return "", nil, errors.New("number of bindVars less than number arguments")
 	}
 

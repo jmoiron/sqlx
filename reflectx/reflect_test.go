@@ -70,16 +70,15 @@ func TestEmbedded(t *testing.T) {
 
 func TestTagNameMapping(t *testing.T) {
 	type Strategy struct {
-		StrategyId   string `protobuf:"bytes,1,opt,name=strategy_id" json:"strategy_id,omitempty"`
+		StrategyID   string `protobuf:"bytes,1,opt,name=strategy_id" json:"strategy_id,omitempty"`
 		StrategyName string
 	}
 
 	m := NewMapperTagFunc("json", strings.ToUpper, func(value string) string {
 		if strings.Contains(value, ",") {
 			return strings.Split(value, ",")[0]
-		} else {
-			return value
 		}
+		return value
 	})
 	strategy := Strategy{"1", "Alpah"}
 	mapping := m.TypeMap(reflect.TypeOf(strategy))

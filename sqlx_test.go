@@ -519,13 +519,13 @@ func TestNamedQuery(t *testing.T) {
 		// queries and NamedStmt queries, which use different code paths internally.
 		old := *db.Mapper
 
-		type JsonPerson struct {
+		type JSONPerson struct {
 			FirstName sql.NullString `json:"FIRST"`
 			LastName  sql.NullString `json:"last_name"`
 			Email     sql.NullString
 		}
 
-		jp := JsonPerson{
+		jp := JSONPerson{
 			FirstName: sql.NullString{"ben", true},
 			LastName:  sql.NullString{"smith", true},
 			Email:     sql.NullString{"ben@smith.com", true},
@@ -551,7 +551,7 @@ func TestNamedQuery(t *testing.T) {
 
 		// Checks that a person pulled out of the db matches the one we put in
 		check := func(t *testing.T, rows *Rows) {
-			jp = JsonPerson{}
+			jp = JSONPerson{}
 			for rows.Next() {
 				err = rows.StructScan(&jp)
 				if err != nil {
@@ -619,7 +619,7 @@ func TestNilInserts(t *testing.T) {
 
 	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
 		type TT struct {
-			Id    int
+			ID    int
 			Value *string
 		}
 		var v, v2 TT
@@ -627,14 +627,14 @@ func TestNilInserts(t *testing.T) {
 
 		db.MustExec(r(`INSERT INTO tt (id) VALUES (1)`))
 		db.Get(&v, r(`SELECT * FROM tt`))
-		if v.Id != 1 {
-			t.Errorf("Expecting id of 1, got %v", v.Id)
+		if v.ID != 1 {
+			t.Errorf("Expecting id of 1, got %v", v.ID)
 		}
 		if v.Value != nil {
 			t.Errorf("Expecting NULL to map to nil, got %s", v.Value)
 		}
 
-		v.Id = 2
+		v.ID = 2
 		// NOTE: this incidentally uncovered a bug which was that named queries with
 		// pointer destinations would not work if the passed value here was not addressable,
 		// as reflectx.FieldByIndexes attempts to allocate nil pointer receivers for
@@ -643,8 +643,8 @@ func TestNilInserts(t *testing.T) {
 		db.NamedExec(`INSERT INTO tt (id, value) VALUES (:id, :value)`, v)
 
 		db.Get(&v2, r(`SELECT * FROM tt WHERE id=2`))
-		if v.Id != v2.Id {
-			t.Errorf("%v != %v", v.Id, v2.Id)
+		if v.ID != v2.ID {
+			t.Errorf("%v != %v", v.ID, v2.ID)
 		}
 		if v2.Value != nil {
 			t.Errorf("Expecting NULL to map to nil, got %s", v.Value)

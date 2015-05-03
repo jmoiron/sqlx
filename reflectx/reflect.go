@@ -1,4 +1,4 @@
-// Package reflect implements extensions to the standard reflect lib suitable
+// Package reflectx implements extensions to the standard reflect lib suitable
 // for implementing marshaling and unmarshaling packages.  The main Mapper type
 // allows for Go-compatible named atribute access, including accessing embedded
 // struct attributes and the ability to use  functions and struct tags to
@@ -121,7 +121,7 @@ func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {
 	return vals
 }
 
-// Traversals by name returns a slice of int slices which represent the struct
+// TraversalsByName returns a slice of int slices which represent the struct
 // traversals for each mapped name.  Panics if t is not a struct or Indirectable
 // to a struct.  Returns empty int slice for each name not found.
 func (m *Mapper) TraversalsByName(t reflect.Type, names []string) [][]int {
@@ -177,13 +177,13 @@ func Deref(t reflect.Type) reflect.Type {
 
 // -- helpers & utilities --
 
-type Kinder interface {
+type kinder interface {
 	Kind() reflect.Kind
 }
 
 // mustBe checks a value against a kind, panicing with a reflect.ValueError
 // if the kind isn't that which is required.
-func mustBe(v Kinder, expected reflect.Kind) {
+func mustBe(v kinder, expected reflect.Kind) {
 	k := v.Kind()
 	if k != expected {
 		panic(&reflect.ValueError{Method: methodName(), Kind: k})

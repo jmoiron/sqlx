@@ -181,18 +181,6 @@ type EmbedConflict struct {
 	Person
 }
 
-type Loop1 struct {
-	Person
-}
-
-type Loop2 struct {
-	Loop1
-}
-
-type Loop3 struct {
-	Loop2
-}
-
 type SliceMember struct {
 	Country   string
 	City      sql.NullString
@@ -329,6 +317,10 @@ func TestMissingNames(t *testing.T) {
 }
 
 func TestEmbeddedStructs(t *testing.T) {
+	type Loop1 struct{ Person }
+	type Loop2 struct{ Loop1 }
+	type Loop3 struct{ Loop2 }
+
 	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
 		loadDefaultFixture(db, t)
 		peopleAndPlaces := []PersonPlace{}

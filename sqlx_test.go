@@ -485,9 +485,9 @@ func TestNamedQuery(t *testing.T) {
 		}
 
 		p := Person{
-			FirstName: sql.NullString{"ben", true},
-			LastName:  sql.NullString{"doe", true},
-			Email:     sql.NullString{"ben@doe.com", true},
+			FirstName: sql.NullString{String: "ben", Valid: true},
+			LastName:  sql.NullString{String: "doe", Valid: true},
+			Email:     sql.NullString{String: "ben@doe.com", Valid: true},
 		}
 
 		q1 := `INSERT INTO person (first_name, last_name, email) VALUES (:first_name, :last_name, :email)`
@@ -526,9 +526,9 @@ func TestNamedQuery(t *testing.T) {
 		}
 
 		jp := JSONPerson{
-			FirstName: sql.NullString{"ben", true},
-			LastName:  sql.NullString{"smith", true},
-			Email:     sql.NullString{"ben@smith.com", true},
+			FirstName: sql.NullString{String: "ben", Valid: true},
+			LastName:  sql.NullString{String: "smith", Valid: true},
+			Email:     sql.NullString{String: "ben@smith.com", Valid: true},
 		}
 
 		db.Mapper = reflectx.NewMapperFunc("json", strings.ToUpper)
@@ -631,7 +631,7 @@ func TestNilInserts(t *testing.T) {
 			t.Errorf("Expecting id of 1, got %v", v.ID)
 		}
 		if v.Value != nil {
-			t.Errorf("Expecting NULL to map to nil, got %s", v.Value)
+			t.Errorf("Expecting NULL to map to nil, got %s", *v.Value)
 		}
 
 		v.ID = 2
@@ -647,7 +647,7 @@ func TestNilInserts(t *testing.T) {
 			t.Errorf("%v != %v", v.ID, v2.ID)
 		}
 		if v2.Value != nil {
-			t.Errorf("Expecting NULL to map to nil, got %s", v.Value)
+			t.Errorf("Expecting NULL to map to nil, got %s", *v.Value)
 		}
 	})
 }
@@ -1037,7 +1037,7 @@ func TestUsage(t *testing.T) {
 			t.Error(err)
 		}
 		if *pcount != count {
-			t.Error("expected %d = %d", *pcount, count)
+			t.Errorf("expected %d = %d", *pcount, count)
 		}
 
 		// test Select...
@@ -1294,7 +1294,7 @@ func TestIn(t *testing.T) {
 			t.Error(err)
 		}
 		if len(places) != 2 {
-			t.Fatal("Expecting 2 results, got %d", len(places))
+			t.Fatalf("Expecting 2 results, got %d", len(places))
 		}
 		if places[0].TelCode != 65 {
 			t.Errorf("Expecting singapore first, but got %#v", places[0])

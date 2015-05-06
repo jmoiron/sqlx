@@ -208,8 +208,7 @@ func methodName() string {
 }
 
 type typeQueue struct {
-	t reflect.Type
-	// p []int
+	t  reflect.Type
 	fi *fieldInfo
 }
 
@@ -265,6 +264,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 
 			// bfs search of anonymous embedded structs
 			if f.Anonymous {
+				fi := &fieldInfo{Path: tq.fi.Path}
 				fi.Path = apnd(fi.Path, fieldPos)
 				queue = append(queue, typeQueue{Deref(f.Type), fi})
 				continue
@@ -275,8 +275,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 				continue
 			}
 			// add it to the map at the current position
-			fi.Path = apnd(tq.fi.Path, fieldPos)
-			m[name] = fi
+			m[name] = &fieldInfo{Path: apnd(tq.fi.Path, fieldPos)}
 		}
 	}
 	return m

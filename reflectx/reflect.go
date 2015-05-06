@@ -13,7 +13,14 @@ import (
 	"runtime"
 )
 
-type fieldMap map[string][]int
+type fieldInfo struct {
+	Name    string
+	Path    []int
+	Tag     string
+	Options map[string]string
+}
+
+type fieldMap map[string]*fieldInfo
 
 // Mapper is a general purpose mapper of names to struct fields.  A Mapper
 // behaves like most marshallers, optionally obeying a field tag for name
@@ -79,8 +86,8 @@ func (m *Mapper) FieldMap(v reflect.Value) map[string]reflect.Value {
 
 	r := map[string]reflect.Value{}
 	nm := m.TypeMap(v.Type())
-	for tagName, indexes := range nm {
-		r[tagName] = FieldByIndexes(v, indexes)
+	for tagName, fi := range nm {
+		r[tagName] = FieldByIndexes(v, fi.Path)
 	}
 	return r
 }
@@ -93,11 +100,11 @@ func (m *Mapper) FieldByName(v reflect.Value, name string) reflect.Value {
 	mustBe(v, reflect.Struct)
 
 	nm := m.TypeMap(v.Type())
-	traversal, ok := nm[name]
+	fi, ok := nm[name]
 	if !ok {
 		return *new(reflect.Value)
 	}
-	return FieldByIndexes(v, traversal)
+	return FieldByIndexes(v, fi.Path)
 }
 
 // FieldsByName returns a slice of values corresponding to the slice of names
@@ -111,11 +118,11 @@ func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {
 
 	vals := make([]reflect.Value, 0, len(names))
 	for _, name := range names {
-		traversal, ok := nm[name]
+		fi, ok := nm[name]
 		if !ok {
 			vals = append(vals, *new(reflect.Value))
 		} else {
-			vals = append(vals, FieldByIndexes(v, traversal))
+			vals = append(vals, FieldByIndexes(v, fi.Path))
 		}
 	}
 	return vals
@@ -131,11 +138,11 @@ func (m *Mapper) TraversalsByName(t reflect.Type, names []string) [][]int {
 
 	r := make([][]int, 0, len(names))
 	for _, name := range names {
-		traversal, ok := nm[name]
+		fi, ok := nm[name]
 		if !ok {
 			r = append(r, []int{})
 		} else {
-			r = append(r, traversal)
+			r = append(r, fi.Path)
 		}
 	}
 	return r
@@ -202,7 +209,8 @@ func methodName() string {
 
 type typeQueue struct {
 	t reflect.Type
-	p []int
+	// p []int
+	fi *fieldInfo
 }
 
 // A copying append that creates a new slice each time.
@@ -219,7 +227,7 @@ func apnd(is []int, i int) []int {
 // tagMapFunc to determine the canonical names of fields.
 func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string) string) fieldMap {
 	queue := []typeQueue{}
-	queue = append(queue, typeQueue{Deref(t), []int{}})
+	queue = append(queue, typeQueue{Deref(t), &fieldInfo{}})
 	m := fieldMap{}
 	for len(queue) != 0 {
 		// pop the first item off of the queue
@@ -228,6 +236,10 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 		// iterate through all of its fields
 		for fieldPos := 0; fieldPos < tq.t.NumField(); fieldPos++ {
 			f := tq.t.Field(fieldPos)
+
+			fi := &fieldInfo{}
+			fi.Name = f.Name
+			// TODO: fi.Options ...
 
 			name := f.Tag.Get(tagName)
 			if len(name) == 0 {
@@ -239,6 +251,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 			} else if tagMapFunc != nil {
 				name = tagMapFunc(name)
 			}
+			fi.Tag = name
 
 			// if the name is "-", disabled via a tag, skip it
 			if name == "-" {
@@ -252,7 +265,8 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 
 			// bfs search of anonymous embedded structs
 			if f.Anonymous {
-				queue = append(queue, typeQueue{Deref(f.Type), apnd(tq.p, fieldPos)})
+				fi.Path = apnd(fi.Path, fieldPos)
+				queue = append(queue, typeQueue{Deref(f.Type), fi})
 				continue
 			}
 
@@ -261,7 +275,8 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 				continue
 			}
 			// add it to the map at the current position
-			m[name] = apnd(tq.p, fieldPos)
+			fi.Path = apnd(tq.fi.Path, fieldPos)
+			m[name] = fi
 		}
 	}
 	return m

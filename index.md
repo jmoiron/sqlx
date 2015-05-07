@@ -2,9 +2,9 @@
 
 <a href="https://github.com/jmoiron/sqlx/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"></a>
 
-`sqlx` is a package for Go which provides a set of extensions on top of the excellent built-in `database/sql` package.  
+`sqlx` is a package for Go which provides a set of extensions on top of the excellent built-in `database/sql` package.
 
-Examining *Go* idioms is the focus of this document, so there is no presumption being made that any *SQL* herein is actually a recommended way to use a database.  It will not cover setting up a Go development environment, basic Go information about syntax or semantics, or SQL itself. 
+Examining *Go* idioms is the focus of this document, so there is no presumption being made that any *SQL* herein is actually a recommended way to use a database.  It will not cover setting up a Go development environment, basic Go information about syntax or semantics, or SQL itself.
 
 Finally, the standard `err` variable will be used to indicate that errors are being returned, but for brevity they will be ignored.  You should make sure to check all errors in an actual program.
 
@@ -58,7 +58,7 @@ A `DB` instance is *not* a connection, but an abstraction representing a Databas
 ```go
 var db *sqlx.DB
 
-// exactly the same as the built-in 
+// exactly the same as the built-in
 db = sqlx.Open("sqlite3", ":memory:")
 
 // from a pre-existing sql.DB; note the required driverName
@@ -198,7 +198,7 @@ var telcode int
 err = row.Scan(&telcode)
 ```
 
-Unlike Query, QueryRow returns a Row type result with no error, making it safe to chain the Scan off of the return.  If there was an error executing the query, that error is returned by Scan.  If there are no rows, Scan returns `sql.ErrNoRows`.  If the scan itself fails (eg. due to type mismatch), that error is also returned.  
+Unlike Query, QueryRow returns a Row type result with no error, making it safe to chain the Scan off of the return.  If there was an error executing the query, that error is returned by Scan.  If there are no rows, Scan returns `sql.ErrNoRows`.  If the scan itself fails (eg. due to type mismatch), that error is also returned.
 
 The Rows struct internal to the Row result is Closed upon Scan, meaning that the connection used by QueryRow is kept open until the result is scanned.  It also means that `sql.RawBytes` is not usable here, since the referenced memory belongs to the driver and may already be invalid by the time control is returned to the caller.
 
@@ -306,7 +306,7 @@ The `database/sql` package does not do anything with your actual query text.  Th
 
 ### "In" Queries <a href="#inQueries" class="permalink" id="inQueries">&para;</a>
 
-Because `database/sql` does not inspect your query and it passes your arguments directly to the driver, it makes it makes dealing with queries with IN clauses difficult:
+Because `database/sql` does not inspect your query and it passes your arguments directly to the driver, it makes dealing with queries with IN clauses difficult:
 
 ```sql
 SELECT * FROM users WHERE level IN (?);
@@ -491,7 +491,7 @@ for rows.Next() {
 }
 ```
 
-SliceScan returns an `[]interface{}` of all columns, which can be useful in [situations](http://wts.jmoiron.net) where you are executing queries on behalf of a third party and have no way of knowing what columns may be returned.  MapScan behaves the same way, but maps the column names to interface{} values.  An important caveat here is that the results returned by `rows.Columns()` does not include fully qualified names, such that `SELECT a.id, b.id FROM a NATURAL JOIN b` will result in a Columns result of `[]string{"id", "id"}`, clobbering one of the results in your map. 
+SliceScan returns an `[]interface{}` of all columns, which can be useful in [situations](http://wts.jmoiron.net) where you are executing queries on behalf of a third party and have no way of knowing what columns may be returned.  MapScan behaves the same way, but maps the column names to interface{} values.  An important caveat here is that the results returned by `rows.Columns()` does not include fully qualified names, such that `SELECT a.id, b.id FROM a NATURAL JOIN b` will result in a Columns result of `[]string{"id", "id"}`, clobbering one of the results in your map.
 
 ## Custom Types <a href="#customTypes" class="permalink" id="customTypes">&para;</a>
 

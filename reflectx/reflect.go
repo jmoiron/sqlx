@@ -6,18 +6,50 @@
 //
 package reflectx
 
-import "sync"
+import (
+	"strings"
+
+	"sync"
+)
 
 import (
 	"reflect"
 	"runtime"
 )
 
+/*
+// ANOTHER TAKE... where we parse each tag..
+// dont really want to do this...
+// if anything.. we introduce another map or all the stuff..
+
+type A struct {
+	ID `db:"id,required" json:"id" bond:",pk"`
+}
+
+reflectx.StructTagOptions ... .. hmm
+
+finfo["id"] := {
+	Path: [0],
+	Field: <..the field...>
+	Tags: map[string]Tag{
+		"db": {
+			Name: "id", Options: map[string]string{""}
+		},
+		"json": {
+			Name: "id", Options: {},
+		}
+	}
+}
+
+*/
+
 type fieldInfo struct {
-	Name    string
-	Path    []int
-	Tag     string
-	Options map[string]string
+	Path     []int
+	Field    reflect.StructField
+	Zero     reflect.Value
+	Name     string
+	Options  map[string]string
+	Embedded bool
 }
 
 type fieldMap map[string]*fieldInfo
@@ -225,20 +257,24 @@ func apnd(is []int, i int) []int {
 // getMapping returns a mapping for the t type, using the tagName, mapFunc and
 // tagMapFunc to determine the canonical names of fields.
 func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string) string) fieldMap {
+	m := fieldMap{}
+
 	queue := []typeQueue{}
 	queue = append(queue, typeQueue{Deref(t), &fieldInfo{}})
-	m := fieldMap{}
+
 	for len(queue) != 0 {
 		// pop the first item off of the queue
 		tq := queue[0]
 		queue = queue[1:]
+
 		// iterate through all of its fields
 		for fieldPos := 0; fieldPos < tq.t.NumField(); fieldPos++ {
 			f := tq.t.Field(fieldPos)
 
 			fi := &fieldInfo{}
-			fi.Name = f.Name
-			// TODO: fi.Options ...
+			fi.Field = f
+			fi.Zero = reflect.New(f.Type).Elem()
+			fi.Options = map[string]string{}
 
 			name := f.Tag.Get(tagName)
 			if len(name) == 0 {
@@ -250,7 +286,21 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 			} else if tagMapFunc != nil {
 				name = tagMapFunc(name)
 			}
-			fi.Tag = name
+
+			parts := strings.Split(name, ",")
+			if len(parts) > 1 {
+				name = parts[0]
+				for _, opt := range parts[1:] {
+					kv := strings.Split(opt, "=")
+					if len(kv) > 1 {
+						fi.Options[kv[0]] = kv[1]
+					} else {
+						fi.Options[kv[0]] = ""
+					}
+				}
+			}
+			fi.Name = name
+			// log.Println("name:", name, fi)
 
 			// if the name is "-", disabled via a tag, skip it
 			if name == "-" {
@@ -264,9 +314,14 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 
 			// bfs search of anonymous embedded structs
 			if f.Anonymous {
-				fi := &fieldInfo{Path: tq.fi.Path}
+				fiq := *fi
+				fiq.Path = apnd(tq.fi.Path, fieldPos)
+				queue = append(queue, typeQueue{Deref(f.Type), &fiq})
+
+				fi.Embedded = true
 				fi.Path = apnd(fi.Path, fieldPos)
-				queue = append(queue, typeQueue{Deref(f.Type), fi})
+				m[name] = fi
+
 				continue
 			}
 
@@ -275,7 +330,9 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 				continue
 			}
 			// add it to the map at the current position
-			m[name] = &fieldInfo{Path: apnd(tq.fi.Path, fieldPos)}
+			fiq := *fi
+			fiq.Path = apnd(tq.fi.Path, fieldPos)
+			m[name] = &fiq
 		}
 	}
 	return m

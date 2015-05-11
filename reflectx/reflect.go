@@ -8,14 +8,10 @@ package reflectx
 
 import (
 	"fmt"
-	"strings"
-
-	"sync"
-)
-
-import (
 	"reflect"
 	"runtime"
+	"strings"
+	"sync"
 )
 
 type fieldInfo struct {
@@ -57,6 +53,16 @@ func (f fields) GetByTraversal(index []int) (fieldInfo, bool) {
 		}
 	}
 	return fieldInfo{}, false
+}
+
+func (f fields) FieldMap() map[string]fieldInfo {
+	fm := map[string]fieldInfo{}
+	for _, fi := range f {
+		if fi.Path != "" && !fi.Embedded {
+			fm[fi.Path] = fi
+		}
+	}
+	return fm
 }
 
 // Mapper is a general purpose mapper of names to struct fields.  A Mapper

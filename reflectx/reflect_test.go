@@ -19,7 +19,7 @@ func TestBasic(t *testing.T) {
 
 	f := Foo{1, 2, 3}
 	fv := reflect.ValueOf(f)
-	m := NewMapper("")
+	m := NewMapperFunc("", func(s string) string { return s })
 
 	v := m.FieldByName(fv, "A")
 	if ival(v) != f.A {
@@ -51,7 +51,7 @@ func TestBasicEmbedded(t *testing.T) {
 		Bar `db:"Bar"`
 	}
 
-	m := NewMapper("db")
+	m := NewMapperFunc("db", func(s string) string { return s })
 
 	z := Baz{}
 	z.A = 1
@@ -87,17 +87,17 @@ func TestBasicEmbedded(t *testing.T) {
 
 func TestBasicEmbeddedWithTags(t *testing.T) {
 	type Foo struct {
-		A int
+		A int `db:"a"`
 	}
 
 	type Bar struct {
-		Foo
-		B int
+		Foo     // `db:""` is implied for an embedded struct
+		B   int `db:"b"`
 	}
 
 	type Baz struct {
-		A   int
-		Bar `db:""` // an inline path
+		A   int `db:"a"`
+		Bar     // `db:""` is implied for an embedded struct
 	}
 
 	m := NewMapper("db")
@@ -108,11 +108,11 @@ func TestBasicEmbeddedWithTags(t *testing.T) {
 	z.Bar.Foo.A = 3
 	zv := reflect.ValueOf(z)
 
-	v := m.FieldByName(zv, "A")
+	v := m.FieldByName(zv, "a")
 	if ival(v) != z.A {
 		t.Errorf("Expecting %d, got %d", z.A, ival(v))
 	}
-	v = m.FieldByName(zv, "B")
+	v = m.FieldByName(zv, "b")
 	if ival(v) != z.B {
 		t.Errorf("Expecting %d, got %d", z.B, ival(v))
 	}

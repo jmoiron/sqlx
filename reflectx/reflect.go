@@ -292,11 +292,8 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 				tag = f.Tag.Get(tagName)
 				name = tag
 			} else {
-				// Use the name of the field
 				if mapFunc != nil {
 					name = mapFunc(f.Name)
-				} else {
-					name = f.Name
 				}
 			}
 

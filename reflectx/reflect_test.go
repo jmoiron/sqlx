@@ -1,7 +1,6 @@
 package reflectx
 
 import (
-	"log"
 	"reflect"
 	"strings"
 	"testing"
@@ -36,7 +35,57 @@ func TestBasic(t *testing.T) {
 	}
 }
 
-func TestEmbedded(t *testing.T) {
+func TestBasicEmbedded(t *testing.T) {
+	type Foo struct {
+		A int
+	}
+
+	type Bar struct {
+		Foo
+		B int
+		C int `db:"-"`
+	}
+
+	type Baz struct {
+		A   int
+		Bar `db:"Bar"`
+	}
+
+	m := NewMapper("db")
+
+	z := Baz{}
+	z.A = 1
+	z.B = 2
+	z.C = 4
+	z.Bar.Foo.A = 3
+
+	zv := reflect.ValueOf(z)
+	fields := m.TypeMap(reflect.TypeOf(z))
+
+	if len(fields) != 5 {
+		t.Errorf("Expecting 5 fields")
+	}
+
+	v := m.FieldByName(zv, "A")
+	if ival(v) != z.A {
+		t.Errorf("Expecting %d, got %d", z.A, ival(v))
+	}
+	v = m.FieldByName(zv, "Bar.B")
+	if ival(v) != z.Bar.B {
+		t.Errorf("Expecting %d, got %d", z.Bar.B, ival(v))
+	}
+	v = m.FieldByName(zv, "Bar.C")
+	if _, ok := v.Interface().(int); ok {
+		t.Errorf("Expecting Bar.C to not exist")
+	}
+
+	_, ok := fields.GetByPath("Bar.C")
+	if ok {
+		t.Errorf("Bar.C should not exist")
+	}
+}
+
+func TestBasicEmbeddedWithTags(t *testing.T) {
 	type Foo struct {
 		A int
 	}
@@ -47,11 +96,11 @@ func TestEmbedded(t *testing.T) {
 	}
 
 	type Baz struct {
-		A int
-		Bar
+		A   int
+		Bar `db:""` // an inline path
 	}
 
-	m := NewMapper("")
+	m := NewMapper("db")
 
 	z := Baz{}
 	z.A = 1
@@ -59,177 +108,229 @@ func TestEmbedded(t *testing.T) {
 	z.Bar.Foo.A = 3
 	zv := reflect.ValueOf(z)
 
-	// m.FieldInfoByName(zv, "A")
-
-	// .. or m.FieldByName() .. make this return the fieldInfo object...?1
-
 	v := m.FieldByName(zv, "A")
 	if ival(v) != z.A {
-		t.Errorf("Expecting %d, got %d", ival(v), z.A)
+		t.Errorf("Expecting %d, got %d", z.A, ival(v))
 	}
 	v = m.FieldByName(zv, "B")
 	if ival(v) != z.B {
-		t.Errorf("Expecting %d, got %d", ival(v), z.B)
+		t.Errorf("Expecting %d, got %d", z.B, ival(v))
 	}
 }
 
-func TestFieldInfo(t *testing.T) {
-	type Foo struct {
-		A int `db:"a,omitempty"`
-	}
-
-	type Bar struct {
-		Foo
-		B int `db:"b"`
-	}
-
+func TestFlatTags(t *testing.T) {
 	m := NewMapper("db")
 
-	b := Bar{}
-	b.A = 1
-	b.B = 2
-	bv := reflect.ValueOf(b)
-
-	v := m.FieldByName(bv, "a") // .. hmm.. so this returns the reflect.Value .. but we want options for a field..
-	if ival(v) != b.A {
-		t.Errorf("Expecting %d, got %d", ival(v), b.A)
+	type Asset struct {
+		Title string `db:"title"`
 	}
-	v = m.FieldByName(bv, "b")
-	if ival(v) != b.B {
-		t.Errorf("Expecting %d, got %d", ival(v), b.B)
+	type Post struct {
+		Author string `db:"author,required"`
+		Asset  Asset  `db:""`
 	}
+	// Post columns: (author title)
 
-	// hmm.. return it all separately,
-	// then, have a flatten thing..? the returns output
-	// is already flattened..
+	post := Post{Author: "Joe", Asset: Asset{Title: "Hello"}}
+	pv := reflect.ValueOf(post)
 
-	//---------
-	// a question would be, how does reflect traverse a struct now with other structs..?
-	//---------
-
-	// .... hmm.. so we get "a" from BV ....  cuz of the inline..
-	// its like, ",inline" isnt even necessary
-
-	// log.Println("--- BAR ---")
-	// fi := m.TypeMap(reflect.TypeOf(b))
-	// log.Println(fi)
-	// log.Println("====>", fi["b"])
-	// log.Println("====>", fi["a"])
-
-	//--
-	// Test Bar2
-
-	// so in this case... right now.. the db:"f" does nothing at all..
-	// but it kinda should...
-	// what would be an ideal response...?
-
-	type Bar2 struct {
-		Foo `db:"f"`
-		B   int `db:"b"`
+	v := m.FieldByName(pv, "author")
+	if v.Interface().(string) != post.Author {
+		t.Errorf("Expecting %s, got %s", post.Author, v.Interface().(string))
 	}
-
-	b2 := Bar2{}
-	b2.A = 1
-	b2.B = 2
-	bv2 := reflect.ValueOf(b2)
-	v = m.FieldByName(bv2, "a")
-	if ival(v) != b2.A {
-		t.Errorf("Expecting %d, got %d", ival(v), b2.A)
+	v = m.FieldByName(pv, "title")
+	if v.Interface().(string) != post.Asset.Title {
+		t.Errorf("Expecting %s, got %s", post.Asset.Title, v.Interface().(string))
 	}
-	v = m.FieldByName(bv2, "b")
-	if ival(v) != b2.B {
-		t.Errorf("Expecting %d, got %d", ival(v), b2.B)
+}
+
+func TestNestedStruct(t *testing.T) {
+	m := NewMapper("db")
+
+	type Details struct {
+		Active bool `db:"active"`
 	}
-
-	//--
-	// Test Bar3
-
-	type Bar3 struct {
-		F Foo `db:"f"`
-		B int `db:"b"`
+	type Asset struct {
+		Title   string  `db:"title"`
+		Details Details `db:"details"`
 	}
-
-	b3 := Bar3{}
-	b3.F.A = 1
-	b3.B = 2
-	bv3 := reflect.ValueOf(b3)
-
-	v = m.FieldByName(bv3, "f")
-	if v.Type() != reflect.TypeOf(Foo{}) {
-		t.Errorf("Expecting %d, got %d", reflect.TypeOf(Foo{}), v.Type())
+	type Post struct {
+		Author string `db:"author,required"`
+		Asset  `db:"asset"`
 	}
-	vfoo := v.Interface().(Foo)
-	if vfoo.A != b3.F.A {
-		t.Errorf("Expecting %d, got %d", b3.F.A, vfoo)
+	// Post columns: (author asset.title asset.details.active)
+
+	post := Post{
+		Author: "Joe",
+		Asset:  Asset{Title: "Hello", Details: Details{Active: true}},
 	}
+	pv := reflect.ValueOf(post)
 
-	v = m.FieldByName(bv2, "b")
-	if ival(v) != b3.B {
-		t.Errorf("Expecting %d, got %d", b3.B, ival(v))
+	v := m.FieldByName(pv, "author")
+	if v.Interface().(string) != post.Author {
+		t.Errorf("Expecting %s, got %s", post.Author, v.Interface().(string))
 	}
+	v = m.FieldByName(pv, "title")
+	if _, ok := v.Interface().(string); ok {
+		t.Errorf("Expecting field to not exist")
+	}
+	v = m.FieldByName(pv, "asset.title")
+	if v.Interface().(string) != post.Asset.Title {
+		t.Errorf("Expecting %s, got %s", post.Asset.Title, v.Interface().(string))
+	}
+	v = m.FieldByName(pv, "asset.details.active")
+	if v.Interface().(bool) != post.Asset.Details.Active {
+		t.Errorf("Expecting %s, got %s", post.Asset.Details.Active, v.Interface().(bool))
+	}
+}
 
-	//--
-	// Test Bar4
+func TestInlineStruct(t *testing.T) {
+	m := NewMapperTagFunc("db", strings.ToLower, nil)
 
-	type Bar4 struct {
-		Foo `db:"-"`
-		B   int `db:"b"`
+	type Employee struct {
+		Name string
+		Id   int
+	}
+	type Boss Employee
+	type person struct {
+		Employee `db:"employee"` // is implied
+		Boss     `db:"boss"`     // is implied
+	}
+	// employees columns: (employee.name employee.id boss.name boss.id)
+
+	em := person{Employee: Employee{Name: "Joe", Id: 2}, Boss: Boss{Name: "Dick", Id: 1}}
+	ev := reflect.ValueOf(em)
+
+	fields := m.TypeMap(reflect.TypeOf(em))
+	if len(fields) != 6 {
+		t.Errorf("Expecting 6 fields")
 	}
 
-	b4 := Bar4{}
-	b4.A = 1
-	b4.B = 2
-	bv4 := reflect.ValueOf(b4)
-	v = m.FieldByName(bv4, "a")
-	if v.IsValid() {
-		t.Errorf("should not be defined..")
+	v := m.FieldByName(ev, "employee.name")
+	if v.Interface().(string) != em.Employee.Name {
+		t.Errorf("Expecting %s, got %s", em.Employee.Name, v.Interface().(string))
 	}
-	v = m.FieldByName(bv4, "b")
-	if ival(v) != b4.B {
-		t.Errorf("Expecting %d, got %d", ival(v), b4.B)
+	v = m.FieldByName(ev, "boss.id")
+	if ival(v) != em.Boss.Id {
+		t.Errorf("Expecting %s, got %s", em.Boss.Id, ival(v))
 	}
+}
 
-	// ...
+// TODO: .. question was.. inline struct mapping.. can this be cached..?
+// *********** what is the performance hit..?
+
+func TestFieldsEmbedded(t *testing.T) {
+	m := NewMapper("db")
 
 	type Person struct {
-		Name string
+		Name string `db:"name"`
 	}
 	type Place struct {
-		Name string
+		Name string `db:"name"`
+	}
+	type Article struct {
+		Title string `db:"title"`
 	}
 	type PP struct {
-		Person `db:"person,prefix=person."`
-		Place  `db:",prefix=place."`
+		Person  `db:"person,required"`
+		Place   `db:",someflag"`
+		Article `db:",required"`
 	}
-
-	log.Println("** PPV **")
+	// PP columns: (person.name name title)
 
 	pp := PP{}
 	pp.Person.Name = "Peter"
 	pp.Place.Name = "Toronto"
+	pp.Article.Title = "Best city ever"
 
-	fi := m.TypeMap(reflect.TypeOf(pp))
-	log.Println("FI:", fi)
-	for k, i := range fi {
-		log.Println("key:", k, "=", i)
-	}
+	fields := m.TypeMap(reflect.TypeOf(pp))
+	// for i, f := range fields {
+	// 	log.Println(i, f)
+	// }
 
 	ppv := reflect.ValueOf(pp)
 
-	v = m.FieldByName(ppv, "person") // should return Person struct
-	if v.Type() != reflect.TypeOf(Person{}) {
-		t.Errorf("Expecting %d, got %d", reflect.TypeOf(Person{}), v.Type())
+	v := m.FieldByName(ppv, "person.name")
+	if v.Interface().(string) != pp.Person.Name {
+		t.Errorf("Expecting %s, got %s", pp.Person.Name, v.Interface().(string))
 	}
 
-	v = m.FieldByName(ppv, "Name") // should return Place.Name string
+	v = m.FieldByName(ppv, "name")
+	if v.Interface().(string) != pp.Place.Name {
+		t.Errorf("Expecting %s, got %s", pp.Place.Name, v.Interface().(string))
+	}
 
-	// ??
-	v = m.FieldByName(ppv, "Place") // should return Place struct
-	// .. Path: [1], Embedded: true, Name: "", Options: {"prefix":"place."}, Field: Place{..}
-	// .. no name, uses default of the FieldName .....?
-	// or, dont return a fieldMap .. returns []fieldInfo with a .Get() .. what does json do..?
+	v = m.FieldByName(ppv, "title")
+	if v.Interface().(string) != pp.Article.Title {
+		t.Errorf("Expecting %s, got %s", pp.Article.Title, v.Interface().(string))
+	}
 
-	v = m.FieldByName(ppv, "person.Name") //
+	fi, _ := fields.GetByPath("person")
+	if _, ok := fi.Options["required"]; !ok {
+		t.Errorf("Expecting required option to be set")
+	}
+	if !fi.Embedded {
+		t.Errorf("Expecting field to be embedded")
+	}
+	if len(fi.Index) != 1 || fi.Index[0] != 0 {
+		t.Errorf("Expecting index to be [0]")
+	}
+
+	fi, ok := fields.GetByPath("person.name")
+	if !ok {
+		t.Errorf("Expecting person.name to exist")
+	}
+	if fi.Path != "person.name" {
+		t.Errorf("Expecting %s, got %s", "person.name", fi.Path)
+	}
+
+	fi, ok = fields.GetByTraversal([]int{1, 0})
+	if !ok {
+		t.Errorf("Expecting traveral to exist")
+	}
+	if fi.Path != "name" {
+		t.Errorf("Expecting %s, got %s", "name", fi.Path)
+	}
+
+	fi, ok = fields.GetByTraversal([]int{2})
+	if !ok {
+		t.Errorf("Expecting traversal to exist")
+	}
+	if _, ok := fi.Options["required"]; !ok {
+		t.Errorf("Expecting required option to be set")
+	}
+
+	trs := m.TraversalsByName(reflect.TypeOf(pp), []string{"person.name", "name", "title"})
+	if !reflect.DeepEqual(trs, [][]int{{0, 0}, {1, 0}, {2, 0}}) {
+		t.Errorf("Expecting traversal: %v", trs)
+	}
+}
+
+func TestPtrFields(t *testing.T) {
+	m := NewMapperTagFunc("db", strings.ToLower, nil)
+	type Asset struct {
+		Title string
+	}
+	type Post struct {
+		*Asset `db:"asset"`
+		Author string
+	}
+
+	post := &Post{Author: "Joe", Asset: &Asset{Title: "Hiyo"}}
+	pv := reflect.ValueOf(post)
+
+	fields := m.TypeMap(reflect.TypeOf(post))
+	if len(fields) != 3 {
+		t.Errorf("Expecting 3 fields")
+	}
+
+	v := m.FieldByName(pv, "asset.title")
+	if v.Interface().(string) != post.Asset.Title {
+		t.Errorf("Expecting %s, got %s", post.Asset.Title, v.Interface().(string))
+	}
+	v = m.FieldByName(pv, "author")
+	if v.Interface().(string) != post.Author {
+		t.Errorf("Expecting %s, got %s", post.Author, v.Interface().(string))
+	}
 }
 
 func TestTagNameMapping(t *testing.T) {
@@ -248,7 +349,7 @@ func TestTagNameMapping(t *testing.T) {
 	mapping := m.TypeMap(reflect.TypeOf(strategy))
 
 	for _, key := range []string{"strategy_id", "STRATEGYNAME"} {
-		if _, ok := mapping[key]; !ok {
+		if _, ok := mapping.GetByPath(key); !ok {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}
 	}
@@ -266,7 +367,7 @@ func TestMapping(t *testing.T) {
 	mapping := m.TypeMap(reflect.TypeOf(p))
 
 	for _, key := range []string{"id", "name", "wears_glasses"} {
-		if _, ok := mapping[key]; !ok {
+		if _, ok := mapping.GetByPath(key); !ok {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}
 	}
@@ -279,10 +380,9 @@ func TestMapping(t *testing.T) {
 	s := SportsPerson{Weight: 100, Age: 30, Person: p}
 	mapping = m.TypeMap(reflect.TypeOf(s))
 	for _, key := range []string{"id", "name", "wears_glasses", "weight", "age"} {
-		if _, ok := mapping[key]; !ok {
+		if _, ok := mapping.GetByPath(key); !ok {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}
-
 	}
 
 	type RugbyPlayer struct {
@@ -294,33 +394,14 @@ func TestMapping(t *testing.T) {
 	r := RugbyPlayer{12, true, false, s}
 	mapping = m.TypeMap(reflect.TypeOf(r))
 	for _, key := range []string{"id", "name", "wears_glasses", "weight", "age", "position", "is_intense"} {
-		if _, ok := mapping[key]; !ok {
+		if _, ok := mapping.GetByPath(key); !ok {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}
 	}
 
-	if _, ok := mapping["isallblack"]; ok {
+	if _, ok := mapping.GetByPath("isallblack"); ok {
 		t.Errorf("Expecting to ignore `IsAllBlack` field")
 	}
-
-	type EmbeddedLiteral struct {
-		Embedded struct {
-			Person   string
-			Position int
-		}
-		IsIntense bool
-	}
-
-	e := EmbeddedLiteral{}
-	mapping = m.TypeMap(reflect.TypeOf(e))
-	//fmt.Printf("Mapping: %#v\n", mapping)
-
-	//f := FieldByIndexes(reflect.ValueOf(e), mapping["isintense"])
-	//fmt.Println(f, f.Interface())
-
-	//tbn := m.TraversalsByName(reflect.TypeOf(e), []string{"isintense"})
-	//fmt.Printf("%#v\n", tbn)
-
 }
 
 type E1 struct {

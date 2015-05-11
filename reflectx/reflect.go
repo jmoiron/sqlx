@@ -7,6 +7,7 @@
 package reflectx
 
 import (
+	"fmt"
 	"strings"
 
 	"sync"
@@ -17,34 +18,9 @@ import (
 	"runtime"
 )
 
-/*
-// ANOTHER TAKE... where we parse each tag..
-// dont really want to do this...
-// if anything.. we introduce another map or all the stuff..
-
-type A struct {
-	ID `db:"id,required" json:"id" bond:",pk"`
-}
-
-reflectx.StructTagOptions ... .. hmm
-
-finfo["id"] := {
-	Path: [0],
-	Field: <..the field...>
-	Tags: map[string]Tag{
-		"db": {
-			Name: "id", Options: map[string]string{""}
-		},
-		"json": {
-			Name: "id", Options: {},
-		}
-	}
-}
-
-*/
-
 type fieldInfo struct {
-	Path     []int
+	Index    []int
+	Path     string
 	Field    reflect.StructField
 	Zero     reflect.Value
 	Name     string
@@ -52,13 +28,42 @@ type fieldInfo struct {
 	Embedded bool
 }
 
-type fieldMap map[string]*fieldInfo
+type fields []fieldInfo
+
+func (f fields) GetByPath(path string) (fieldInfo, bool) {
+	for _, fi := range f {
+		if fi.Path == path {
+			return fi, true
+		}
+	}
+	return fieldInfo{}, false
+}
+
+func (f fields) GetByTraversal(index []int) (fieldInfo, bool) {
+	n := len(index)
+	for _, fi := range f {
+		if len(fi.Index) != n {
+			continue
+		}
+		same := true
+		for i, v := range fi.Index {
+			if index[i] != v {
+				same = false
+				break
+			}
+		}
+		if same {
+			return fi, true
+		}
+	}
+	return fieldInfo{}, false
+}
 
 // Mapper is a general purpose mapper of names to struct fields.  A Mapper
 // behaves like most marshallers, optionally obeying a field tag for name
 // mapping and a function to provide a basic mapping of fields to names.
 type Mapper struct {
-	cache      map[reflect.Type]fieldMap
+	cache      map[reflect.Type]fields
 	tagName    string
 	tagMapFunc func(string) string
 	mapFunc    func(string) string
@@ -69,7 +74,7 @@ type Mapper struct {
 // by tagName.  If tagName is the empty string, it is ignored.
 func NewMapper(tagName string) *Mapper {
 	return &Mapper{
-		cache:   make(map[reflect.Type]fieldMap),
+		cache:   make(map[reflect.Type]fields),
 		tagName: tagName,
 	}
 }
@@ -79,7 +84,7 @@ func NewMapper(tagName string) *Mapper {
 // have values like "name,omitempty".
 func NewMapperTagFunc(tagName string, mapFunc, tagMapFunc func(string) string) *Mapper {
 	return &Mapper{
-		cache:      make(map[reflect.Type]fieldMap),
+		cache:      make(map[reflect.Type]fields),
 		tagName:    tagName,
 		mapFunc:    mapFunc,
 		tagMapFunc: tagMapFunc,
@@ -91,7 +96,7 @@ func NewMapperTagFunc(tagName string, mapFunc, tagMapFunc func(string) string) *
 // for any other field, the mapped name will be f(field.Name)
 func NewMapperFunc(tagName string, f func(string) string) *Mapper {
 	return &Mapper{
-		cache:   make(map[reflect.Type]fieldMap),
+		cache:   make(map[reflect.Type]fields),
 		tagName: tagName,
 		mapFunc: f,
 	}
@@ -99,7 +104,7 @@ func NewMapperFunc(tagName string, f func(string) string) *Mapper {
 
 // TypeMap returns a mapping of field strings to int slices representing
 // the traversal down the struct to reach the field.
-func (m *Mapper) TypeMap(t reflect.Type) fieldMap {
+func (m *Mapper) TypeMap(t reflect.Type) fields {
 	m.mutex.Lock()
 	mapping, ok := m.cache[t]
 	if !ok {
@@ -112,17 +117,17 @@ func (m *Mapper) TypeMap(t reflect.Type) fieldMap {
 
 // FieldMap returns the mapper's mapping of field names to reflect values.  Panics
 // if v's Kind is not Struct, or v is not Indirectable to a struct kind.
-func (m *Mapper) FieldMap(v reflect.Value) map[string]reflect.Value {
-	v = reflect.Indirect(v)
-	mustBe(v, reflect.Struct)
+// func (m *Mapper) FieldMap(v reflect.Value) map[string]reflect.Value {
+// 	v = reflect.Indirect(v)
+// 	mustBe(v, reflect.Struct)
 
-	r := map[string]reflect.Value{}
-	nm := m.TypeMap(v.Type())
-	for tagName, fi := range nm {
-		r[tagName] = FieldByIndexes(v, fi.Path)
-	}
-	return r
-}
+// 	r := map[string]reflect.Value{}
+// 	nm := m.TypeMap(v.Type())
+// 	for tagName, fi := range nm {
+// 		r[tagName] = FieldByIndexes(v, fi.Index)
+// 	}
+// 	return r
+// }
 
 // FieldByName returns a field by the its mapped name as a reflect.Value.
 // Panics if v's Kind is not Struct or v is not Indirectable to a struct Kind.
@@ -131,12 +136,12 @@ func (m *Mapper) FieldByName(v reflect.Value, name string) reflect.Value {
 	v = reflect.Indirect(v)
 	mustBe(v, reflect.Struct)
 
-	nm := m.TypeMap(v.Type())
-	fi, ok := nm[name]
+	tm := m.TypeMap(v.Type())
+	fi, ok := tm.GetByPath(name)
 	if !ok {
-		return *new(reflect.Value)
+		return v
 	}
-	return FieldByIndexes(v, fi.Path)
+	return FieldByIndexes(v, fi.Index)
 }
 
 // FieldsByName returns a slice of values corresponding to the slice of names
@@ -146,15 +151,14 @@ func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {
 	v = reflect.Indirect(v)
 	mustBe(v, reflect.Struct)
 
-	nm := m.TypeMap(v.Type())
-
+	tm := m.TypeMap(v.Type())
 	vals := make([]reflect.Value, 0, len(names))
 	for _, name := range names {
-		fi, ok := nm[name]
+		fi, ok := tm.GetByPath(name)
 		if !ok {
 			vals = append(vals, *new(reflect.Value))
 		} else {
-			vals = append(vals, FieldByIndexes(v, fi.Path))
+			vals = append(vals, FieldByIndexes(v, fi.Index))
 		}
 	}
 	return vals
@@ -166,15 +170,15 @@ func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {
 func (m *Mapper) TraversalsByName(t reflect.Type, names []string) [][]int {
 	t = Deref(t)
 	mustBe(t, reflect.Struct)
-	nm := m.TypeMap(t)
+	tm := m.TypeMap(t)
 
 	r := make([][]int, 0, len(names))
 	for _, name := range names {
-		fi, ok := nm[name]
+		fi, ok := tm.GetByPath(name)
 		if !ok {
 			r = append(r, []int{})
 		} else {
-			r = append(r, fi.Path)
+			r = append(r, fi.Index)
 		}
 	}
 	return r
@@ -241,7 +245,8 @@ func methodName() string {
 
 type typeQueue struct {
 	t  reflect.Type
-	fi *fieldInfo
+	fi fieldInfo
+	pp string // Parent path
 }
 
 // A copying append that creates a new slice each time.
@@ -256,11 +261,11 @@ func apnd(is []int, i int) []int {
 
 // getMapping returns a mapping for the t type, using the tagName, mapFunc and
 // tagMapFunc to determine the canonical names of fields.
-func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string) string) fieldMap {
-	m := fieldMap{}
+func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string) string) fields {
+	m := []fieldInfo{}
 
 	queue := []typeQueue{}
-	queue = append(queue, typeQueue{Deref(t), &fieldInfo{}})
+	queue = append(queue, typeQueue{Deref(t), fieldInfo{}, ""})
 
 	for len(queue) != 0 {
 		// pop the first item off of the queue
@@ -271,20 +276,22 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 		for fieldPos := 0; fieldPos < tq.t.NumField(); fieldPos++ {
 			f := tq.t.Field(fieldPos)
 
-			fi := &fieldInfo{}
+			fi := fieldInfo{}
 			fi.Field = f
 			fi.Zero = reflect.New(f.Type).Elem()
 			fi.Options = map[string]string{}
 
-			name := f.Tag.Get(tagName)
-			if len(name) == 0 {
+			var tag, name string
+			if tagName != "" && strings.Contains(string(f.Tag), tagName+":") {
+				tag = f.Tag.Get(tagName)
+				name = tag
+			} else {
+				// Use the name of the field
 				if mapFunc != nil {
 					name = mapFunc(f.Name)
 				} else {
 					name = f.Name
 				}
-			} else if tagMapFunc != nil {
-				name = tagMapFunc(name)
 			}
 
 			parts := strings.Split(name, ",")
@@ -299,8 +306,19 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 					}
 				}
 			}
+
+			// TODO: what to do with this...?
+			if tagMapFunc != nil {
+				tag = tagMapFunc(tag)
+			}
+
 			fi.Name = name
-			// log.Println("name:", name, fi)
+
+			if tq.pp == "" || (tq.pp == "" && tag == "") {
+				fi.Path = fi.Name
+			} else {
+				fi.Path = fmt.Sprintf("%s.%s", tq.pp, fi.Name)
+			}
 
 			// if the name is "-", disabled via a tag, skip it
 			if name == "-" {
@@ -314,25 +332,24 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 
 			// bfs search of anonymous embedded structs
 			if f.Anonymous {
-				fiq := *fi
-				fiq.Path = apnd(tq.fi.Path, fieldPos)
-				queue = append(queue, typeQueue{Deref(f.Type), &fiq})
+				var pp string
+				if tag != "" {
+					pp = fi.Path
+				}
 
+				fiq := fi
+				fiq.Index = apnd(tq.fi.Index, fieldPos)
+				queue = append(queue, typeQueue{Deref(f.Type), fiq, pp})
 				fi.Embedded = true
-				fi.Path = apnd(fi.Path, fieldPos)
-				m[name] = fi
-
-				continue
+			} else if fi.Zero.Kind() == reflect.Struct {
+				fiq := fi
+				fiq.Index = apnd(tq.fi.Index, fieldPos)
+				queue = append(queue, typeQueue{Deref(f.Type), fiq, fiq.Path})
 			}
 
-			// if the name is shadowed by an earlier identical name in the search, skip it
-			if _, ok := m[name]; ok {
-				continue
-			}
-			// add it to the map at the current position
-			fiq := *fi
-			fiq.Path = apnd(tq.fi.Path, fieldPos)
-			m[name] = &fiq
+			fiq := fi
+			fiq.Index = apnd(tq.fi.Index, fieldPos)
+			m = append(m, fiq)
 		}
 	}
 	return m

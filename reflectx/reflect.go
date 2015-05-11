@@ -58,7 +58,7 @@ func (f fields) GetByTraversal(index []int) (fieldInfo, bool) {
 func (f fields) FieldMap() map[string]fieldInfo {
 	fm := map[string]fieldInfo{}
 	for _, fi := range f {
-		if fi.Path != "" && !fi.Embedded {
+		if fi.Name != "" && !fi.Embedded {
 			fm[fi.Path] = fi
 		}
 	}

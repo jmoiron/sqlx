@@ -192,8 +192,8 @@ func TestInlineStruct(t *testing.T) {
 	}
 	type Boss Employee
 	type person struct {
-		Employee `db:"employee"` // is implied
-		Boss     `db:"boss"`     // is implied
+		Employee `db:"employee"`
+		Boss     `db:"boss"`
 	}
 	// employees columns: (employee.name employee.id boss.name boss.id)
 

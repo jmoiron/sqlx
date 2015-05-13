@@ -41,9 +41,9 @@ func TestBasicEmbedded(t *testing.T) {
 	}
 
 	type Bar struct {
-		Foo
-		B int
-		C int `db:"-"`
+		Foo // `db:""` is implied for an embedded struct
+		B   int
+		C   int `db:"-"`
 	}
 
 	type Baz struct {
@@ -62,9 +62,13 @@ func TestBasicEmbedded(t *testing.T) {
 	zv := reflect.ValueOf(z)
 	fields := m.TypeMap(reflect.TypeOf(z))
 
-	if len(fields) != 5 {
+	if len(fields.Index) != 5 {
 		t.Errorf("Expecting 5 fields")
 	}
+
+	// for _, fi := range fields.index {
+	// 	log.Println(fi)
+	// }
 
 	v := m.FieldByName(zv, "A")
 	if ival(v) != z.A {
@@ -74,13 +78,17 @@ func TestBasicEmbedded(t *testing.T) {
 	if ival(v) != z.Bar.B {
 		t.Errorf("Expecting %d, got %d", z.Bar.B, ival(v))
 	}
+	v = m.FieldByName(zv, "Bar.A")
+	if ival(v) != z.Bar.Foo.A {
+		t.Errorf("Expecting %d, got %d", z.Bar.Foo.A, ival(v))
+	}
 	v = m.FieldByName(zv, "Bar.C")
 	if _, ok := v.Interface().(int); ok {
 		t.Errorf("Expecting Bar.C to not exist")
 	}
 
-	_, ok := fields.GetByPath("Bar.C")
-	if ok {
+	fi := fields.GetByPath("Bar.C")
+	if fi != nil {
 		t.Errorf("Bar.C should not exist")
 	}
 }
@@ -106,11 +114,21 @@ func TestBasicEmbeddedWithTags(t *testing.T) {
 	z.A = 1
 	z.B = 2
 	z.Bar.Foo.A = 3
+
 	zv := reflect.ValueOf(z)
+	fields := m.TypeMap(reflect.TypeOf(z))
+
+	if len(fields.Index) != 5 {
+		t.Errorf("Expecting 5 fields")
+	}
+
+	// for _, fi := range fields.index {
+	// 	log.Println(fi)
+	// }
 
 	v := m.FieldByName(zv, "a")
-	if ival(v) != z.A {
-		t.Errorf("Expecting %d, got %d", z.A, ival(v))
+	if ival(v) != z.Bar.Foo.A { // the dominant field
+		t.Errorf("Expecting %d, got %d", z.Bar.Foo.A, ival(v))
 	}
 	v = m.FieldByName(zv, "b")
 	if ival(v) != z.B {
@@ -201,7 +219,7 @@ func TestInlineStruct(t *testing.T) {
 	ev := reflect.ValueOf(em)
 
 	fields := m.TypeMap(reflect.TypeOf(em))
-	if len(fields) != 6 {
+	if len(fields.Index) != 6 {
 		t.Errorf("Expecting 6 fields")
 	}
 
@@ -264,7 +282,7 @@ func TestFieldsEmbedded(t *testing.T) {
 		t.Errorf("Expecting %s, got %s", pp.Article.Title, v.Interface().(string))
 	}
 
-	fi, _ := fields.GetByPath("person")
+	fi := fields.GetByPath("person")
 	if _, ok := fi.Options["required"]; !ok {
 		t.Errorf("Expecting required option to be set")
 	}
@@ -275,24 +293,24 @@ func TestFieldsEmbedded(t *testing.T) {
 		t.Errorf("Expecting index to be [0]")
 	}
 
-	fi, ok := fields.GetByPath("person.name")
-	if !ok {
+	fi = fields.GetByPath("person.name")
+	if fi == nil {
 		t.Errorf("Expecting person.name to exist")
 	}
 	if fi.Path != "person.name" {
 		t.Errorf("Expecting %s, got %s", "person.name", fi.Path)
 	}
 
-	fi, ok = fields.GetByTraversal([]int{1, 0})
-	if !ok {
+	fi = fields.GetByTraversal([]int{1, 0})
+	if fi == nil {
 		t.Errorf("Expecting traveral to exist")
 	}
 	if fi.Path != "name" {
 		t.Errorf("Expecting %s, got %s", "name", fi.Path)
 	}
 
-	fi, ok = fields.GetByTraversal([]int{2})
-	if !ok {
+	fi = fields.GetByTraversal([]int{2})
+	if fi == nil {
 		t.Errorf("Expecting traversal to exist")
 	}
 	if _, ok := fi.Options["required"]; !ok {
@@ -319,7 +337,7 @@ func TestPtrFields(t *testing.T) {
 	pv := reflect.ValueOf(post)
 
 	fields := m.TypeMap(reflect.TypeOf(post))
-	if len(fields) != 3 {
+	if len(fields.Index) != 3 {
 		t.Errorf("Expecting 3 fields")
 	}
 
@@ -349,7 +367,7 @@ func TestTagNameMapping(t *testing.T) {
 	mapping := m.TypeMap(reflect.TypeOf(strategy))
 
 	for _, key := range []string{"strategy_id", "STRATEGYNAME"} {
-		if _, ok := mapping.GetByPath(key); !ok {
+		if fi := mapping.GetByPath(key); fi == nil {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}
 	}
@@ -367,7 +385,7 @@ func TestMapping(t *testing.T) {
 	mapping := m.TypeMap(reflect.TypeOf(p))
 
 	for _, key := range []string{"id", "name", "wears_glasses"} {
-		if _, ok := mapping.GetByPath(key); !ok {
+		if fi := mapping.GetByPath(key); fi == nil {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}
 	}
@@ -380,7 +398,7 @@ func TestMapping(t *testing.T) {
 	s := SportsPerson{Weight: 100, Age: 30, Person: p}
 	mapping = m.TypeMap(reflect.TypeOf(s))
 	for _, key := range []string{"id", "name", "wears_glasses", "weight", "age"} {
-		if _, ok := mapping.GetByPath(key); !ok {
+		if fi := mapping.GetByPath(key); fi == nil {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}
 	}
@@ -394,12 +412,12 @@ func TestMapping(t *testing.T) {
 	r := RugbyPlayer{12, true, false, s}
 	mapping = m.TypeMap(reflect.TypeOf(r))
 	for _, key := range []string{"id", "name", "wears_glasses", "weight", "age", "position", "is_intense"} {
-		if _, ok := mapping.GetByPath(key); !ok {
+		if fi := mapping.GetByPath(key); fi == nil {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}
 	}
 
-	if _, ok := mapping.GetByPath("isallblack"); ok {
+	if fi := mapping.GetByPath("isallblack"); fi != nil {
 		t.Errorf("Expecting to ignore `IsAllBlack` field")
 	}
 }

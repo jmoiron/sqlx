@@ -14,7 +14,7 @@ import (
 	"sync"
 )
 
-type field struct {
+type Field struct {
 	Index    []int
 	Path     string
 	Field    reflect.StructField
@@ -24,13 +24,13 @@ type field struct {
 	Embedded bool
 }
 
-type fields struct {
-	Index []*field
-	Paths map[string]*field
-	Names map[string]*field
+type Fields struct {
+	Index []*Field
+	Paths map[string]*Field
+	Names map[string]*Field
 }
 
-func (f fields) GetByPath(path string) *field {
+func (f Fields) GetByPath(path string) *Field {
 	if fi, ok := f.Paths[path]; ok {
 		return fi
 	} else {
@@ -38,7 +38,7 @@ func (f fields) GetByPath(path string) *field {
 	}
 }
 
-func (f fields) GetByTraversal(index []int) *field {
+func (f Fields) GetByTraversal(index []int) *Field {
 	n := len(index)
 	for _, fi := range f.Index {
 		if len(fi.Index) != n {
@@ -62,7 +62,7 @@ func (f fields) GetByTraversal(index []int) *field {
 // behaves like most marshallers, optionally obeying a field tag for name
 // mapping and a function to provide a basic mapping of fields to names.
 type Mapper struct {
-	cache      map[reflect.Type]*fields
+	cache      map[reflect.Type]*Fields
 	tagName    string
 	tagMapFunc func(string) string
 	mapFunc    func(string) string
@@ -73,7 +73,7 @@ type Mapper struct {
 // by tagName.  If tagName is the empty string, it is ignored.
 func NewMapper(tagName string) *Mapper {
 	return &Mapper{
-		cache:   make(map[reflect.Type]*fields),
+		cache:   make(map[reflect.Type]*Fields),
 		tagName: tagName,
 	}
 }
@@ -83,7 +83,7 @@ func NewMapper(tagName string) *Mapper {
 // have values like "name,omitempty".
 func NewMapperTagFunc(tagName string, mapFunc, tagMapFunc func(string) string) *Mapper {
 	return &Mapper{
-		cache:      make(map[reflect.Type]*fields),
+		cache:      make(map[reflect.Type]*Fields),
 		tagName:    tagName,
 		mapFunc:    mapFunc,
 		tagMapFunc: tagMapFunc,
@@ -95,7 +95,7 @@ func NewMapperTagFunc(tagName string, mapFunc, tagMapFunc func(string) string) *
 // for any other field, the mapped name will be f(field.Name)
 func NewMapperFunc(tagName string, f func(string) string) *Mapper {
 	return &Mapper{
-		cache:   make(map[reflect.Type]*fields),
+		cache:   make(map[reflect.Type]*Fields),
 		tagName: tagName,
 		mapFunc: f,
 	}
@@ -103,7 +103,7 @@ func NewMapperFunc(tagName string, f func(string) string) *Mapper {
 
 // TypeMap returns a mapping of field strings to int slices representing
 // the traversal down the struct to reach the field.
-func (m *Mapper) TypeMap(t reflect.Type) *fields {
+func (m *Mapper) TypeMap(t reflect.Type) *Fields {
 	m.mutex.Lock()
 	mapping, ok := m.cache[t]
 	if !ok {
@@ -244,7 +244,7 @@ func methodName() string {
 
 type typeQueue struct {
 	t  reflect.Type
-	fi *field
+	fi *Field
 	pp string // Parent path
 }
 
@@ -260,11 +260,11 @@ func apnd(is []int, i int) []int {
 
 // getMapping returns a mapping for the t type, using the tagName, mapFunc and
 // tagMapFunc to determine the canonical names of fields.
-func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string) string) *fields {
-	m := []*field{}
+func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string) string) *Fields {
+	m := []*Field{}
 
 	queue := []typeQueue{}
-	queue = append(queue, typeQueue{Deref(t), &field{}, ""})
+	queue = append(queue, typeQueue{Deref(t), &Field{}, ""})
 
 	for len(queue) != 0 {
 		// pop the first item off of the queue
@@ -275,7 +275,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 		for fieldPos := 0; fieldPos < tq.t.NumField(); fieldPos++ {
 			f := tq.t.Field(fieldPos)
 
-			fi := &field{}
+			fi := &Field{}
 			fi.Field = f
 			fi.Zero = reflect.New(f.Type).Elem()
 			fi.Options = map[string]string{}
@@ -349,7 +349,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 		}
 	}
 
-	flds := &fields{Index: m, Paths: map[string]*field{}, Names: map[string]*field{}}
+	flds := &Fields{Index: m, Paths: map[string]*Field{}, Names: map[string]*Field{}}
 	for _, fi := range flds.Index {
 		flds.Paths[fi.Path] = fi
 		if fi.Name != "" && !fi.Embedded {

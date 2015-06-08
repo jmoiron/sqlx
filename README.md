@@ -111,7 +111,7 @@ type Place struct {
 }
 
 func main() {
-    // this connects & tries a simple 'SELECT 1', panics on error
+    // this Pings the database trying to connect, panics on error
     // use sqlx.Open() for sql.Open() semantics
     db, err := sqlx.Connect("postgres", "user=foo dbname=bar sslmode=disable")
     if err != nil {

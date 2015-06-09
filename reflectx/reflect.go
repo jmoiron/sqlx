@@ -143,7 +143,7 @@ func (m *Mapper) FieldByName(v reflect.Value, name string) reflect.Value {
 	return FieldByIndexes(v, fi.Index)
 }
 
-// StructMapByName returns a slice of values corresponding to the slice of names
+// FieldsByName returns a slice of values corresponding to the slice of names
 // for the value.  Panics if v's Kind is not Struct or v is not Indirectable
 // to a struct Kind.  Returns zero Value for each name not found.
 func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {

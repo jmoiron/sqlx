@@ -66,7 +66,7 @@ func TestBasicEmbedded(t *testing.T) {
 		t.Errorf("Expecting 5 fields")
 	}
 
-	// for _, fi := range fields.index {
+	// for _, fi := range fields.Index {
 	// 	log.Println(fi)
 	// }
 
@@ -233,9 +233,6 @@ func TestInlineStruct(t *testing.T) {
 	}
 }
 
-// TODO: .. question was.. inline struct mapping.. can this be cached..?
-// *********** what is the performance hit..?
-
 func TestFieldsEmbedded(t *testing.T) {
 	m := NewMapper("db")
 
@@ -348,6 +345,32 @@ func TestPtrFields(t *testing.T) {
 	v = m.FieldByName(pv, "author")
 	if v.Interface().(string) != post.Author {
 		t.Errorf("Expecting %s, got %s", post.Author, v.Interface().(string))
+	}
+}
+
+func TestFieldMap(t *testing.T) {
+	type Foo struct {
+		A int
+		B int
+		C int
+	}
+
+	f := Foo{1, 2, 3}
+	m := NewMapperFunc("db", strings.ToLower)
+
+	fm := m.FieldMap(reflect.ValueOf(f))
+
+	if len(fm) != 3 {
+		t.Errorf("Expecting %d keys, got %d", 3, len(fm))
+	}
+	if fm["a"].Interface().(int) != 1 {
+		t.Errorf("Expecting %d, got %d", 1, ival(fm["a"]))
+	}
+	if fm["b"].Interface().(int) != 2 {
+		t.Errorf("Expecting %d, got %d", 2, ival(fm["b"]))
+	}
+	if fm["c"].Interface().(int) != 3 {
+		t.Errorf("Expecting %d, got %d", 3, ival(fm["c"]))
 	}
 }
 

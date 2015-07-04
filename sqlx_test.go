@@ -58,6 +58,10 @@ func ConnectAll() {
 	TestMysql = mydsn != "skip"
 	TestSqlite = sqdsn != "skip"
 
+	if !strings.Contains(mydsn, "parseTime=true") {
+		mydsn += "?parseTime=true"
+	}
+
 	if TestPostgres {
 		pgdb, err = Connect("postgres", pgdsn)
 		if err != nil {

@@ -14,6 +14,7 @@ import (
 	"sync"
 )
 
+// A FieldInfo is a collection of metadata about a struct field.
 type FieldInfo struct {
 	Index    []int
 	Path     string
@@ -24,21 +25,27 @@ type FieldInfo struct {
 	Embedded bool
 }
 
+// A StructMap is an index of field metadata for a struct.
 type StructMap struct {
 	Index []*FieldInfo
 	Paths map[string]*FieldInfo
 	Names map[string]*FieldInfo
 }
 
+// GetByPath returns a *FieldInfo for a given string path.
 func (f StructMap) GetByPath(path string) *FieldInfo {
-	if fi, ok := f.Paths[path]; ok {
-		return fi
-	} else {
-		return nil
-	}
+	return f.Paths[path]
 }
 
+// GetByTraversal returns a *FieldInfo for a given integer path.  It is
+// analagous to reflect.FieldByIndex.
 func (f StructMap) GetByTraversal(index []int) *FieldInfo {
+	// XXX: this function has a lot worse complexity than the one it replaces.
+	// It should work exactly as FieldByIndexes does below, but instead of
+	// actually traversing a tree it linearly checks a big list of all possible
+	// traversals, which doesn't feel right.  Ideally, StructMap.Index could
+	// be changed to be a Tree, but I'm not sure that's possible since it's
+	// exposed.
 	n := len(index)
 	for _, fi := range f.Index {
 		if len(fi.Index) != n {

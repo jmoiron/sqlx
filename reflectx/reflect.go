@@ -43,12 +43,6 @@ func (f StructMap) GetByPath(path string) *FieldInfo {
 // GetByTraversal returns a *FieldInfo for a given integer path.  It is
 // analagous to reflect.FieldByIndex.
 func (f StructMap) GetByTraversal(index []int) *FieldInfo {
-	// XXX: this function has a lot worse complexity than the one it replaces.
-	// It should work exactly as FieldByIndexes does below, but instead of
-	// actually traversing a tree it linearly checks a big list of all possible
-	// traversals, which doesn't feel right.  Ideally, StructMap.Index could
-	// be changed to be a Tree, but I'm not sure that's possible since it's
-	// exposed.
 	if len(index) == 0 {
 		return nil
 	}

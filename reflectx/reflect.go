@@ -23,10 +23,13 @@ type FieldInfo struct {
 	Name     string
 	Options  map[string]string
 	Embedded bool
+	Children []*FieldInfo
+	Parent   *FieldInfo
 }
 
 // A StructMap is an index of field metadata for a struct.
 type StructMap struct {
+	Tree  *FieldInfo
 	Index []*FieldInfo
 	Paths map[string]*FieldInfo
 	Names map[string]*FieldInfo
@@ -46,23 +49,18 @@ func (f StructMap) GetByTraversal(index []int) *FieldInfo {
 	// traversals, which doesn't feel right.  Ideally, StructMap.Index could
 	// be changed to be a Tree, but I'm not sure that's possible since it's
 	// exposed.
-	n := len(index)
-	for _, fi := range f.Index {
-		if len(fi.Index) != n {
-			continue
-		}
-		same := true
-		for i, v := range fi.Index {
-			if index[i] != v {
-				same = false
-				break
-			}
-		}
-		if same {
-			return fi
-		}
+	if len(index) == 0 {
+		return nil
 	}
-	return nil
+
+	tree := f.Tree
+	for _, i := range index {
+		if i >= len(tree.Children) || tree.Children[i] == nil {
+			return nil
+		}
+		tree = tree.Children[i]
+	}
+	return tree
 }
 
 // Mapper is a general purpose mapper of names to struct fields.  A Mapper
@@ -270,19 +268,21 @@ func apnd(is []int, i int) []int {
 func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string) string) *StructMap {
 	m := []*FieldInfo{}
 
+	root := &FieldInfo{}
 	queue := []typeQueue{}
-	queue = append(queue, typeQueue{Deref(t), &FieldInfo{}, ""})
+	queue = append(queue, typeQueue{Deref(t), root, ""})
 
 	for len(queue) != 0 {
 		// pop the first item off of the queue
 		tq := queue[0]
 		queue = queue[1:]
+		tq.fi.Children = make([]*FieldInfo, tq.t.NumField())
 
 		// iterate through all of its fields
 		for fieldPos := 0; fieldPos < tq.t.NumField(); fieldPos++ {
 			f := tq.t.Field(fieldPos)
 
-			fi := &FieldInfo{}
+			fi := FieldInfo{}
 			fi.Field = f
 			fi.Zero = reflect.New(f.Type).Elem()
 			fi.Options = map[string]string{}
@@ -339,23 +339,24 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 					pp = fi.Path
 				}
 
-				fiq := *fi
-				fiq.Index = apnd(tq.fi.Index, fieldPos)
-				queue = append(queue, typeQueue{Deref(f.Type), &fiq, pp})
 				fi.Embedded = true
+				fi.Index = apnd(tq.fi.Index, fieldPos)
+				fi.Children = make([]*FieldInfo, Deref(f.Type).NumField())
+				queue = append(queue, typeQueue{Deref(f.Type), &fi, pp})
 			} else if fi.Zero.Kind() == reflect.Struct {
-				fiq := *fi
-				fiq.Index = apnd(tq.fi.Index, fieldPos)
-				queue = append(queue, typeQueue{Deref(f.Type), &fiq, fiq.Path})
+				fi.Index = apnd(tq.fi.Index, fieldPos)
+				fi.Children = make([]*FieldInfo, Deref(f.Type).NumField())
+				queue = append(queue, typeQueue{Deref(f.Type), &fi, fi.Path})
 			}
 
-			fiq := *fi
-			fiq.Index = apnd(tq.fi.Index, fieldPos)
-			m = append(m, &fiq)
+			fi.Index = apnd(tq.fi.Index, fieldPos)
+			fi.Parent = tq.fi
+			tq.fi.Children[fieldPos] = &fi
+			m = append(m, &fi)
 		}
 	}
 
-	flds := &StructMap{Index: m, Paths: map[string]*FieldInfo{}, Names: map[string]*FieldInfo{}}
+	flds := &StructMap{Index: m, Tree: root, Paths: map[string]*FieldInfo{}, Names: map[string]*FieldInfo{}}
 	for _, fi := range flds.Index {
 		flds.Paths[fi.Path] = fi
 		if fi.Name != "" && !fi.Embedded {

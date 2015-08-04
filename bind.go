@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 // Bindvar types supported by Rebind, BindMap and BindStruct.
@@ -92,70 +93,95 @@ func rebindBuff(bindType int, query string) string {
 // and a new arg list that can be executed by a database. The `query` should
 // use the `?` bindVar.  The return value uses the `?` bindVar.
 func In(query string, args ...interface{}) (string, []interface{}, error) {
-	type ra struct {
-		v       reflect.Value
-		t       reflect.Type
-		isSlice bool
-	}
-	ras := make([]ra, 0, len(args))
-	for _, arg := range args {
-		v := reflect.ValueOf(arg)
-		t, _ := baseType(v.Type(), reflect.Slice)
-		ras = append(ras, ra{v, t, t != nil})
+	// argMeta stores reflect.Value and length for slices and
+	// the value itself for non-slice arguments
+	type argMeta struct {
+		v      reflect.Value
+		i      interface{}
+		length int
 	}
 
-	anySlices := false
-	for _, s := range ras {
-		if s.isSlice {
-			anySlices = true
-			if s.v.Len() == 0 {
+	var flatArgsCount, sliceCount int
+
+	meta := make([]argMeta, len(args))
+
+	for i, arg := range args {
+		v := reflect.ValueOf(arg)
+		t, _ := baseType(v.Type(), reflect.Slice)
+
+		if t != nil {
+			meta[i].length = v.Len()
+			meta[i].v = v
+
+			sliceCount++
+			flatArgsCount += meta[i].length
+
+			if meta[i].length == 0 {
 				return "", nil, errors.New("empty slice passed to 'in' query")
 			}
+		} else {
+			meta[i].i = arg
+			flatArgsCount++
 		}
 	}
 
 	// don't do any parsing if there aren't any slices;  note that this means
 	// some errors that we might have caught below will not be returned.
-	if !anySlices {
+	if sliceCount == 0 {
 		return query, args, nil
 	}
 
-	var a []interface{}
-	var buf bytes.Buffer
-	var pos int
+	newArgs := make([]interface{}, 0, flatArgsCount)
 
-	for _, r := range query {
-		if r == '?' {
-			if pos >= len(ras) {
-				// if this argument wasn't passed, lets return an error;  this is
-				// not actually how database/sql Exec/Query works, but since we are
-				// creating an argument list programmatically, we want to be able
-				// to catch these programmer errors earlier.
-				return "", nil, errors.New("number of bindVars exceeds arguments")
-			} else if ras[pos].isSlice {
-				// if this argument is a slice, expand the slice into arguments and
-				// assume that the bindVars should be comma separated.
-				length := ras[pos].v.Len()
-				for i := 0; i < length-1; i++ {
-					buf.Write([]byte("?, "))
-					a = append(a, ras[pos].v.Index(i).Interface())
-				}
-				a = append(a, ras[pos].v.Index(length-1).Interface())
-				buf.WriteRune('?')
-			} else {
-				// a normal argument, procede as normal.
-				a = append(a, args[pos])
-				buf.WriteRune(r)
-			}
-			pos++
-		} else {
-			buf.WriteRune(r)
+	var arg, offset int
+	var buf bytes.Buffer
+
+	for i := strings.IndexByte(query[offset:], '?'); i != -1 && arg < len(meta); i = strings.IndexByte(query[offset:], '?') {
+		argMeta := meta[arg]
+		arg++
+
+		// not a slice, continue.
+		// our questionmark will either be written before the next expansion
+		// of a slice or after the loop when writing the rest of the query
+		if argMeta.length == 0 {
+			offset = offset + i + 1
+			newArgs = append(newArgs, argMeta.i)
+			continue
 		}
+
+		// write everything up to and including our ? character
+		buf.WriteString(query[:offset+i+1])
+
+		newArgs = append(newArgs, argMeta.v.Index(0).Interface())
+
+		for si := 1; si < argMeta.length; si++ {
+			buf.WriteString(", ?")
+			newArgs = append(newArgs, argMeta.v.Index(si).Interface())
+		}
+
+		// slice the query and reset the offset. this avoids some bookkeeping for
+		// the write after the loop
+		query = query[offset+i+1:]
+		offset = 0
 	}
 
-	if pos != len(ras) {
+	buf.WriteString(query)
+
+	if arg < len(meta) {
 		return "", nil, errors.New("number of bindVars less than number arguments")
 	}
 
-	return buf.String(), a, nil
+	// get the result as bytes first, to avoid converting to a string if we return
+	// an error
+	res := buf.Bytes()
+
+	if bytes.Count(res, []byte{'?'}) > flatArgsCount {
+		// if an argument wasn't passed, lets return an error;  this is
+		// not actually how database/sql Exec/Query works, but since we are
+		// creating an argument list programmatically, we want to be able
+		// to catch these programmer errors earlier.
+		return "", nil, errors.New("number of bindVars exceeds arguments")
+	}
+
+	return string(res), newArgs, nil
 }

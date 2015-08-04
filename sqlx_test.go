@@ -1228,7 +1228,7 @@ func TestIn(t *testing.T) {
 			t.Error(err)
 		}
 		if len(a) != test.c {
-			t.Errorf("Expected %d args, but got %d (%+v)", len(a), test.c, a)
+			t.Errorf("Expected %d args, but got %d (%+v)", test.c, len(a), a)
 		}
 		if strings.Count(q, "?") != test.c {
 			t.Errorf("Expected %d bindVars, got %d", test.c, strings.Count(q, "?"))
@@ -1457,6 +1457,14 @@ func BenchmarkBindMap(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		bindMap(DOLLAR, q1, am)
+	}
+}
+
+func BenchmarkIn(b *testing.B) {
+	q := `SELECT * FROM foo WHERE x = ? AND v in (?) AND y = ?`
+
+	for i := 0; i < b.N; i++ {
+		_, _, _ = In(q, []interface{}{"foo", []int{0, 5, 7, 2, 9}, "bar"}...)
 	}
 }
 

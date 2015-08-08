@@ -103,7 +103,8 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		length int
 	}
 
-	var flatArgsCount, sliceCount int
+	var flatArgsCount int
+	var anySlices bool
 
 	meta := make([]argMeta, len(args))
 
@@ -115,7 +116,7 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 			meta[i].length = v.Len()
 			meta[i].v = v
 
-			sliceCount++
+			anySlices = true
 			flatArgsCount += meta[i].length
 
 			if meta[i].length == 0 {
@@ -129,7 +130,7 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 
 	// don't do any parsing if there aren't any slices;  note that this means
 	// some errors that we might have caught below will not be returned.
-	if sliceCount == 0 {
+	if !anySlices {
 		return query, args, nil
 	}
 

@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
 // Bindvar types supported by Rebind, BindMap and BindStruct.
@@ -107,9 +109,9 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 
 	for i, arg := range args {
 		v := reflect.ValueOf(arg)
-		t, _ := baseType(v.Type(), reflect.Slice)
+		t := reflectx.Deref(v.Type())
 
-		if t != nil {
+		if t.Kind() == reflect.Slice {
 			meta[i].length = v.Len()
 			meta[i].v = v
 

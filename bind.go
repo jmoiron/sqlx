@@ -138,7 +138,15 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 	var arg, offset int
 	var buf bytes.Buffer
 
-	for i := strings.IndexByte(query[offset:], '?'); i != -1 && arg < len(meta); i = strings.IndexByte(query[offset:], '?') {
+	for i := strings.IndexByte(query[offset:], '?'); i != -1; i = strings.IndexByte(query[offset:], '?') {
+		if arg >= len(meta) {
+			// if an argument wasn't passed, lets return an error;  this is
+			// not actually how database/sql Exec/Query works, but since we are
+			// creating an argument list programmatically, we want to be able
+			// to catch these programmer errors earlier.
+			return "", nil, errors.New("number of bindVars exceeds arguments")
+		}
+
 		argMeta := meta[arg]
 		arg++
 
@@ -173,17 +181,5 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		return "", nil, errors.New("number of bindVars less than number arguments")
 	}
 
-	// get the result as bytes first, to avoid converting to a string if we return
-	// an error
-	res := buf.Bytes()
-
-	if bytes.Count(res, []byte{'?'}) > flatArgsCount {
-		// if an argument wasn't passed, lets return an error;  this is
-		// not actually how database/sql Exec/Query works, but since we are
-		// creating an argument list programmatically, we want to be able
-		// to catch these programmer errors earlier.
-		return "", nil, errors.New("number of bindVars exceeds arguments")
-	}
-
-	return string(res), newArgs, nil
+	return buf.String(), newArgs, nil
 }

@@ -58,7 +58,7 @@ func isScannable(t reflect.Type) bool {
 	// it's not important that we use the right mapper for this particular object,
 	// we're only concerned on how many exported fields this struct has
 	m := mapper()
-	if len(m.TypeMap(t)) == 0 {
+	if len(m.TypeMap(t).Index) == 0 {
 		return true
 	}
 	return false

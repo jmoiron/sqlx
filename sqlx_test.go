@@ -136,12 +136,20 @@ CREATE TABLE nullperson (
     last_name text NULL,
     email text NULL
 );
+
+CREATE TABLE employees (
+	name text,
+	id integer,
+	boss_id integer
+);
+
 `,
 	drop: `
 drop table person;
 drop table place;
 drop table capplace;
 drop table nullperson;
+drop table employees;
 `,
 }
 
@@ -246,6 +254,9 @@ func loadDefaultFixture(db *DB, t *testing.T) {
 	} else {
 		tx.MustExec(tx.Rebind("INSERT INTO capplace (\"COUNTRY\", \"TELCODE\") VALUES (?, ?)"), "Sarf Efrica", "27")
 	}
+	tx.MustExec(tx.Rebind("INSERT INTO employees (name, id) VALUES (?, ?)"), "Peter", "4444")
+	tx.MustExec(tx.Rebind("INSERT INTO employees (name, id, boss_id) VALUES (?, ?, ?)"), "Joe", "1", "4444")
+	tx.MustExec(tx.Rebind("INSERT INTO employees (name, id, boss_id) VALUES (?, ?, ?)"), "Martin", "2", "4444")
 	tx.Commit()
 }
 
@@ -405,6 +416,42 @@ func TestEmbeddedStructs(t *testing.T) {
 		// in order to allow for more flexibility in destination structs
 		if err != nil {
 			t.Errorf("Was not expecting an error on embed conflicts.")
+		}
+	})
+}
+
+func TestJoinQuery(t *testing.T) {
+	type Employee struct {
+		Name string
+		Id   int64
+		// BossId is an id into the employee table
+		BossId sql.NullInt64 `db:"boss_id"`
+	}
+	type Boss Employee
+
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+
+		var employees []struct {
+			Employee
+			Boss `db:"boss"`
+		}
+
+		err := db.Select(
+			&employees,
+			`SELECT employees.*, boss.id "boss.id", boss.name "boss.name" FROM employees
+			  JOIN employees AS boss ON employees.boss_id = boss.id`)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, em := range employees {
+			if len(em.Employee.Name) == 0 {
+				t.Errorf("Expected non zero lengthed name.")
+			}
+			if em.Employee.BossId.Int64 != em.Boss.Id {
+				t.Errorf("Expected boss ids to match")
+			}
 		}
 	})
 }

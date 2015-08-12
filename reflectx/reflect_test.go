@@ -348,6 +348,55 @@ func TestPtrFields(t *testing.T) {
 	}
 }
 
+func TestNamedPtrFields(t *testing.T) {
+	m := NewMapperTagFunc("db", strings.ToLower, nil)
+
+	type User struct {
+		Name string
+	}
+
+	type Asset struct {
+		Title string
+
+		Owner *User `db:"owner"`
+	}
+	type Post struct {
+		Author string
+
+		Asset1 *Asset `db:"asset1"`
+		Asset2 *Asset `db:"asset2"`
+	}
+
+	post := &Post{Author: "Joe", Asset1: &Asset{Title: "Hiyo", Owner: &User{"Username"}}} // Let Asset2 be nil
+	pv := reflect.ValueOf(post)
+
+	fields := m.TypeMap(reflect.TypeOf(post))
+	if len(fields.Index) != 9 {
+		t.Errorf("Expecting 9 fields")
+	}
+
+	v := m.FieldByName(pv, "asset1.title")
+	if v.Interface().(string) != post.Asset1.Title {
+		t.Errorf("Expecting %s, got %s", post.Asset1.Title, v.Interface().(string))
+	}
+	v = m.FieldByName(pv, "asset1.owner.name")
+	if v.Interface().(string) != post.Asset1.Owner.Name {
+		t.Errorf("Expecting %s, got %s", post.Asset1.Owner.Name, v.Interface().(string))
+	}
+	v = m.FieldByName(pv, "asset2.title")
+	if v.Interface().(string) != post.Asset2.Title {
+		t.Errorf("Expecting %s, got %s", post.Asset2.Title, v.Interface().(string))
+	}
+	v = m.FieldByName(pv, "asset2.owner.name")
+	if v.Interface().(string) != post.Asset2.Owner.Name {
+		t.Errorf("Expecting %s, got %s", post.Asset2.Owner.Name, v.Interface().(string))
+	}
+	v = m.FieldByName(pv, "author")
+	if v.Interface().(string) != post.Author {
+		t.Errorf("Expecting %s, got %s", post.Author, v.Interface().(string))
+	}
+}
+
 func TestFieldMap(t *testing.T) {
 	type Foo struct {
 		A int

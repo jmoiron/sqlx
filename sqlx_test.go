@@ -456,6 +456,46 @@ func TestJoinQuery(t *testing.T) {
 	})
 }
 
+func TestJoinQueryNamedPointerStructs(t *testing.T) {
+	type Employee struct {
+		Name string
+		Id   int64
+		// BossId is an id into the employee table
+		BossId sql.NullInt64 `db:"boss_id"`
+	}
+	type Boss Employee
+
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+
+		var employees []struct {
+			Emp1  *Employee `db:"emp1"`
+			Emp2  *Employee `db:"emp2"`
+			*Boss `db:"boss"`
+		}
+
+		err := db.Select(
+			&employees,
+			`SELECT emp.name "emp1.name", emp.id "emp1.id", emp.boss_id "emp1.boss_id",
+			 emp.name "emp2.name", emp.id "emp2.id", emp.boss_id "emp2.boss_id",
+			 boss.id "boss.id", boss.name "boss.name" FROM employees AS emp
+			  JOIN employees AS boss ON emp.boss_id = boss.id
+			  `)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, em := range employees {
+			if len(em.Emp1.Name) == 0 || len(em.Emp2.Name) == 0 {
+				t.Errorf("Expected non zero lengthed name.")
+			}
+			if em.Emp1.BossId.Int64 != em.Boss.Id || em.Emp2.BossId.Int64 != em.Boss.Id {
+				t.Errorf("Expected boss ids to match")
+			}
+		}
+	})
+}
+
 func TestSelectSliceMapTime(t *testing.T) {
 	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
 		loadDefaultFixture(db, t)

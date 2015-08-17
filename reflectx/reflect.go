@@ -337,7 +337,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 				fi.Index = apnd(tq.fi.Index, fieldPos)
 				fi.Children = make([]*FieldInfo, Deref(f.Type).NumField())
 				queue = append(queue, typeQueue{Deref(f.Type), &fi, pp})
-			} else if fi.Zero.Kind() == reflect.Struct {
+			} else if fi.Zero.Kind() == reflect.Struct || (fi.Zero.Kind() == reflect.Ptr && fi.Zero.Type().Elem().Kind() == reflect.Struct) {
 				fi.Index = apnd(tq.fi.Index, fieldPos)
 				fi.Children = make([]*FieldInfo, Deref(f.Type).NumField())
 				queue = append(queue, typeQueue{Deref(f.Type), &fi, fi.Path})

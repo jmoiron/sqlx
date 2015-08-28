@@ -473,35 +473,35 @@ func (s *Stmt) Unsafe() *Stmt {
 
 // Select using the prepared statement.
 func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
-	return Select(&qStmt{*s}, dest, "", args...)
+	return Select(&qStmt{s}, dest, "", args...)
 }
 
 // Get using the prepared statement.
 func (s *Stmt) Get(dest interface{}, args ...interface{}) error {
-	return Get(&qStmt{*s}, dest, "", args...)
+	return Get(&qStmt{s}, dest, "", args...)
 }
 
 // MustExec (panic) using this statement.  Note that the query portion of the error
 // output will be blank, as Stmt does not expose its query.
 func (s *Stmt) MustExec(args ...interface{}) sql.Result {
-	return MustExec(&qStmt{*s}, "", args...)
+	return MustExec(&qStmt{s}, "", args...)
 }
 
 // QueryRowx using this statement.
 func (s *Stmt) QueryRowx(args ...interface{}) *Row {
-	qs := &qStmt{*s}
+	qs := &qStmt{s}
 	return qs.QueryRowx("", args...)
 }
 
 // Queryx using this statement.
 func (s *Stmt) Queryx(args ...interface{}) (*Rows, error) {
-	qs := &qStmt{*s}
+	qs := &qStmt{s}
 	return qs.Queryx("", args...)
 }
 
 // qStmt is an unexposed wrapper which lets you use a Stmt as a Queryer & Execer by
 // implementing those interfaces and ignoring the `query` argument.
-type qStmt struct{ Stmt }
+type qStmt struct{ *Stmt }
 
 func (q *qStmt) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return q.Stmt.Query(args...)

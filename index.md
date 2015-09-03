@@ -409,7 +409,7 @@ type Employee struct {
 }
 ```
 
-Not that sqlx historically supported this feature for non-embedded structs, this ended up being confusing because users were using this feature to define relationships and embedding the same structs twice:
+Note that sqlx historically supported this feature for non-embedded structs, this ended up being confusing because users were using this feature to define relationships and embedding the same structs twice:
 
 ```go
 type Child struct {

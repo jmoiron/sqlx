@@ -396,7 +396,7 @@ type Employee struct {
 }
 </pre>
 
-<p>Not that sqlx historically supported this feature for non-embedded structs, this ended up being confusing because users were using this feature to define relationships and embedding the same structs twice:</p>
+<p>Note that sqlx historically supported this feature for non-embedded structs, this ended up being confusing because users were using this feature to define relationships and embedding the same structs twice:</p>
 <pre class="prettyprint linenums">
 type Child struct {
     Father Person

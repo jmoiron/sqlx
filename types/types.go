@@ -10,8 +10,12 @@ import (
 	"io/ioutil"
 )
 
+// GzippedText is a []byte which transparently gzips data being submitted to
+// a database and ungzips data being Scanned from a database.
 type GzippedText []byte
 
+// Value implements the driver.Valuer interface, gzipping the raw value of
+// this GzippedText.
 func (g GzippedText) Value() (driver.Value, error) {
 	b := make([]byte, 0, len(g))
 	buf := bytes.NewBuffer(b)
@@ -22,6 +26,8 @@ func (g GzippedText) Value() (driver.Value, error) {
 
 }
 
+// Scan implements the sql.Scanner interface, ungzipping the value coming off
+// the wire and storing the raw result in the GzippedText.
 func (g *GzippedText) Scan(src interface{}) error {
 	var source []byte
 	switch src.(type) {
@@ -50,7 +56,7 @@ type JsonText json.RawMessage
 
 var _EMPTY_JSON = JsonText("{}")
 
-// Returns the *j as the JSON encoding of j.
+// MarshalJSON returns the *j as the JSON encoding of j.
 func (j *JsonText) MarshalJSON() ([]byte, error) {
 	if len(*j) == 0 {
 		*j = _EMPTY_JSON

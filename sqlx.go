@@ -58,7 +58,7 @@ func isScannable(t reflect.Type) bool {
 	// it's not important that we use the right mapper for this particular object,
 	// we're only concerned on how many exported fields this struct has
 	m := mapper()
-	if len(m.TypeMap(t)) == 0 {
+	if len(m.TypeMap(t).Index) == 0 {
 		return true
 	}
 	return false
@@ -279,7 +279,7 @@ func (db *DB) Unsafe() *DB {
 
 // BindNamed binds a query using the DB driver's bindvar type.
 func (db *DB) BindNamed(query string, arg interface{}) (string, []interface{}, error) {
-	return BindNamed(BindType(db.driverName), query, arg)
+	return bindNamedMapper(BindType(db.driverName), query, arg, db.Mapper)
 }
 
 // NamedQuery using this DB.
@@ -377,7 +377,7 @@ func (tx *Tx) Unsafe() *Tx {
 
 // BindNamed binds a query within a transaction's bindvar type.
 func (tx *Tx) BindNamed(query string, arg interface{}) (string, []interface{}, error) {
-	return BindNamed(BindType(tx.driverName), query, arg)
+	return bindNamedMapper(BindType(tx.driverName), query, arg, tx.Mapper)
 }
 
 // NamedQuery within a transaction.
@@ -473,35 +473,35 @@ func (s *Stmt) Unsafe() *Stmt {
 
 // Select using the prepared statement.
 func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
-	return Select(&qStmt{*s}, dest, "", args...)
+	return Select(&qStmt{s}, dest, "", args...)
 }
 
 // Get using the prepared statement.
 func (s *Stmt) Get(dest interface{}, args ...interface{}) error {
-	return Get(&qStmt{*s}, dest, "", args...)
+	return Get(&qStmt{s}, dest, "", args...)
 }
 
 // MustExec (panic) using this statement.  Note that the query portion of the error
 // output will be blank, as Stmt does not expose its query.
 func (s *Stmt) MustExec(args ...interface{}) sql.Result {
-	return MustExec(&qStmt{*s}, "", args...)
+	return MustExec(&qStmt{s}, "", args...)
 }
 
 // QueryRowx using this statement.
 func (s *Stmt) QueryRowx(args ...interface{}) *Row {
-	qs := &qStmt{*s}
+	qs := &qStmt{s}
 	return qs.QueryRowx("", args...)
 }
 
 // Queryx using this statement.
 func (s *Stmt) Queryx(args ...interface{}) (*Rows, error) {
-	qs := &qStmt{*s}
+	qs := &qStmt{s}
 	return qs.Queryx("", args...)
 }
 
 // qStmt is an unexposed wrapper which lets you use a Stmt as a Queryer & Execer by
 // implementing those interfaces and ignoring the `query` argument.
-type qStmt struct{ Stmt }
+type qStmt struct{ *Stmt }
 
 func (q *qStmt) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return q.Stmt.Query(args...)

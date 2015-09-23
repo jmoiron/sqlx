@@ -286,9 +286,17 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 	return string(rebound), names, err
 }
 
-// Bind binds a struct or a map to a query with named parameters.
+// BindNamed binds a struct or a map to a query with named parameters.
+// DEPRECATED: use sqlx.Named` instead of this, it may be removed in future.
 func BindNamed(bindType int, query string, arg interface{}) (string, []interface{}, error) {
 	return bindNamedMapper(bindType, query, arg, mapper())
+}
+
+// Named takes a query using named parameters and an argument and
+// returns a new query with a list of args that can be executed by
+// a database.  The return value uses the `?` bindvar.
+func Named(query string, arg interface{}) (string, []interface{}, error) {
+	return bindNamedMapper(QUESTION, query, arg, mapper())
 }
 
 func bindNamedMapper(bindType int, query string, arg interface{}, m *reflectx.Mapper) (string, []interface{}, error) {

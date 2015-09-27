@@ -541,6 +541,11 @@ func (r *Rows) SliceScan() ([]interface{}, error) {
 	return SliceScan(r)
 }
 
+// SliceScanWithColumns using this Rows.
+func (r *Rows) SliceScanWithColumns() ([]interface{}, []string, error) {
+	return SliceScanWithColumns(r)
+}
+
 // MapScan using this Rows.
 func (r *Rows) MapScan(dest map[string]interface{}) error {
 	return MapScan(r, dest)
@@ -676,6 +681,11 @@ func (r *Row) SliceScan() ([]interface{}, error) {
 	return SliceScan(r)
 }
 
+// SliceScanWithColumns using this Rows.
+func (r *Row) SliceScanWithColumns() ([]interface{}, []string, error) {
+	return SliceScanWithColumns(r)
+}
+
 // MapScan using this Rows.
 func (r *Row) MapScan(dest map[string]interface{}) error {
 	return MapScan(r, dest)
@@ -743,10 +753,15 @@ func (r *Row) StructScan(dest interface{}) error {
 // it's recommended that you do that as it will not have to allocate new
 // slices per row.
 func SliceScan(r ColScanner) ([]interface{}, error) {
+	values, _, err := sliceScan(r)
+	return values, err
+}
+
+func sliceScan(r ColScanner) ([]interface{}, []string, error) {
 	// ignore r.started, since we needn't use reflect for anything.
 	columns, err := r.Columns()
 	if err != nil {
-		return []interface{}{}, err
+		return []interface{}{}, columns, err
 	}
 
 	values := make([]interface{}, len(columns))
@@ -757,14 +772,24 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 	err = r.Scan(values...)
 
 	if err != nil {
-		return values, err
+		return values, columns, err
 	}
 
 	for i := range columns {
 		values[i] = *(values[i].(*interface{}))
 	}
 
-	return values, r.Err()
+	return values, columns, r.Err()
+}
+
+// SliceScanWithColumns a row, returning a []interface{} with values similar to MapScan.
+// Additionally, you'll get a []string with the column names, in order.
+// This function is primarly intended for use where the number of columns
+// is not known.  Because you can pass an []interface{} directly to Scan,
+// it's recommended that you do that as it will not have to allocate new
+// slices per row.
+func SliceScanWithColumns(r ColScanner) ([]interface{}, []string, error) {
+	return sliceScan(r)
 }
 
 // MapScan scans a single Row into the dest map[string]interface{}.

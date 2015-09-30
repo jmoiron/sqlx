@@ -287,6 +287,12 @@ func (db *DB) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(db, query, arg)
 }
 
+// NamedQueryRow using this DB.
+func (db *DB) NamedQueryRow(query string, arg interface{}) *Row {
+	rows, err := NamedQuery(db, query, arg)
+	return &Row{rows: rows.Rows, err: err, unsafe: db.unsafe, Mapper: db.Mapper}
+}
+
 // NamedExec using this DB.
 func (db *DB) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	return NamedExec(db, query, arg)
@@ -383,6 +389,12 @@ func (tx *Tx) BindNamed(query string, arg interface{}) (string, []interface{}, e
 // NamedQuery within a transaction.
 func (tx *Tx) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(tx, query, arg)
+}
+
+// NamedQueryRow within a transaction.
+func (tx *Tx) NamedQueryRow(query string, arg interface{}) *Row {
+	rows, err := NamedQuery(tx, query, arg)
+	return &Row{rows: rows.Rows, err: err, unsafe: tx.unsafe, Mapper: tx.Mapper}
 }
 
 // NamedExec a named query within a transaction.

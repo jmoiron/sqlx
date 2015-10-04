@@ -33,10 +33,10 @@ var mpr *reflectx.Mapper
 // mapper returns a valid mapper using the configured NameMapper func.
 func mapper() *reflectx.Mapper {
 	if mpr == nil {
-		mpr = reflectx.NewMapperFunc("db", NameMapper)
+		mpr = reflectx.NewMapperFunc("json", NameMapper)
 	} else if origMapper != reflect.ValueOf(NameMapper) {
 		// if NameMapper has changed, create a new mapper
-		mpr = reflectx.NewMapperFunc("db", NameMapper)
+		mpr = reflectx.NewMapperFunc("json", NameMapper)
 		origMapper = reflect.ValueOf(NameMapper)
 	}
 	return mpr
@@ -261,7 +261,7 @@ func MustOpen(driverName, dataSourceName string) *DB {
 // MapperFunc sets a new mapper for this db using the default sqlx struct tag
 // and the provided mapper function.
 func (db *DB) MapperFunc(mf func(string) string) {
-	db.Mapper = reflectx.NewMapperFunc("db", mf)
+	db.Mapper = reflectx.NewMapperFunc("json", mf)
 }
 
 // Rebind transforms a query from QUESTION to the DB driver's bindvar type.

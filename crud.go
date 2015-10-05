@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -83,7 +82,7 @@ func extract(obj StructTable) (map[string]interface{}, error) {
 				items[dbName] = concreteValue
 				// dbVals = append(dbVals, ":"+dbName)
 			case time.Time:
-				if isZeroValue(reflect.ValueOf(item)) {
+				if item.IsZero() {
 					items[dbName] = "NOW"
 				} else {
 					items[dbName] = concreteValue
@@ -131,7 +130,6 @@ func JsonToStruct(input map[string]interface{}, s StructTable) error {
 	// YT: LOL
 	b, err := json.Marshal(input)
 	if err != nil {
-		fmt.Println("dafuq?")
 		return err
 	}
 	return json.Unmarshal(b, s)
@@ -151,17 +149,6 @@ func MakeStructTable(input map[string]interface{}, obj StructTable) error {
 		fv.Set(ptr)
 	}
 	return nil
-}
-
-// Checks to see if x is the Zero Value
-// This is not fully implemented for Arrays, or Structs, or other weird stuff
-func isZeroValue(v reflect.Value) bool {
-	// v := reflect.ValueOf(x)
-	switch v.Kind() {
-	case reflect.Map, reflect.Slice:
-		return v.IsNil()
-	}
-	return v.Interface() == reflect.Zero(v.Type()).Interface()
 }
 
 // special insertion rules:

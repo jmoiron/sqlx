@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -124,10 +125,13 @@ func (o tagOptions) Contains(optionName string) bool {
 
 /* END ripped from unexported std lib END */
 
-func MapJsonToStruct(input map[string]interface{}, s StructTable) error {
+// MsiToStruct takes in a JSON serializable map[string]interface{} and converts
+// it the actual object
+func JsonToStruct(input map[string]interface{}, s StructTable) error {
 	// YT: LOL
 	b, err := json.Marshal(input)
 	if err != nil {
+		fmt.Println("dafuq?")
 		return err
 	}
 	return json.Unmarshal(b, s)
@@ -211,11 +215,11 @@ func (h *Helper) CreateObject(obj StructTable) error {
 	return err
 }
 
-// type SafeProjector []string
-
-func (h *Helper) MustDelete(obj StructTable) error {
-	tableName := obj.TableName()
-	msi, err := extract(obj)
+// DeleteAll removes all rows in the table matching condition.
+// If no matching row was deleted, then an error is returned.
+func (h *Helper) DeleteAll(condition StructTable) error {
+	tableName := condition.TableName()
+	msi, err := extract(condition)
 	if err != nil {
 		return err
 	}
@@ -238,12 +242,11 @@ func (h *Helper) MustDelete(obj StructTable) error {
 	return nil
 }
 
-// A query bounded to a given object
-func (h *Helper) QueryOne(cond StructTable, newObj StructTable, projection ...string) error {
-	tableName := cond.TableName()
-	projs, err := MakeProjector(projection, cond)
+func (h *Helper) buildQuery(condition StructTable, projection []string) (string, []interface{}, error) {
+	tableName := condition.TableName()
+	projs, err := MakeProjector(projection, condition)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	query := "SELECT "
 	if len(projs) > 0 {
@@ -259,21 +262,39 @@ func (h *Helper) QueryOne(cond StructTable, newObj StructTable, projection ...st
 	query += " FROM "
 	query += tableName
 	query += " WHERE "
-	msi, err := extract(cond)
+	msi, err := extract(condition)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	where, args := expand(msi, " AND ")
 	query += where
 	query += " LIMIT 1"
 	query = h.Rebind(query)
-	return h.QueryRowx(query, args...).StructScan(newObj)
+	return query, args, nil
 }
 
-// Update a subset of the columns of a table using a struct. This method returns an error
-// if no rows were affected. Note that updating the same row twice is not classified as an
-// error.
-func (h *Helper) UpdateTable(updates StructTable, conds StructTable) error {
+// QueryOne returns a scanned object corresponding to the first row matching condition. For
+// more complicated tasks such as pagination, etc. It's more sensible to build your own SQL.
+// objPtr must be some pointer to a StructTable to receive the deserialized value.
+func (h *Helper) QueryOne(condition StructTable, objPtr StructTable, projection ...string) error {
+	query, args, err := h.buildQuery(condition, projection)
+	if err != nil {
+		return err
+	}
+	return h.QueryRowx(query, args...).StructScan(objPtr)
+}
+
+func (h *Helper) QueryRows(condition StructTable, projection ...string) (*Rows, error) {
+	query, args, err := h.buildQuery(condition, projection)
+	if err != nil {
+		return nil, err
+	}
+	return h.Queryx(query, args...)
+}
+
+// UpdateAll updates rows matching condition with new values given by updates.
+// If no matching row was updated, then an error is returned.
+func (h *Helper) UpdateAll(updates StructTable, conds StructTable) error {
 	tableName := updates.TableName()
 
 	msi1, err := extract(updates)

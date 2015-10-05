@@ -153,22 +153,6 @@ func MakeStructTable(input map[string]interface{}, obj StructTable) error {
 	return nil
 }
 
-// MakeProjector creates a projector that is used to filter the columns returned, like its
-// cousin MakeSelector, it validates against the given object.
-func MakeProjector(input []string, obj interface{}) ([]string, error) {
-	base := reflect.TypeOf(reflect.Indirect(reflect.ValueOf(obj)).Interface())
-	cols := []string{}
-	for _, fname := range input {
-		b, ok := base.FieldByName(fname)
-		if !ok {
-			return nil, errors.New("Unknown Field Name")
-		}
-		new_key, _ := parseTag(b.Tag.Get("db"))
-		cols = append(cols, new_key)
-	}
-	return cols, nil
-}
-
 // Checks to see if x is the Zero Value
 // This is not fully implemented for Arrays, or Structs, or other weird stuff
 func isZeroValue(v reflect.Value) bool {
@@ -244,15 +228,11 @@ func (h *Helper) DeleteAll(condition StructTable) error {
 
 func (h *Helper) buildQuery(condition StructTable, projection []string) (string, []interface{}, error) {
 	tableName := condition.TableName()
-	projs, err := MakeProjector(projection, condition)
-	if err != nil {
-		return "", nil, err
-	}
 	query := "SELECT "
-	if len(projs) > 0 {
-		for idx, p := range projs {
+	if len(projection) > 0 {
+		for idx, p := range projection {
 			query += p
-			if idx != len(projs)-1 {
+			if idx != len(projection)-1 {
 				query += ","
 			}
 		}
@@ -261,34 +241,42 @@ func (h *Helper) buildQuery(condition StructTable, projection []string) (string,
 	}
 	query += " FROM "
 	query += tableName
-	query += " WHERE "
 	msi, err := extract(condition)
 	if err != nil {
 		return "", nil, err
 	}
-	where, args := expand(msi, " AND ")
-	query += where
-	query += " LIMIT 1"
-	query = h.Rebind(query)
+	args := []interface{}{}
+	if len(msi) > 0 {
+		query += " WHERE "
+		var where string
+		where, args = expand(msi, " AND ")
+		query += where
+	}
 	return query, args, nil
 }
 
 // QueryOne returns a scanned object corresponding to the first row matching condition. For
 // more complicated tasks such as pagination, etc. It's more sensible to build your own SQL.
-// objPtr must be some pointer to a StructTable to receive the deserialized value.
+// objPtr must be some pointer to a StructTable to receive the deserialized value. Projection
+// should be json tags.
 func (h *Helper) QueryOne(condition StructTable, objPtr StructTable, projection ...string) error {
 	query, args, err := h.buildQuery(condition, projection)
 	if err != nil {
 		return err
 	}
+	query += " LIMIT 1"
+	query = h.Rebind(query)
 	return h.QueryRowx(query, args...).StructScan(objPtr)
 }
 
+// QueryRows returns a pointer to a sql.Rows object that can iterated over and scanned. Projection
+// should be json tags.
 func (h *Helper) QueryRows(condition StructTable, projection ...string) (*Rows, error) {
 	query, args, err := h.buildQuery(condition, projection)
 	if err != nil {
 		return nil, err
 	}
+	query = h.Rebind(query)
 	return h.Queryx(query, args...)
 }
 

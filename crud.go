@@ -59,19 +59,16 @@ func extract(obj StructTable) (map[string]interface{}, error) {
 	if err := obj.Validate(); err != nil {
 		return nil, err
 	}
-
-	base := reflect.Indirect(reflect.ValueOf(obj)) // a parameter itself
-	baseType := reflect.TypeOf(base.Interface())   // eg. Parameter
+	baseType := reflect.TypeOf(obj) // eg. Parameter
 	items := map[string]interface{}{}
 	for i := 0; i < baseType.NumField(); i++ {
 		fieldName := baseType.Field(i).Name // eg. "Torsion"
-		possiblePtrFieldValue := base.FieldByName(fieldName)
-
-		if possiblePtrFieldValue.Kind() == reflect.Ptr && possiblePtrFieldValue.IsNil() {
+		possiblyNil := reflect.ValueOf(obj).FieldByName(fieldName)
+		if possiblyNil.IsNil() {
 			// pass
 		} else {
 			// we are not a nil pointer, then indirect would always work.
-			fieldValue := reflect.Indirect(possiblePtrFieldValue)
+			fieldValue := reflect.Indirect(possiblyNil)
 			concreteValue := fieldValue.Interface()
 			dbName, _ := parseTag(baseType.Field(i).Tag.Get("json"))
 			// if tagOptions.Contains("nonzero") && isZeroValue(fieldValue) {
@@ -91,6 +88,15 @@ func extract(obj StructTable) (map[string]interface{}, error) {
 		}
 	}
 	return items, nil
+}
+
+func LookupTag(obj StructTable, field string) string {
+	b, ok := reflect.TypeOf(obj).FieldByName(field)
+	if !ok {
+		return ""
+	}
+	tagName, _ := parseTag(b.Tag.Get("json"))
+	return tagName
 }
 
 /* START ripped from unexported std lib END */
@@ -269,14 +275,13 @@ func (h *Helper) QueryRows(condition StructTable, projection ...string) (*Rows, 
 
 // UpdateAll updates rows matching condition with new values given by updates.
 // If no matching row was updated, then an error is returned.
-func (h *Helper) UpdateAll(updates StructTable, conds StructTable) error {
-	tableName := updates.TableName()
-
-	msi1, err := extract(updates)
+func (h *Helper) UpdateAll(update StructTable, condition StructTable) error {
+	tableName := update.TableName()
+	msi1, err := extract(update)
 	if err != nil {
 		return err
 	}
-	msi2, err := extract(conds)
+	msi2, err := extract(condition)
 	if err != nil {
 		return err
 	}

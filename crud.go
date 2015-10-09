@@ -281,6 +281,10 @@ func (h *Helper) UpdateAll(update StructTable, condition StructTable) error {
 	if err != nil {
 		return err
 	}
+	if len(msi1) == 0 {
+		// nothing to update, all nil
+		return nil
+	}
 	msi2, err := extract(condition)
 	if err != nil {
 		return err
@@ -288,12 +292,15 @@ func (h *Helper) UpdateAll(update StructTable, condition StructTable) error {
 	query := "UPDATE " + tableName + " SET "
 	expansion, args := expand(msi1, ",")
 	query += expansion
-	query += " WHERE "
-	expansion2, args2 := expand(msi2, " AND ")
-	query += expansion2
-	all_args := append(args, args2...)
+	// all_args := append(args
+	if len(msi2) > 0 {
+		query += " WHERE "
+		expansion2, args2 := expand(msi2, " AND ")
+		query += expansion2
+		args = append(args, args2...)
+	}
 	query = h.Rebind(query)
-	res, err := h.Exec(query, all_args...)
+	res, err := h.Exec(query, args...)
 	if err != nil {
 		return err
 	}

@@ -99,3 +99,8 @@ func (j *JsonText) Scan(src interface{}) error {
 func (j *JsonText) Unmarshal(v interface{}) error {
 	return json.Unmarshal([]byte(*j), v)
 }
+
+// Pretty printing for JsonText types
+func (j JsonText) String() string {
+	return string(j)
+}

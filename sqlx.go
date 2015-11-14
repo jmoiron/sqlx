@@ -105,29 +105,35 @@ type Preparer interface {
 
 // determine if any of our extensions are unsafe
 func isUnsafe(i interface{}) bool {
-	switch i.(type) {
+	switch v := i.(type) {
 	case Row:
-		return i.(Row).unsafe
+		return v.unsafe
 	case *Row:
-		return i.(*Row).unsafe
+		return v.unsafe
 	case Rows:
-		return i.(Rows).unsafe
+		return v.unsafe
 	case *Rows:
-		return i.(*Rows).unsafe
+		return v.unsafe
+	case NamedStmt:
+		return v.Stmt.unsafe
+	case *NamedStmt:
+		return v.Stmt.unsafe
 	case Stmt:
-		return i.(Stmt).unsafe
+		return v.unsafe
+	case *Stmt:
+		return v.unsafe
 	case qStmt:
-		return i.(qStmt).Stmt.unsafe
+		return v.unsafe
 	case *qStmt:
-		return i.(*qStmt).Stmt.unsafe
+		return v.unsafe
 	case DB:
-		return i.(DB).unsafe
+		return v.unsafe
 	case *DB:
-		return i.(*DB).unsafe
+		return v.unsafe
 	case Tx:
-		return i.(Tx).unsafe
+		return v.unsafe
 	case *Tx:
-		return i.(*Tx).unsafe
+		return v.unsafe
 	case sql.Rows, *sql.Rows:
 		return false
 	default:

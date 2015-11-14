@@ -328,6 +328,53 @@ func TestMissingNames(t *testing.T) {
 		}
 		rowsx.Close()
 
+		// test Named stmt
+		if !isUnsafe(db) {
+			t.Error("Expected db to be unsafe, but it isn't")
+		}
+		nstmt, err := db.PrepareNamed(`SELECT * FROM person WHERE first_name != :name`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// its internal stmt should be marked unsafe
+		if !nstmt.Stmt.unsafe {
+			t.Error("expected NamedStmt to be unsafe but its underlying stmt did not inherit safety")
+		}
+		pps = []PersonPlus{}
+		err = nstmt.Select(&pps, map[string]interface{}{"name": "Jason"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(pps) != 1 {
+			t.Errorf("Expected 1 person back, got %d", len(pps))
+		}
+
+		// test it with a safe db
+		db.unsafe = false
+		if isUnsafe(db) {
+			t.Error("expected db to be safe but it isn't")
+		}
+		nstmt, err = db.PrepareNamed(`SELECT * FROM person WHERE first_name != :name`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// it should be safe
+		if isUnsafe(nstmt) {
+			t.Error("NamedStmt did not inherit safety")
+		}
+		nstmt.Unsafe()
+		if !isUnsafe(nstmt) {
+			t.Error("expected newly unsafed NamedStmt to be unsafe")
+		}
+		pps = []PersonPlus{}
+		err = nstmt.Select(&pps, map[string]interface{}{"name": "Jason"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(pps) != 1 {
+			t.Errorf("Expected 1 person back, got %d", len(pps))
+		}
+
 	})
 }
 

@@ -93,6 +93,20 @@ func TestBasicEmbedded(t *testing.T) {
 	}
 }
 
+func TestEmbeddedSimple(t *testing.T) {
+	type UUID [16]byte
+	type MyID struct {
+		UUID
+	}
+	type Item struct {
+		ID MyID
+	}
+	z := Item{}
+
+	m := NewMapper("db")
+	m.TypeMap(reflect.TypeOf(z))
+}
+
 func TestBasicEmbeddedWithTags(t *testing.T) {
 	type Foo struct {
 		A int `db:"a"`

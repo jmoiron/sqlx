@@ -270,10 +270,14 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 		// pop the first item off of the queue
 		tq := queue[0]
 		queue = queue[1:]
-		tq.fi.Children = make([]*FieldInfo, tq.t.NumField())
+		nChildren := 0
+		if tq.t.Kind() == reflect.Struct {
+			nChildren = tq.t.NumField()
+		}
+		tq.fi.Children = make([]*FieldInfo, nChildren)
 
 		// iterate through all of its fields
-		for fieldPos := 0; fieldPos < tq.t.NumField(); fieldPos++ {
+		for fieldPos := 0; fieldPos < nChildren; fieldPos++ {
 			f := tq.t.Field(fieldPos)
 
 			fi := FieldInfo{}
@@ -335,7 +339,12 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 
 				fi.Embedded = true
 				fi.Index = apnd(tq.fi.Index, fieldPos)
-				fi.Children = make([]*FieldInfo, Deref(f.Type).NumField())
+				nChildren := 0
+				ft := Deref(f.Type)
+				if ft.Kind() == reflect.Struct {
+					nChildren = ft.NumField()
+				}
+				fi.Children = make([]*FieldInfo, nChildren)
 				queue = append(queue, typeQueue{Deref(f.Type), &fi, pp})
 			} else if fi.Zero.Kind() == reflect.Struct || (fi.Zero.Kind() == reflect.Ptr && fi.Zero.Type().Elem().Kind() == reflect.Struct) {
 				fi.Index = apnd(tq.fi.Index, fieldPos)

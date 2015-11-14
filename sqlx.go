@@ -440,6 +440,8 @@ func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
 		s = stmt.(*Stmt).Stmt
 	case *sql.Stmt:
 		s = stmt.(*sql.Stmt)
+	default:
+		panic(fmt.Sprintf("non-statement type %v passed to Stmtx", reflect.ValueOf(stmt).Type()))
 	}
 	return &Stmt{Stmt: tx.Stmt(s), Mapper: tx.Mapper}
 }

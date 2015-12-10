@@ -14,7 +14,9 @@ type DBI interface {
 	NamedQueryRow(query string, arg interface{}) *Row
 	NamedQuery(query string, arg interface{}) (*Rows, error)
 	QueryRowx(query string, args ...interface{}) *Row
+	QueryRow(query string, args ...interface{}) *sql.Row
 	Queryx(query string, args ...interface{}) (*Rows, error)
+	ExecOne(query string, args ...interface{}) error
 	Rebind(query string) string
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }

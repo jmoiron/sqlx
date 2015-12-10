@@ -258,6 +258,21 @@ func MustOpen(driverName, dataSourceName string) *DB {
 	return db
 }
 
+func ExecOne(ex Execer, query string, args ...interface{}) error {
+	rows, err := ex.Exec(query, args...)
+	if err != nil {
+		return err
+	}
+	count, err := rows.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 // MapperFunc sets a new mapper for this db using the default sqlx struct tag
 // and the provided mapper function.
 func (db *DB) MapperFunc(mf func(string) string) {
@@ -357,6 +372,11 @@ func (db *DB) PrepareNamed(query string) (*NamedStmt, error) {
 	return prepareNamed(db, query)
 }
 
+// ExecOne expects exactly one row to be affected.
+func (db *DB) ExecOne(query string, args ...interface{}) error {
+	return ExecOne(db, query, args...)
+}
+
 // Tx is an sqlx wrapper around sql.Tx with extra functionality
 type Tx struct {
 	*sql.Tx
@@ -405,6 +425,11 @@ func (tx *Tx) NamedExec(query string, arg interface{}) (sql.Result, error) {
 // Select within a transaction.
 func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(tx, dest, query, args...)
+}
+
+// ExecOne expects exactly one row to be affected.
+func (tx *Tx) ExecOne(query string, args ...interface{}) error {
+	return ExecOne(tx, query, args...)
 }
 
 // Queryx within a transaction.

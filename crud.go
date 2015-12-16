@@ -65,12 +65,23 @@ func extract(obj StructTable) (map[string]interface{}, error) {
 	items := map[string]interface{}{}
 	for i := 0; i < baseType.NumField(); i++ {
 		fieldName := baseType.Field(i).Name // eg. "Torsion"
-		possiblyNil := reflect.ValueOf(obj).FieldByName(fieldName)
-		if possiblyNil.IsNil() {
+		possiblyPtr := reflect.ValueOf(obj).FieldByName(fieldName)
+		// possiblyPtr could also be a struct or pointer
+		if possiblyPtr.Kind() == reflect.Struct {
+			subMap, err := extract(possiblyPtr.Interface().(StructTable))
+			if err != nil {
+				return nil, err
+			}
+			for k, v := range subMap {
+				items[k] = v
+			}
+			continue
+		}
+		if possiblyPtr.IsNil() {
 			// pass
 		} else {
 			// we are not a nil pointer, then indirect would always work.
-			fieldValue := reflect.Indirect(possiblyNil)
+			fieldValue := reflect.Indirect(possiblyPtr)
 			concreteValue := fieldValue.Interface()
 			dbName, _ := parseTag(baseType.Field(i).Tag.Get("json"))
 			// if tagOptions.Contains("nonzero") && isZeroValue(fieldValue) {

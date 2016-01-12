@@ -470,9 +470,9 @@ func TestEmbeddedStructs(t *testing.T) {
 func TestJoinQuery(t *testing.T) {
 	type Employee struct {
 		Name string
-		Id   int64
-		// BossId is an id into the employee table
-		BossId sql.NullInt64 `db:"boss_id"`
+		ID   int64
+		// BossID is an id into the employee table
+		BossID sql.NullInt64 `db:"boss_id"`
 	}
 	type Boss Employee
 
@@ -496,7 +496,7 @@ func TestJoinQuery(t *testing.T) {
 			if len(em.Employee.Name) == 0 {
 				t.Errorf("Expected non zero lengthed name.")
 			}
-			if em.Employee.BossId.Int64 != em.Boss.Id {
+			if em.Employee.BossID.Int64 != em.Boss.ID {
 				t.Errorf("Expected boss ids to match")
 			}
 		}
@@ -506,9 +506,9 @@ func TestJoinQuery(t *testing.T) {
 func TestJoinQueryNamedPointerStructs(t *testing.T) {
 	type Employee struct {
 		Name string
-		Id   int64
-		// BossId is an id into the employee table
-		BossId sql.NullInt64 `db:"boss_id"`
+		ID   int64
+		// BossID is an id into the employee table
+		BossID sql.NullInt64 `db:"boss_id"`
 	}
 	type Boss Employee
 
@@ -536,7 +536,7 @@ func TestJoinQueryNamedPointerStructs(t *testing.T) {
 			if len(em.Emp1.Name) == 0 || len(em.Emp2.Name) == 0 {
 				t.Errorf("Expected non zero lengthed name.")
 			}
-			if em.Emp1.BossId.Int64 != em.Boss.Id || em.Emp2.BossId.Int64 != em.Boss.Id {
+			if em.Emp1.BossID.Int64 != em.Boss.ID || em.Emp2.BossID.Int64 != em.Boss.ID {
 				t.Errorf("Expected boss ids to match")
 			}
 		}
@@ -1338,6 +1338,53 @@ func TestEmbeddedMaps(t *testing.T) {
 		if m.Properties == nil {
 			t.Error("Expected m.Properties to not be nil, but it was.")
 		}
+	})
+}
+
+func TestIssue197(t *testing.T) {
+	// this test actually tests for a bug in database/sql:
+	//   https://github.com/golang/go/issues/13905
+	// this potentially makes _any_ named type that is an alias for []byte
+	// unsafe to use in a lot of different ways (basically, unsafe to hold
+	// onto after loading from the database).
+	t.Skip()
+
+	type mybyte []byte
+	type Var struct{ Raw json.RawMessage }
+	type Var2 struct{ Raw []byte }
+	type Var3 struct{ Raw mybyte }
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		var err error
+		var v, q Var
+		if err = db.Get(&v, `SELECT '{"a": "b"}' AS raw`); err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("%s: v %s\n", db.DriverName(), v.Raw)
+		if err = db.Get(&q, `SELECT 'null' AS raw`); err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("%s: v %s\n", db.DriverName(), v.Raw)
+
+		var v2, q2 Var2
+		if err = db.Get(&v2, `SELECT '{"a": "b"}' AS raw`); err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("%s: v2 %s\n", db.DriverName(), v2.Raw)
+		if err = db.Get(&q2, `SELECT 'null' AS raw`); err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("%s: v2 %s\n", db.DriverName(), v2.Raw)
+
+		var v3, q3 Var3
+		if err = db.QueryRow(`SELECT '{"a": "b"}' AS raw`).Scan(&v3.Raw); err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("v3 %s\n", v3.Raw)
+		if err = db.QueryRow(`SELECT '{"c": "d"}' AS raw`).Scan(&q3.Raw); err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("v3 %s\n", v3.Raw)
+		t.Fail()
 	})
 }
 

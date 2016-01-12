@@ -211,7 +211,7 @@ func TestNestedStruct(t *testing.T) {
 	}
 	v = m.FieldByName(pv, "asset.details.active")
 	if v.Interface().(bool) != post.Asset.Details.Active {
-		t.Errorf("Expecting %s, got %s", post.Asset.Details.Active, v.Interface().(bool))
+		t.Errorf("Expecting %v, got %v", post.Asset.Details.Active, v.Interface().(bool))
 	}
 }
 
@@ -243,7 +243,7 @@ func TestInlineStruct(t *testing.T) {
 	}
 	v = m.FieldByName(ev, "boss.id")
 	if ival(v) != em.Boss.ID {
-		t.Errorf("Expecting %s, got %s", em.Boss.ID, ival(v))
+		t.Errorf("Expecting %v, got %v", em.Boss.ID, ival(v))
 	}
 }
 

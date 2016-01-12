@@ -12,6 +12,10 @@ import (
 
 // GzippedText is a []byte which transparently gzips data being submitted to
 // a database and ungzips data being Scanned from a database.
+// WARNING: due to go issue https://github.com/golang/go/issues/13905 it is
+// potentially unsafe to use any []byte alias (like GzippedText) unless you
+// use it as if it had the behavior of sql.RawBytes (ie. it ceases to be
+// valid at the next scan)
 type GzippedText []byte
 
 // Value implements the driver.Valuer interface, gzipping the raw value of
@@ -48,21 +52,25 @@ func (g *GzippedText) Scan(src interface{}) error {
 	return nil
 }
 
-// JsonText is a json.RawMessage, which is a []byte underneath.
+// JSONText is a json.RawMessage, which is a []byte underneath.
 // Value() validates the json format in the source, and returns an error if
-// the json is not valid.  Scan does no validation.  JsonText additionally
+// the json is not valid.  Scan does no validation.  JSONText additionally
 // implements `Unmarshal`, which unmarshals the json within to an interface{}
-type JsonText json.RawMessage
+// WARNING: due to go issue https://github.com/golang/go/issues/13905 it is
+// potentially unsafe to use any []byte alias (like JSONText) unless you
+// use it as if it had the behavior of sql.RawBytes (ie. it ceases to be
+// valid at the next scan)
+type JSONText json.RawMessage
 
 // MarshalJSON returns the *j as the JSON encoding of j.
-func (j *JsonText) MarshalJSON() ([]byte, error) {
+func (j *JSONText) MarshalJSON() ([]byte, error) {
 	return *j, nil
 }
 
 // UnmarshalJSON sets *j to a copy of data
-func (j *JsonText) UnmarshalJSON(data []byte) error {
+func (j *JSONText) UnmarshalJSON(data []byte) error {
 	if j == nil {
-		return errors.New("JsonText: UnmarshalJSON on nil pointer")
+		return errors.New("JSONText: UnmarshalJSON on nil pointer")
 	}
 	*j = append((*j)[0:0], data...)
 	return nil
@@ -71,7 +79,7 @@ func (j *JsonText) UnmarshalJSON(data []byte) error {
 
 // Value returns j as a value.  This does a validating unmarshal into another
 // RawMessage.  If j is invalid json, it returns an error.
-func (j JsonText) Value() (driver.Value, error) {
+func (j JSONText) Value() (driver.Value, error) {
 	var m json.RawMessage
 	var err = j.Unmarshal(&m)
 	if err != nil {
@@ -81,7 +89,7 @@ func (j JsonText) Value() (driver.Value, error) {
 }
 
 // Scan stores the src in *j.  No validation is done.
-func (j *JsonText) Scan(src interface{}) error {
+func (j *JSONText) Scan(src interface{}) error {
 	var source []byte
 	switch src.(type) {
 	case string:
@@ -89,18 +97,18 @@ func (j *JsonText) Scan(src interface{}) error {
 	case []byte:
 		source = src.([]byte)
 	default:
-		return errors.New("Incompatible type for JsonText")
+		return errors.New("Incompatible type for JSONText")
 	}
-	*j = JsonText(append((*j)[0:0], source...))
+	*j = JSONText(append((*j)[0:0], source...))
 	return nil
 }
 
 // Unmarshal unmarshal's the json in j to v, as in json.Unmarshal.
-func (j *JsonText) Unmarshal(v interface{}) error {
+func (j *JSONText) Unmarshal(v interface{}) error {
 	return json.Unmarshal([]byte(*j), v)
 }
 
-// Pretty printing for JsonText types
-func (j JsonText) String() string {
+// Pretty printing for JSONText types
+func (j JSONText) String() string {
 	return string(j)
 }

@@ -17,8 +17,8 @@ func TestGzipText(t *testing.T) {
 	}
 }
 
-func TestJsonText(t *testing.T) {
-	j := JsonText(`{"foo": 1, "bar": 2}`)
+func TestJSONText(t *testing.T) {
+	j := JSONText(`{"foo": 1, "bar": 2}`)
 	v, err := j.Value()
 	if err != nil {
 		t.Errorf("Was not expecting an error")
@@ -34,7 +34,7 @@ func TestJsonText(t *testing.T) {
 		t.Errorf("Expected valid json but got some garbage instead? %#v", m)
 	}
 
-	j = JsonText(`{"foo": 1, invalid, false}`)
+	j = JSONText(`{"foo": 1, invalid, false}`)
 	v, err = j.Value()
 	if err == nil {
 		t.Errorf("Was expecting invalid json to fail!")

@@ -1,6 +1,6 @@
 // Package reflectx implements extensions to the standard reflect lib suitable
 // for implementing marshaling and unmarshaling packages.  The main Mapper type
-// allows for Go-compatible named atribute access, including accessing embedded
+// allows for Go-compatible named attribute access, including accessing embedded
 // struct attributes and the ability to use  functions and struct tags to
 // customize field names.
 //
@@ -41,7 +41,7 @@ func (f StructMap) GetByPath(path string) *FieldInfo {
 }
 
 // GetByTraversal returns a *FieldInfo for a given integer path.  It is
-// analagous to reflect.FieldByIndex.
+// analogous to reflect.FieldByIndex.
 func (f StructMap) GetByTraversal(index []int) *FieldInfo {
 	if len(index) == 0 {
 		return nil

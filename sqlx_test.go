@@ -202,7 +202,7 @@ type SliceMember struct {
 }
 
 // Note that because of field map caching, we need a new type here
-// if we've used Place already soemwhere in sqlx
+// if we've used Place already somewhere in sqlx
 type CPlace Place
 
 func MultiExec(e Execer, query string) {

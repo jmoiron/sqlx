@@ -744,7 +744,7 @@ func (r *Row) StructScan(dest interface{}) error {
 }
 
 // SliceScan a row, returning a []interface{} with values similar to MapScan.
-// This function is primarly intended for use where the number of columns
+// This function is primarily intended for use where the number of columns
 // is not known.  Because you can pass an []interface{} directly to Scan,
 // it's recommended that you do that as it will not have to allocate new
 // slices per row.

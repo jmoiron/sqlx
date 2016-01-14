@@ -12,10 +12,6 @@ import (
 
 // GzippedText is a []byte which transparently gzips data being submitted to
 // a database and ungzips data being Scanned from a database.
-// WARNING: due to go issue https://github.com/golang/go/issues/13905 it is
-// potentially unsafe to use any []byte alias (like GzippedText) unless you
-// use it as if it had the behavior of sql.RawBytes (ie. it ceases to be
-// valid at the next scan)
 type GzippedText []byte
 
 // Value implements the driver.Valuer interface, gzipping the raw value of
@@ -56,10 +52,6 @@ func (g *GzippedText) Scan(src interface{}) error {
 // Value() validates the json format in the source, and returns an error if
 // the json is not valid.  Scan does no validation.  JSONText additionally
 // implements `Unmarshal`, which unmarshals the json within to an interface{}
-// WARNING: due to go issue https://github.com/golang/go/issues/13905 it is
-// potentially unsafe to use any []byte alias (like JSONText) unless you
-// use it as if it had the behavior of sql.RawBytes (ie. it ceases to be
-// valid at the next scan)
 type JSONText json.RawMessage
 
 // MarshalJSON returns the *j as the JSON encoding of j.

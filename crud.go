@@ -37,9 +37,9 @@ type StructTable interface {
 
 type SafeSelector map[string]interface{}
 
-// expand expands the selector into a clause delimited by some space and a list of
+// Expand expands the selector into a clause delimited by some space and a list of
 // args to append into prepared statements
-func expand(s map[string]interface{}, spacer string) (string, []interface{}) {
+func Expand(s map[string]interface{}, spacer string) (string, []interface{}) {
 	args := []interface{}{}
 	cnt := 0
 	query := ""
@@ -55,8 +55,8 @@ func expand(s map[string]interface{}, spacer string) (string, []interface{}) {
 	return query, args
 }
 
-// extract takes in a struct object and extracts out the mapping
-func extract(obj StructTable) (map[string]interface{}, error) {
+// Extract takes in a struct object and extracts out the mapping
+func Extract(obj StructTable) (map[string]interface{}, error) {
 	// Validate the schema.
 	if err := obj.Validate(); err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func extract(obj StructTable) (map[string]interface{}, error) {
 		possiblyPtr := reflect.ValueOf(obj).FieldByName(fieldName)
 		// possiblyPtr could also be a struct or pointer
 		if possiblyPtr.Kind() == reflect.Struct {
-			subMap, err := extract(possiblyPtr.Interface().(StructTable))
+			subMap, err := Extract(possiblyPtr.Interface().(StructTable))
 			if err != nil {
 				return nil, err
 			}
@@ -174,7 +174,7 @@ func MakeStructTable(input map[string]interface{}, obj StructTable) error {
 // 		if type is time.Time, and the value is a Zero Value, then CURRENT_TIMESTAMP will be inserted
 //		if type is a Pointer, and its indirected value is nil, then it is omitted.
 func (h *Helper) CreateObject(obj StructTable) error {
-	msi, err := extract(obj)
+	msi, err := Extract(obj)
 	if err != nil {
 		return err
 	}
@@ -209,13 +209,13 @@ func (h *Helper) CreateObject(obj StructTable) error {
 // If no matching row was deleted, then an error is returned.
 func (h *Helper) DeleteAll(condition StructTable) error {
 	tableName := condition.TableName()
-	msi, err := extract(condition)
+	msi, err := Extract(condition)
 	if err != nil {
 		return err
 	}
 	query := "DELETE FROM " + tableName
 	query += " WHERE "
-	where, args := expand(msi, " AND ")
+	where, args := Expand(msi, " AND ")
 	query += where
 	query = h.Rebind(query)
 	res, err := h.Exec(query, args...)
@@ -247,7 +247,7 @@ func (h *Helper) buildQuery(condition StructTable, projection []string) (string,
 	}
 	query += " FROM "
 	query += tableName
-	msi, err := extract(condition)
+	msi, err := Extract(condition)
 	if err != nil {
 		return "", nil, err
 	}
@@ -255,7 +255,7 @@ func (h *Helper) buildQuery(condition StructTable, projection []string) (string,
 	if len(msi) > 0 {
 		query += " WHERE "
 		var where string
-		where, args = expand(msi, " AND ")
+		where, args = Expand(msi, " AND ")
 		query += where
 	}
 	return query, args, nil
@@ -290,7 +290,7 @@ func (h *Helper) QueryRows(condition StructTable, projection ...string) (*Rows, 
 // If no matching row was updated, then an error is returned.
 func (h *Helper) UpdateAll(update StructTable, condition StructTable) error {
 	tableName := update.TableName()
-	msi1, err := extract(update)
+	msi1, err := Extract(update)
 	if err != nil {
 		return err
 	}
@@ -298,17 +298,17 @@ func (h *Helper) UpdateAll(update StructTable, condition StructTable) error {
 		// nothing to update, all nil
 		return nil
 	}
-	msi2, err := extract(condition)
+	msi2, err := Extract(condition)
 	if err != nil {
 		return err
 	}
 	query := "UPDATE " + tableName + " SET "
-	expansion, args := expand(msi1, ",")
+	expansion, args := Expand(msi1, ",")
 	query += expansion
 	// all_args := append(args
 	if len(msi2) > 0 {
 		query += " WHERE "
-		expansion2, args2 := expand(msi2, " AND ")
+		expansion2, args2 := Expand(msi2, " AND ")
 		query += expansion2
 		args = append(args, args2...)
 	}

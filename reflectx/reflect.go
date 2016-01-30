@@ -326,7 +326,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 			}
 
 			// skip unexported fields
-			if len(f.PkgPath) != 0 {
+			if len(f.PkgPath) != 0 && !f.Anonymous {
 				continue
 			}
 

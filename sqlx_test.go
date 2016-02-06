@@ -1318,7 +1318,7 @@ func TestEmbeddedMaps(t *testing.T) {
 		for _, m := range messages {
 			_, err := db.NamedExec(q1, m)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 		}
 		var count int

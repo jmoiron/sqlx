@@ -227,7 +227,7 @@ func (h *Helper) DeleteAll(condition StructTable) error {
 		return err
 	}
 	if cnt == 0 {
-		return errors.New("No row was deleted.")
+		return sql.ErrNoRows
 	}
 	return nil
 }

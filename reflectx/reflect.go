@@ -62,18 +62,18 @@ func (f StructMap) GetByTraversal(index []int) *FieldInfo {
 // mapping and a function to provide a basic mapping of fields to names.
 type Mapper struct {
 	cache      map[reflect.Type]*StructMap
-	tagName    string
+	tagNames   []string
 	tagMapFunc func(string) string
 	mapFunc    func(string) string
 	mutex      sync.Mutex
 }
 
 // NewMapper returns a new mapper which optionally obeys the field tag given
-// by tagName.  If tagName is the empty string, it is ignored.
-func NewMapper(tagName string) *Mapper {
+// by tagNames.  If tagName is the empty string, it is ignored.
+func NewMapper(tagNames ...string) *Mapper {
 	return &Mapper{
-		cache:   make(map[reflect.Type]*StructMap),
-		tagName: tagName,
+		cache:    make(map[reflect.Type]*StructMap),
+		tagNames: tagNames,
 	}
 }
 
@@ -83,7 +83,7 @@ func NewMapper(tagName string) *Mapper {
 func NewMapperTagFunc(tagName string, mapFunc, tagMapFunc func(string) string) *Mapper {
 	return &Mapper{
 		cache:      make(map[reflect.Type]*StructMap),
-		tagName:    tagName,
+		tagNames:   []string{tagName},
 		mapFunc:    mapFunc,
 		tagMapFunc: tagMapFunc,
 	}
@@ -94,9 +94,9 @@ func NewMapperTagFunc(tagName string, mapFunc, tagMapFunc func(string) string) *
 // for any other field, the mapped name will be f(field.Name)
 func NewMapperFunc(tagName string, f func(string) string) *Mapper {
 	return &Mapper{
-		cache:   make(map[reflect.Type]*StructMap),
-		tagName: tagName,
-		mapFunc: f,
+		cache:    make(map[reflect.Type]*StructMap),
+		tagNames: []string{tagName},
+		mapFunc:  f,
 	}
 }
 
@@ -106,7 +106,7 @@ func (m *Mapper) TypeMap(t reflect.Type) *StructMap {
 	m.mutex.Lock()
 	mapping, ok := m.cache[t]
 	if !ok {
-		mapping = getMapping(t, m.tagName, m.mapFunc, m.tagMapFunc)
+		mapping = getMapping(t, m.tagNames, m.mapFunc, m.tagMapFunc)
 		m.cache[t] = mapping
 	}
 	m.mutex.Unlock()
@@ -259,7 +259,7 @@ func apnd(is []int, i int) []int {
 
 // getMapping returns a mapping for the t type, using the tagName, mapFunc and
 // tagMapFunc to determine the canonical names of fields.
-func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string) string) *StructMap {
+func getMapping(t reflect.Type, tagNames []string, mapFunc, tagMapFunc func(string) string) *StructMap {
 	m := []*FieldInfo{}
 
 	root := &FieldInfo{}
@@ -282,10 +282,17 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 			fi.Options = map[string]string{}
 
 			var tag, name string
-			if tagName != "" && strings.Contains(string(f.Tag), tagName+":") {
-				tag = f.Tag.Get(tagName)
-				name = tag
-			} else {
+			hasMappedWithTag := false
+			for _, tagName := range tagNames {
+				if tagName != "" && strings.Contains(string(f.Tag), tagName+":") {
+					tag = f.Tag.Get(tagName)
+					name = tag
+					// If we find this tag is valid, mark it so and don't keep processing.
+					hasMappedWithTag = true
+					break
+				}
+			}
+			if !hasMappedWithTag {
 				if mapFunc != nil {
 					name = mapFunc(f.Name)
 				}

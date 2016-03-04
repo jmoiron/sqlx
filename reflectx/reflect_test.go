@@ -161,6 +161,28 @@ func TestFlatTags(t *testing.T) {
 	}
 }
 
+func TestMultipleTags(t *testing.T) {
+	m := NewMapper("db", "json")
+
+	type Foo struct {
+		Bar string `json:"-" db:"bar"`
+		Baz string `json:"baz"`
+	}
+	// Post columns: (author title)
+
+	foo := Foo{Bar: "a", Baz: "b"}
+	fv := reflect.ValueOf(foo)
+
+	v := m.FieldByName(fv, "bar")
+	if v.Interface().(string) != foo.Bar {
+		t.Errorf("Expecting %s, got %s", foo.Bar, v.Interface().(string))
+	}
+	v = m.FieldByName(fv, "baz")
+	if v.Interface().(string) != foo.Baz {
+		t.Errorf("Expecting %s, got %s", foo.Baz, v.Interface().(string))
+	}
+}
+
 func TestNestedStruct(t *testing.T) {
 	m := NewMapper("db")
 

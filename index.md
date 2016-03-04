@@ -431,7 +431,7 @@ type PersonPlace struct {
 
 A StructScan will set an `id` column result in `Person.AutoIncr.ID`, also accessible as `Person.ID`.  To avoid confusion, it's suggested that you use `AS` to create column aliases in your SQL instead.
 
-### Scan Destination Safety <a href="#safety" class="permalink" id="safety">&para</a>
+### Scan Destination Safety <a href="#safety" class="permalink" id="safety">&para;</a>
 
 By default, StructScan will return an error if a column does not map to a field in the destination.  This mimics the treatment for things like unused variables in Go, but does *not* match the way that standard library marshallers like `encoding/json` behave.  Because SQL is generally executed in a more controlled fashion than parsing JSON, and these errors are generally coding errors, a decision was made to return errors by default.
 
@@ -449,7 +449,7 @@ udb := db.Unsafe()
 err = udb.Get(&p, "SELECT * FROM person, place LIMIT 1;")
 ```
 
-### Controlling Name Mapping <a href="#mapping" class="permalink" id="mapping">&para</a>
+### Controlling Name Mapping <a href="#mapping" class="permalink" id="mapping">&para;</a>
 
 Struct fields used as targets for StructScans *must* be capitalized in order to be accessible by sqlx. Because of this, sqlx uses a *NameMapper* which applies `strings.ToLower` to field names to map them to columns in your rows result.  This isn't always desirable, depending on your schema, so sqlx allows the mapping to be customized a number of ways.
 

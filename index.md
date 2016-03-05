@@ -290,7 +290,7 @@ txStmt, err := tx.Prepare(`SELECT * FROM place WHERE telcode=?`)
 row = txStmt.QueryRow(852)
 ```
 
-Prepare actually runs the preparation on the database, so it requires a connection and is connection state.  database/sql abstracts this from you, allowing you to execute from a single Stmt object concurrently on many connections by creating the statements on new connections automatically.  `Preparex()`, which returns an `sqlx.Stmt` which has all of the handle extensions that sqlx.DB and sqlx.Tx do:
+Prepare actually runs the preparation on the database, so it requires a connection and its connection state.  database/sql abstracts this from you, allowing you to execute from a single Stmt object concurrently on many connections by creating the statements on new connections automatically.  `Preparex()`, which returns an `sqlx.Stmt` which has all of the handle extensions that sqlx.DB and sqlx.Tx do:
 
 ```go
 stmt, err := db.Preparex(`SELECT * FROM place WHERE telcode=?`)

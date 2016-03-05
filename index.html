@@ -414,7 +414,7 @@ type PersonPlace struct {
 </pre>
 
 <p>A StructScan will set an <code>id</code> column result in <code>Person.AutoIncr.ID</code>, also accessible as <code>Person.ID</code>.  To avoid confusion, it's suggested that you use <code>AS</code> to create column aliases in your SQL instead.</p>
-<h3>Scan Destination Safety <a href="#safety" class="permalink" id="safety">&amp;para</a></h3>
+<h3>Scan Destination Safety <a href="#safety" class="permalink" id="safety">&para;</a></h3>
 <p>By default, StructScan will return an error if a column does not map to a field in the destination.  This mimics the treatment for things like unused variables in Go, but does <em>not</em> match the way that standard library marshallers like <code>encoding/json</code> behave.  Because SQL is generally executed in a more controlled fashion than parsing JSON, and these errors are generally coding errors, a decision was made to return errors by default.</p>
 <p>Like unused variables, columns which you ignore are a waste of network and database resources, and detecting things like an incompatible mapping or a typo in a struct tag early can be difficult without the mapper letting you know something wasn't found.</p>
 <p>Despite this, there are some cases where ignoring columns with no destination might be desired.  For this, there is the <code>Unsafe</code> method on each <a href="#handles">Handle type</a> which returns a new copy of that handle whith this safety turned off:</p>
@@ -428,7 +428,7 @@ udb := db.Unsafe()
 err = udb.Get(&p, "SELECT * FROM person, place LIMIT 1;")
 </pre>
 
-<h3>Controlling Name Mapping <a href="#mapping" class="permalink" id="mapping">&amp;para</a></h3>
+<h3>Controlling Name Mapping <a href="#mapping" class="permalink" id="mapping">&para;</a></h3>
 <p>Struct fields used as targets for StructScans <em>must</em> be capitalized in order to be accessible by sqlx. Because of this, sqlx uses a <em>NameMapper</em> which applies <code>strings.ToLower</code> to field names to map them to columns in your rows result.  This isn't always desirable, depending on your schema, so sqlx allows the mapping to be customized a number of ways.</p>
 <p>The simplest of these ways is to set it for a db handle by using <code>sqlx.DB.MapperFunc</code>, which receives an argument of type <code>func(string) string</code>.  If your library requires a particular mapper, and you don't want to poison the <code>sqlx.DB</code> you receive, you can create a copy for use in the library to ensure a particular default mapping:</p>
 <pre class="prettyprint linenums">

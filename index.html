@@ -304,7 +304,7 @@ err = stmt.Get(&p, 852)
 <h2>Query Helpers</h2>
 <p>The <code>database/sql</code> package does not do anything with your actual query text.  This makes it trivial to use backend-specific features in your code;  you can write queries just as you would write them in your database prompt.  While this is very flexible, it makes writing certain kinds of queries difficult.</p>
 <h3>"In" Queries <a href="#inQueries" class="permalink" id="inQueries">&para;</a></h3>
-<p>Because <code>database/sql</code> does not inspect your query and it passes your arguments directly to the driver, it makes it makes dealing with queries with IN clauses difficult:</p>
+<p>Because <code>database/sql</code> does not inspect your query and it passes your arguments directly to the driver, it makes dealing with queries with IN clauses difficult:</p>
 <pre class="prettyprint linenums">
 SELECT * FROM users WHERE level IN (?);
 </pre>

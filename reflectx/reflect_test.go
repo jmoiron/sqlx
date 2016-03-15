@@ -457,6 +457,25 @@ func TestTagNameMapping(t *testing.T) {
 			t.Errorf("Expecting to find key %s in mapping but did not.", key)
 		}
 	}
+
+	m = NewMapperTagFunc("protobuf", strings.ToUpper, func(value string) string {
+		if strings.Contains(value, ",") {
+			for _, piece := range strings.Split(value, ",") {
+				if strings.HasPrefix(piece, "name=") {
+					return strings.TrimPrefix(piece, "name=")
+				}
+			}
+		}
+		return value
+	})
+	strategy = Strategy{"1", "Alpah"}
+	mapping = m.TypeMap(reflect.TypeOf(strategy))
+
+	for _, key := range []string{"strategy_id", "STRATEGYNAME"} {
+		if fi := mapping.GetByPath(key); fi == nil {
+			t.Errorf("Expecting to find key %s in mapping but did not.", key)
+		}
+	}
 }
 
 func TestMapping(t *testing.T) {

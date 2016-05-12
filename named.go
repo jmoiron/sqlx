@@ -250,7 +250,7 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 			inName = true
 			name = []byte{}
 			// if we're in a name, and this is an allowed character, continue
-		} else if inName && (unicode.IsOneOf(allowedBindRunes, rune(b)) || b == '_') && i != last {
+		} else if inName && (unicode.IsOneOf(allowedBindRunes, rune(b)) || b == '_' || b == '.') && i != last {
 			// append the byte to the name if we are in a name and not on the last byte
 			name = append(name, b)
 			// if we're in a name and it's not an allowed character, the name is done

@@ -591,10 +591,20 @@ func TestNilReceiver(t *testing.T) {
 func TestNamedQuery(t *testing.T) {
 	var schema = Schema{
 		create: `
+			CREATE TABLE place (
+				id integer AUTO_INCREMENT PRIMARY KEY,
+				name text NULL
+			);
 			CREATE TABLE person (
 				first_name text NULL,
 				last_name text NULL,
 				email text NULL
+			);
+			CREATE TABLE placeperson (
+				first_name text NULL,
+				last_name text NULL,
+				email text NULL,
+				place_id integer NULL
 			);
 			CREATE TABLE jsperson (
 				"FIRST" text NULL,
@@ -604,6 +614,8 @@ func TestNamedQuery(t *testing.T) {
 		drop: `
 			drop table person;
 			drop table jsperson;
+			drop table place;
+			drop table placeperson;
 			`,
 	}
 
@@ -734,6 +746,79 @@ func TestNamedQuery(t *testing.T) {
 
 		db.Mapper = &old
 
+		// Test nested structs
+		type Place struct {
+			ID   int            `db:"id"`
+			Name sql.NullString `db:"name"`
+		}
+		type PlacePerson struct {
+			FirstName sql.NullString `db:"first_name"`
+			LastName  sql.NullString `db:"last_name"`
+			Email     sql.NullString
+			Place     Place `db:"place"`
+		}
+
+		pl := Place{
+			Name: sql.NullString{String: "myplace", Valid: true},
+		}
+
+		pp := PlacePerson{
+			FirstName: sql.NullString{String: "ben", Valid: true},
+			LastName:  sql.NullString{String: "doe", Valid: true},
+			Email:     sql.NullString{String: "ben@doe.com", Valid: true},
+		}
+
+		q2 := `INSERT INTO place (name) VALUES (:name)`
+		result, err := db.NamedExec(q2, pl)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		id, err := result.LastInsertId()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		pp.Place.ID = int(id)
+		q3 := `INSERT INTO placeperson (first_name, last_name, email, place_id) VALUES (:first_name, :last_name, :email, :place.id)`
+		_, err = db.NamedExec(q3, pp)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		pp2 := &PlacePerson{}
+		rows, err = db.NamedQuery(`
+			SELECT
+				first_name,
+				last_name,
+				email,
+				place.id AS "place.id",
+				place.name AS "place.name"
+			FROM placeperson 
+			INNER JOIN place ON place.id = placeperson.place_id
+			WHERE
+				place.id=:place.id`, pp)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for rows.Next() {
+			err = rows.StructScan(pp2)
+			if err != nil {
+				t.Error(err)
+			}
+			if pp2.FirstName.String != "ben" {
+				t.Error("Expected first name of `ben`, got " + pp2.FirstName.String)
+			}
+			if pp2.LastName.String != "doe" {
+				t.Error("Expected first name of `doe`, got " + pp2.LastName.String)
+			}
+			if pp2.Place.Name.String != "myplace" {
+				t.Error("Expected place name of `myplace`, got " + pp2.Place.Name.String)
+			}
+			if pp2.Place.ID != pp.Place.ID {
+				t.Errorf("Expected place name of %v, got %v", pp.Place.ID, pp2.Place.ID)
+			}
+		}
 	})
 }
 

@@ -27,7 +27,7 @@ func BindType(driverName string) int {
 		return QUESTION
 	case "sqlite3":
 		return QUESTION
-	case "oci8":
+	case "oci8", "ora", "goracle":
 		return NAMED
 	}
 	return UNKNOWN

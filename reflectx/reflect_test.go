@@ -251,7 +251,7 @@ func TestFieldsEmbedded(t *testing.T) {
 	m := NewMapper("db")
 
 	type Person struct {
-		Name string `db:"name"`
+		Name string `db:"name,size=64"`
 	}
 	type Place struct {
 		Name string `db:"name"`
@@ -310,6 +310,9 @@ func TestFieldsEmbedded(t *testing.T) {
 	}
 	if fi.Path != "person.name" {
 		t.Errorf("Expecting %s, got %s", "person.name", fi.Path)
+	}
+	if fi.Options["size"] != "64" {
+		t.Errorf("Expecting %s, got %s", "64", fi.Options["size"])
 	}
 
 	fi = fields.GetByTraversal([]int{1, 0})
@@ -506,6 +509,312 @@ func TestMapping(t *testing.T) {
 	if fi := mapping.GetByPath("isallblack"); fi != nil {
 		t.Errorf("Expecting to ignore `IsAllBlack` field")
 	}
+}
+
+func TestGetByTraversal(t *testing.T) {
+	type C struct {
+		C0 int
+		C1 int
+	}
+	type B struct {
+		B0 string
+		B1 *C
+	}
+	type A struct {
+		A0 int
+		A1 B
+	}
+
+	testCases := []struct {
+		Index        []int
+		ExpectedName string
+		ExpectNil    bool
+	}{
+		{
+			Index:        []int{0},
+			ExpectedName: "A0",
+		},
+		{
+			Index:        []int{1, 0},
+			ExpectedName: "B0",
+		},
+		{
+			Index:        []int{1, 1, 1},
+			ExpectedName: "C1",
+		},
+		{
+			Index:     []int{3, 4, 5},
+			ExpectNil: true,
+		},
+		{
+			Index:     []int{},
+			ExpectNil: true,
+		},
+		{
+			Index:     nil,
+			ExpectNil: true,
+		},
+	}
+
+	m := NewMapperFunc("db", func(n string) string { return n })
+	tm := m.TypeMap(reflect.TypeOf(A{}))
+
+	for i, tc := range testCases {
+		fi := tm.GetByTraversal(tc.Index)
+		if tc.ExpectNil {
+			if fi != nil {
+				t.Errorf("%d: expected nil, got %v", i, fi)
+			}
+			continue
+		}
+
+		if fi == nil {
+			t.Errorf("%d: expected %s, got nil", i, tc.ExpectedName)
+			continue
+		}
+
+		if fi.Name != tc.ExpectedName {
+			t.Errorf("%d: expected %s, got %s", i, tc.ExpectedName, fi.Name)
+		}
+	}
+}
+
+// TestMapperMethodsByName tests Mapper methods FieldByName and TraversalsByName
+func TestMapperMethodsByName(t *testing.T) {
+	type C struct {
+		C0 string
+		C1 int
+	}
+	type B struct {
+		B0 *C     `db:"B0"`
+		B1 C      `db:"B1"`
+		B2 string `db:"B2"`
+	}
+	type A struct {
+		A0 *B `db:"A0"`
+		B  `db:"A1"`
+		A2 int
+		a3 int
+	}
+
+	val := &A{
+		A0: &B{
+			B0: &C{C0: "0", C1: 1},
+			B1: C{C0: "2", C1: 3},
+			B2: "4",
+		},
+		B: B{
+			B0: nil,
+			B1: C{C0: "5", C1: 6},
+			B2: "7",
+		},
+		A2: 8,
+	}
+
+	testCases := []struct {
+		Name            string
+		ExpectInvalid   bool
+		ExpectedValue   interface{}
+		ExpectedIndexes []int
+	}{
+		{
+			Name:            "A0.B0.C0",
+			ExpectedValue:   "0",
+			ExpectedIndexes: []int{0, 0, 0},
+		},
+		{
+			Name:            "A0.B0.C1",
+			ExpectedValue:   1,
+			ExpectedIndexes: []int{0, 0, 1},
+		},
+		{
+			Name:            "A0.B1.C0",
+			ExpectedValue:   "2",
+			ExpectedIndexes: []int{0, 1, 0},
+		},
+		{
+			Name:            "A0.B1.C1",
+			ExpectedValue:   3,
+			ExpectedIndexes: []int{0, 1, 1},
+		},
+		{
+			Name:            "A0.B2",
+			ExpectedValue:   "4",
+			ExpectedIndexes: []int{0, 2},
+		},
+		{
+			Name:            "A1.B0.C0",
+			ExpectedValue:   "",
+			ExpectedIndexes: []int{1, 0, 0},
+		},
+		{
+			Name:            "A1.B0.C1",
+			ExpectedValue:   0,
+			ExpectedIndexes: []int{1, 0, 1},
+		},
+		{
+			Name:            "A1.B1.C0",
+			ExpectedValue:   "5",
+			ExpectedIndexes: []int{1, 1, 0},
+		},
+		{
+			Name:            "A1.B1.C1",
+			ExpectedValue:   6,
+			ExpectedIndexes: []int{1, 1, 1},
+		},
+		{
+			Name:            "A1.B2",
+			ExpectedValue:   "7",
+			ExpectedIndexes: []int{1, 2},
+		},
+		{
+			Name:            "A2",
+			ExpectedValue:   8,
+			ExpectedIndexes: []int{2},
+		},
+		{
+			Name:            "XYZ",
+			ExpectInvalid:   true,
+			ExpectedIndexes: []int{},
+		},
+		{
+			Name:            "a3",
+			ExpectInvalid:   true,
+			ExpectedIndexes: []int{},
+		},
+	}
+
+	// build the names array from the test cases
+	names := make([]string, len(testCases))
+	for i, tc := range testCases {
+		names[i] = tc.Name
+	}
+	m := NewMapperFunc("db", func(n string) string { return n })
+	v := reflect.ValueOf(val)
+	values := m.FieldsByName(v, names)
+	if len(values) != len(testCases) {
+		t.Errorf("expected %d values, got %d", len(testCases), len(values))
+		t.FailNow()
+	}
+	indexes := m.TraversalsByName(v.Type(), names)
+	if len(indexes) != len(testCases) {
+		t.Errorf("expected %d traversals, got %d", len(testCases), len(indexes))
+		t.FailNow()
+	}
+	for i, val := range values {
+		tc := testCases[i]
+		traversal := indexes[i]
+		if !reflect.DeepEqual(tc.ExpectedIndexes, traversal) {
+			t.Errorf("%d: expected %v, got %v", tc.ExpectedIndexes, traversal)
+			t.FailNow()
+		}
+		val = reflect.Indirect(val)
+		if tc.ExpectInvalid {
+			if val.IsValid() {
+				t.Errorf("%d: expected zero value, got %v", i, val)
+			}
+			continue
+		}
+		if !val.IsValid() {
+			t.Errorf("%d: expected valid value, got %v", i, val)
+			continue
+		}
+		actualValue := reflect.Indirect(val).Interface()
+		if !reflect.DeepEqual(tc.ExpectedValue, actualValue) {
+			t.Errorf("%d: expected %v, got %v", i, tc.ExpectedValue, actualValue)
+		}
+	}
+}
+
+func TestFieldByIndexes(t *testing.T) {
+	type C struct {
+		C0 bool
+		C1 string
+		C2 int
+		C3 map[string]int
+	}
+	type B struct {
+		B1 C
+		B2 *C
+	}
+	type A struct {
+		A1 B
+		A2 *B
+	}
+	testCases := []struct {
+		value         interface{}
+		indexes       []int
+		expectedValue interface{}
+		readOnly      bool
+	}{
+		{
+			value: A{
+				A1: B{B1: C{C0: true}},
+			},
+			indexes:       []int{0, 0, 0},
+			expectedValue: true,
+			readOnly:      true,
+		},
+		{
+			value: A{
+				A2: &B{B2: &C{C1: "answer"}},
+			},
+			indexes:       []int{1, 1, 1},
+			expectedValue: "answer",
+			readOnly:      true,
+		},
+		{
+			value:         &A{},
+			indexes:       []int{1, 1, 3},
+			expectedValue: map[string]int{},
+		},
+	}
+
+	for i, tc := range testCases {
+		checkResults := func(v reflect.Value) {
+			if tc.expectedValue == nil {
+				if !v.IsNil() {
+					t.Errorf("%d: expected nil, actual %v", i, v.Interface())
+				}
+			} else {
+				if !reflect.DeepEqual(tc.expectedValue, v.Interface()) {
+					t.Errorf("%d: expected %v, actual %v", i, tc.expectedValue, v.Interface())
+				}
+			}
+		}
+
+		checkResults(FieldByIndexes(reflect.ValueOf(tc.value), tc.indexes))
+		if tc.readOnly {
+			checkResults(FieldByIndexesReadOnly(reflect.ValueOf(tc.value), tc.indexes))
+		}
+	}
+}
+
+func TestMustBe(t *testing.T) {
+	typ := reflect.TypeOf(E1{})
+	mustBe(typ, reflect.Struct)
+
+	defer func() {
+		if r := recover(); r != nil {
+			valueErr, ok := r.(*reflect.ValueError)
+			if !ok {
+				t.Errorf("unexpected Method: %s", valueErr.Method)
+				t.Error("expected panic with *reflect.ValueError")
+				return
+			}
+			if valueErr.Method != "github.com/jmoiron/sqlx/reflectx.TestMustBe" {
+			}
+			if valueErr.Kind != reflect.String {
+				t.Errorf("unexpected Kind: %s", valueErr.Kind)
+			}
+		} else {
+			t.Error("expected panic")
+		}
+	}()
+
+	typ = reflect.TypeOf("string")
+	mustBe(typ, reflect.Struct)
+	t.Error("got here, didn't expect to")
 }
 
 type E1 struct {

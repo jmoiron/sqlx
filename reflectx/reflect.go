@@ -1,5 +1,5 @@
 // Package reflectx implements extensions to the standard reflect lib suitable
-// for implementing marshaling and unmarshaling packages.  The main Mapper type
+// for implementing marshalling and unmarshalling packages.  The main Mapper type
 // allows for Go-compatible named attribute access, including accessing embedded
 // struct attributes and the ability to use  functions and struct tags to
 // customize field names.
@@ -231,7 +231,7 @@ func mustBe(v kinder, expected reflect.Kind) {
 	}
 }
 
-// methodName is returns the caller of the function calling methodName
+// methodName returns the caller of the function calling methodName
 func methodName() string {
 	pc, _, _, _ := runtime.Caller(2)
 	f := runtime.FuncForPC(pc)

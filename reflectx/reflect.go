@@ -288,6 +288,9 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 			var tag, name string
 			if tagName != "" && strings.Contains(string(f.Tag), tagName+":") {
 				tag = f.Tag.Get(tagName)
+				if tagMapFunc != nil {
+					tag = tagMapFunc(tag)
+				}
 				name = tag
 			} else {
 				if mapFunc != nil {
@@ -306,10 +309,6 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc func(string)
 						fi.Options[kv[0]] = ""
 					}
 				}
-			}
-
-			if tagMapFunc != nil {
-				tag = tagMapFunc(tag)
 			}
 
 			fi.Name = name

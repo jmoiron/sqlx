@@ -17,7 +17,7 @@ import (
 // Although the NameMapper is convenient, in practice it should not
 // be relied on except for application code.  If you are writing a library
 // that uses sqlx, you should be aware that the name mappings you expect
-// can be overridded by your user's application.
+// can be overridden by your user's application.
 
 // NameMapper is used to map column names to struct field names.  By default,
 // it uses strings.ToLower to lowercase struct field names.  It can be set
@@ -779,7 +779,7 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 // executes SQL from input).  Please do not use this as a primary interface!
 // This will modify the map sent to it in place, so reuse the same map with
 // care.  Columns which occur more than once in the result will overwrite
-// eachother!
+// each other!
 func MapScan(r ColScanner, dest map[string]interface{}) error {
 	// ignore r.started, since we needn't use reflect for anything.
 	columns, err := r.Columns()
@@ -937,7 +937,7 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 // anyway) works on a rows object.
 
 // StructScan all rows from an sql.Rows or an sqlx.Rows into the dest slice.
-// StructScan will scan in the entire rows result, so if you need do not want to
+// StructScan will scan in the entire rows result, so if you do not want to
 // allocate structs for the entire result, use Queryx and see sqlx.Rows.StructScan.
 // If rows is sqlx.Rows, it will use its mapper, otherwise it will use the default.
 func StructScan(rows rowsi, dest interface{}) error {

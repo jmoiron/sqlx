@@ -3,6 +3,7 @@ package sqlx
 import (
 	"database/sql"
 	"testing"
+	"time"
 )
 
 func TestCompileQuery(t *testing.T) {
@@ -126,7 +127,7 @@ func TestNamedQueries(t *testing.T) {
 		test.Error(err)
 
 		ns, err = db.PrepareNamed(`
-			SELECT first_name, last_name, email 
+			SELECT first_name, last_name, email
 			FROM person WHERE first_name=:first_name AND email=:email`)
 		test.Error(err)
 
@@ -166,6 +167,20 @@ func TestNamedQueries(t *testing.T) {
 		if p.Email != people[0].Email {
 			t.Errorf("got %s, expected %s", p.Email, people[0].Email)
 		}
+
+		// test Exec with dot notation
+		ns, err = db.PrepareNamed(`
+					INSERT INTO person (first_name, last_name, email)
+					VALUES (:first.name, :last.name, :email)`)
+		test.Error(err)
+
+		pn := PersonNest{
+			First: Name{Name: "Julien"},
+			Last:  Name{Name: "Savea"},
+			Email: "jsavea@ab.co.nz",
+		}
+		_, err = ns.Exec(pn)
+		test.Error(err)
 
 		// test Exec
 		ns, err = db.PrepareNamed(`
@@ -224,4 +239,14 @@ func TestNamedQueries(t *testing.T) {
 		}
 
 	})
+}
+
+type Name struct {
+	Name string `db:"name"`
+}
+type PersonNest struct {
+	First   Name `db:"first"`
+	Last    Name `db:"last"`
+	Email   string
+	AddedAt time.Time `db:"added_at"`
 }

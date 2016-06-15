@@ -1276,8 +1276,9 @@ func TestBindMap(t *testing.T) {
 
 type Message struct {
 	Text       string      `db:"string"`
-	Properties PropertyMap // Stored as JSON in the database
+	Properties PropertyMap `db:"properties"` // Stored as JSON in the database
 }
+
 type PropertyMap map[string]string
 
 // Implement driver.Valuer and sql.Scanner interfaces on PropertyMap
@@ -1314,7 +1315,7 @@ func TestEmbeddedMaps(t *testing.T) {
 			{"Hello, World", PropertyMap{"one": "1", "two": "2"}},
 			{"Thanks, Joy", PropertyMap{"pull": "request"}},
 		}
-		q1 := `INSERT INTO message (string, properties) VALUES (:string, :properties)`
+		q1 := `INSERT INTO message (string, properties) VALUES (:string, :properties);`
 		for _, m := range messages {
 			_, err := db.NamedExec(q1, m)
 			if err != nil {
@@ -1324,19 +1325,19 @@ func TestEmbeddedMaps(t *testing.T) {
 		var count int
 		err := db.Get(&count, "SELECT count(*) FROM message")
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		if count != len(messages) {
-			t.Errorf("Expected %d messages in DB, found %d", len(messages), count)
+			t.Fatalf("Expected %d messages in DB, found %d", len(messages), count)
 		}
 
 		var m Message
-		err = db.Get(&m, "SELECT * FROM message LIMIT 1")
+		err = db.Get(&m, "SELECT * FROM message LIMIT 1;")
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		if m.Properties == nil {
-			t.Error("Expected m.Properties to not be nil, but it was.")
+			t.Fatal("Expected m.Properties to not be nil, but it was.")
 		}
 	})
 }
@@ -1359,31 +1360,25 @@ func TestIssue197(t *testing.T) {
 		if err = db.Get(&v, `SELECT '{"a": "b"}' AS raw`); err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("%s: v %s\n", db.DriverName(), v.Raw)
 		if err = db.Get(&q, `SELECT 'null' AS raw`); err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("%s: v %s\n", db.DriverName(), v.Raw)
 
 		var v2, q2 Var2
 		if err = db.Get(&v2, `SELECT '{"a": "b"}' AS raw`); err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("%s: v2 %s\n", db.DriverName(), v2.Raw)
 		if err = db.Get(&q2, `SELECT 'null' AS raw`); err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("%s: v2 %s\n", db.DriverName(), v2.Raw)
 
 		var v3, q3 Var3
 		if err = db.QueryRow(`SELECT '{"a": "b"}' AS raw`).Scan(&v3.Raw); err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("v3 %s\n", v3.Raw)
 		if err = db.QueryRow(`SELECT '{"c": "d"}' AS raw`).Scan(&q3.Raw); err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("v3 %s\n", v3.Raw)
 		t.Fail()
 	})
 }

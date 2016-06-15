@@ -705,7 +705,7 @@ func TestMapperMethodsByName(t *testing.T) {
 		tc := testCases[i]
 		traversal := indexes[i]
 		if !reflect.DeepEqual(tc.ExpectedIndexes, traversal) {
-			t.Errorf("%d: expected %v, got %v", tc.ExpectedIndexes, traversal)
+			t.Errorf("expected %v, got %v", tc.ExpectedIndexes, traversal)
 			t.FailNow()
 		}
 		val = reflect.Indirect(val)

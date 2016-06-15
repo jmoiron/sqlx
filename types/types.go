@@ -54,9 +54,9 @@ func (g *GzippedText) Scan(src interface{}) error {
 // implements `Unmarshal`, which unmarshals the json within to an interface{}
 type JSONText json.RawMessage
 
-// MarshalJSON returns the *j as the JSON encoding of j.
-func (j *JSONText) MarshalJSON() ([]byte, error) {
-	return *j, nil
+// MarshalJSON returns j as the JSON encoding of j.
+func (j JSONText) MarshalJSON() ([]byte, error) {
+	return j, nil
 }
 
 // UnmarshalJSON sets *j to a copy of data

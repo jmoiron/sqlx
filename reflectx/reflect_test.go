@@ -175,6 +175,20 @@ func TestFlatTags(t *testing.T) {
 	}
 }
 
+func TestIssue226(t *testing.T) {
+	type Client1 struct {
+		RecCreatedBy string `json:"rec_created_by" db:"rec_created_by"`
+		RecCreated   int    `json:"rec_created" db:"rec_created"`
+	}
+
+	var c Client1
+	m := NewMapperFunc("db", strings.ToLower)
+	f := m.FieldByName(reflect.ValueOf(c), "rec_created")
+	if f.Type().Name() != "int" {
+		t.Errorf("Could not find 'rec_created' field")
+	}
+}
+
 func TestNestedStruct(t *testing.T) {
 	m := NewMapper("db")
 

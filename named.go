@@ -99,6 +99,17 @@ func (n *NamedStmt) Select(dest interface{}, arg interface{}) error {
 	return scanAll(rows, dest, false)
 }
 
+// Selectx using this NamedStmt
+func (n *NamedStmt) Selectx(dest interface{}, arg interface{}) error {
+	rows, err := n.Queryx(arg)
+	if err != nil {
+		return err
+	}
+	// if something happens here, we want to make sure the rows are Closed
+	defer rows.Close()
+	return scanAll(rows, dest, false)
+}
+
 // Get using this NamedStmt
 func (n *NamedStmt) Get(dest interface{}, arg interface{}) error {
 	r := n.QueryRowx(arg)

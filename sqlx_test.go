@@ -116,7 +116,7 @@ CREATE TABLE person (
 	first_name text,
 	last_name text,
 	email text,
-	added_at timestamp default now()
+	added_at timestamp default now() NOT NULL
 );
 
 CREATE TABLE place (
@@ -285,6 +285,45 @@ func TestMissingNames(t *testing.T) {
 		err = db.Get(&pp, "SELECT * FROM person LIMIT 1")
 		if err == nil {
 			t.Error("Expected missing name Get to fail, but it did not.")
+		}
+
+		// test Get with an invalid insertion
+		switch db.DriverName() {
+		case "postgres":
+			stmt, err := db.PrepareNamed(`INSERT INTO person (first_name, last_name, added_at)
+				VALUES (:first, :last, :added) RETURNING added_at;`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var addedAt time.Time
+			var invalidData = map[string]interface{}{
+				"first": "first",
+				"last":  "last",
+				"added": nil,
+			}
+			var ppl int
+			db.Get(&ppl, "SELECT count(*) FROM person;")
+			if ppl != 2 {
+				t.Errorf("expected 2 people but got %d", ppl)
+			}
+			_, err = stmt.Exec(invalidData)
+			if err == nil {
+				t.Error("expected an error but got nil on Exec")
+			}
+			fmt.Println(err)
+			db.Get(&ppl, "SELECT count(*) FROM person;")
+			if ppl != 2 {
+				t.Errorf("expected 2 people but got %d", ppl)
+			}
+			err = stmt.Get(&addedAt, invalidData)
+			if err == nil {
+				t.Fatal("expected an error but got nil")
+			}
+			fmt.Println(err)
+			db.Get(&ppl, "SELECT count(*) FROM person;")
+			if ppl != 2 {
+				t.Errorf("expected 2 people but got %d", ppl)
+			}
 		}
 
 		// test naked StructScan

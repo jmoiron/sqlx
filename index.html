@@ -53,8 +53,8 @@
     
     <h1>Illustrated guide to SQLX</h1>
 <p><a href="https://github.com/jmoiron/sqlx/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"></a></p>
-<p><code>sqlx</code> is a package for Go which provides a set of extensions on top of the excellent built-in <code>database/sql</code> package.  </p>
-<p>Examining <em>Go</em> idioms is the focus of this document, so there is no presumption being made that any <em>SQL</em> herein is actually a recommended way to use a database.  It will not cover setting up a Go development environment, basic Go information about syntax or semantics, or SQL itself. </p>
+<p><code>sqlx</code> is a package for Go which provides a set of extensions on top of the excellent built-in <code>database/sql</code> package.</p>
+<p>Examining <em>Go</em> idioms is the focus of this document, so there is no presumption being made that any <em>SQL</em> herein is actually a recommended way to use a database.  It will not cover setting up a Go development environment, basic Go information about syntax or semantics, or SQL itself.</p>
 <p>Finally, the standard <code>err</code> variable will be used to indicate that errors are being returned, but for brevity they will be ignored.  You should make sure to check all errors in an actual program.</p>
 <h2>Resources <a href="#resources" class="permalink" id="resources">&para;</a></h2>
 <p>There are other resources of excellent information about using SQL in Go:</p>
@@ -93,15 +93,15 @@ $ go get github.com/mattn/go-sqlite3
 </ul>
 <p>As with the handle types, <code>sqlx.Rows</code> embeds <code>sql.Rows</code>.  Because the underlying implementation was inaccessible, <code>sqlx.Row</code> is a partial re-implementation of <code>sql.Row</code> that retains the standard interface.</p>
 <h3>Connecting to Your Database <a href="#connecting" class="permalink" id="connecting">&para;</a></h3>
-<p>A <code>DB</code> instance is <em>not</em> a connection, but an abstraction representing a Database.  This is why creating a DB does not return an error and will not panic.  It maintains a <a href="#connectionPool">connection pool</a> internally, and will attempt to connect when a connection is first needed.  You can create an sqlx.DB via <code>Open</code> or by creating a new sqlx DB handle from an existing sql.DB via <code>NewDB</code>:</p>
+<p>A <code>DB</code> instance is <em>not</em> a connection, but an abstraction representing a Database.  This is why creating a DB does not return an error and will not panic.  It maintains a <a href="#connectionPool">connection pool</a> internally, and will attempt to connect when a connection is first needed.  You can create an sqlx.DB via <code>Open</code> or by creating a new sqlx DB handle from an existing sql.DB via <code>NewDb</code>:</p>
 <pre class="prettyprint linenums">
 var db *sqlx.DB
 
-// exactly the same as the built-in 
+// exactly the same as the built-in
 db = sqlx.Open("sqlite3", ":memory:")
 
 // from a pre-existing sql.DB; note the required driverName
-db = sqlx.NewDB(sql.Open("sqlite3", ":memory:"), "sqlite3")
+db = sqlx.NewDb(sql.Open("sqlite3", ":memory:"), "sqlite3")
 
 // force a connection and test that it worked
 err = db.Ping()
@@ -218,7 +218,7 @@ var telcode int
 err = row.Scan(&telcode)
 </pre>
 
-<p>Unlike Query, QueryRow returns a Row type result with no error, making it safe to chain the Scan off of the return.  If there was an error executing the query, that error is returned by Scan.  If there are no rows, Scan returns <code>sql.ErrNoRows</code>.  If the scan itself fails (eg. due to type mismatch), that error is also returned.  </p>
+<p>Unlike Query, QueryRow returns a Row type result with no error, making it safe to chain the Scan off of the return.  If there was an error executing the query, that error is returned by Scan.  If there are no rows, Scan returns <code>sql.ErrNoRows</code>.  If the scan itself fails (eg. due to type mismatch), that error is also returned.</p>
 <p>The Rows struct internal to the Row result is Closed upon Scan, meaning that the connection used by QueryRow is kept open until the result is scanned.  It also means that <code>sql.RawBytes</code> is not usable here, since the referenced memory belongs to the driver and may already be invalid by the time control is returned to the caller.</p>
 <p>The sqlx extension <code>QueryRowx</code> will return an sqlx.Row instead of an sql.Row, and it implements the same scanning extensions as Rows, outlined above and in the <a href="#advancedScanning">advanced scanning section</a>:</p>
 <pre class="prettyprint linenums">
@@ -464,7 +464,7 @@ for rows.Next() {
 }
 </pre>
 
-<p>SliceScan returns an <code>[]interface{}</code> of all columns, which can be useful in <a href="http://wts.jmoiron.net">situations</a> where you are executing queries on behalf of a third party and have no way of knowing what columns may be returned.  MapScan behaves the same way, but maps the column names to interface{} values.  An important caveat here is that the results returned by <code>rows.Columns()</code> does not include fully qualified names, such that <code>SELECT a.id, b.id FROM a NATURAL JOIN b</code> will result in a Columns result of <code>[]string{"id", "id"}</code>, clobbering one of the results in your map. </p>
+<p>SliceScan returns an <code>[]interface{}</code> of all columns, which can be useful in <a href="http://wts.jmoiron.net">situations</a> where you are executing queries on behalf of a third party and have no way of knowing what columns may be returned.  MapScan behaves the same way, but maps the column names to interface{} values.  An important caveat here is that the results returned by <code>rows.Columns()</code> does not include fully qualified names, such that <code>SELECT a.id, b.id FROM a NATURAL JOIN b</code> will result in a Columns result of <code>[]string{"id", "id"}</code>, clobbering one of the results in your map.</p>
 <h2>Custom Types <a href="#customTypes" class="permalink" id="customTypes">&para;</a></h2>
 <p>The examples above all used the built-in types to both scan and query with, but database/sql provides interfaces to allow you to use any custom types:</p>
 <ul>

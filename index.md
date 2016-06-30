@@ -53,7 +53,7 @@ As with the handle types, `sqlx.Rows` embeds `sql.Rows`.  Because the underlying
 
 ### Connecting to Your Database <a href="#connecting" class="permalink" id="connecting">&para;</a>
 
-A `DB` instance is *not* a connection, but an abstraction representing a Database.  This is why creating a DB does not return an error and will not panic.  It maintains a [connection pool](#connectionPool) internally, and will attempt to connect when a connection is first needed.  You can create an sqlx.DB via `Open` or by creating a new sqlx DB handle from an existing sql.DB via `NewDB`:
+A `DB` instance is *not* a connection, but an abstraction representing a Database.  This is why creating a DB does not return an error and will not panic.  It maintains a [connection pool](#connectionPool) internally, and will attempt to connect when a connection is first needed.  You can create an sqlx.DB via `Open` or by creating a new sqlx DB handle from an existing sql.DB via `NewDb`:
 
 ```go
 var db *sqlx.DB
@@ -62,7 +62,7 @@ var db *sqlx.DB
 db = sqlx.Open("sqlite3", ":memory:")
 
 // from a pre-existing sql.DB; note the required driverName
-db = sqlx.NewDB(sql.Open("sqlite3", ":memory:"), "sqlite3")
+db = sqlx.NewDb(sql.Open("sqlite3", ":memory:"), "sqlite3")
 
 // force a connection and test that it worked
 err = db.Ping()

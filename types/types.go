@@ -39,6 +39,9 @@ func (g *GzippedText) Scan(src interface{}) error {
 		return errors.New("Incompatible type for GzippedText")
 	}
 	reader, err := gzip.NewReader(bytes.NewReader(source))
+	if err != nil {
+		return err
+	}
 	defer reader.Close()
 	b, err := ioutil.ReadAll(reader)
 	if err != nil {

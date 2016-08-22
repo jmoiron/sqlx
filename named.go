@@ -96,7 +96,7 @@ func (n *NamedStmt) Select(dest interface{}, arg interface{}) error {
 	}
 	// if something happens here, we want to make sure the rows are Closed
 	defer rows.Close()
-	return scanAll(rows, dest, false)
+	return ScanAll(rows, dest, false)
 }
 
 // Get using this NamedStmt

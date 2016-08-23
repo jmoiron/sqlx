@@ -158,7 +158,7 @@ func bindArgs(names []string, arg interface{}, m *reflectx.Mapper) ([]interface{
 	fields := m.TraversalsByName(v.Type(), names)
 	for i, t := range fields {
 		if len(t) == 0 {
-			return arglist, fmt.Errorf("could not find name %s in %#v", names[i], arg)
+			return arglist, fmt.Errorf("could not find the field named %q in %#v", names[i], arg)
 		}
 		val := reflectx.FieldByIndexesReadOnly(v, t)
 		arglist = append(arglist, val.Interface())
@@ -174,7 +174,7 @@ func bindMapArgs(names []string, arg map[string]interface{}) ([]interface{}, err
 	for _, name := range names {
 		val, ok := arg[name]
 		if !ok {
-			return arglist, fmt.Errorf("could not find name %s in %#v", name, arg)
+			return arglist, fmt.Errorf("could not find the field named %q in %#v", name, arg)
 		}
 		arglist = append(arglist, val)
 	}

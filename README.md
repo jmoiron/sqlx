@@ -26,9 +26,7 @@ This breaks backwards compatibility, but it's in a way that is trivially fixable
 (`s/JsonText/JSONText/g`).  The `types` package is both experimental and not in
 active development currently.
 
-More importantly, [golang bug #13905](https://github.com/golang/go/issues/13905)
-makes `types.JSONText` and `types.GzippedText` _potentially unsafe_, **especially**
-when used with common auto-scan sqlx idioms like `Select` and `Get`.
+* Using Go 1.6 and below with `types.JSONText` and `types.GzippedText` can be _potentially unsafe_, **especially** when used with common auto-scan sqlx idioms like `Select` and `Get`. See [golang bug #13905](https://github.com/golang/go/issues/13905).
 
 ### Backwards Compatibility
 

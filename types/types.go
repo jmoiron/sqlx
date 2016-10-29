@@ -117,9 +117,8 @@ type BitBool bool
 func (b BitBool) Value() (driver.Value, error) {
 	if b {
 		return []byte{1}, nil
-	} else {
-		return []byte{0}, nil
 	}
+	return []byte{0}, nil
 }
 
 // Scan implements the sql.Scanner interface,

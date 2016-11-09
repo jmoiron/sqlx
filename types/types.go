@@ -74,7 +74,6 @@ func (j *JSONText) UnmarshalJSON(data []byte) error {
 	}
 	*j = append((*j)[0:0], data...)
 	return nil
-
 }
 
 // Value returns j as a value.  This does a validating unmarshal into another
@@ -117,7 +116,7 @@ func (j *JSONText) Unmarshal(v interface{}) error {
 	return json.Unmarshal([]byte(*j), v)
 }
 
-// Pretty printing for JSONText types
+// String supports pretty printing for JSONText types.
 func (j JSONText) String() string {
 	return string(j)
 }

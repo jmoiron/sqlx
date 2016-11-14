@@ -289,21 +289,25 @@ func (db *DB) BindNamed(query string, arg interface{}) (string, []interface{}, e
 }
 
 // NamedQuery using this DB.
+// Any named placeholder parameters are replaced with fields from arg.
 func (db *DB) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(db, query, arg)
 }
 
 // NamedExec using this DB.
+// Any named placeholder parameters are replaced with fields from arg.
 func (db *DB) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	return NamedExec(db, query, arg)
 }
 
 // Select using this DB.
+// Any placeholder parameters are replaced with supplied args.
 func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(db, dest, query, args...)
 }
 
 // Get using this DB.
+// Any placeholder parameters are replaced with supplied args.
 func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
 }
@@ -328,6 +332,7 @@ func (db *DB) Beginx() (*Tx, error) {
 }
 
 // Queryx queries the database and returns an *sqlx.Rows.
+// Any placeholder parameters are replaced with supplied args.
 func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 	r, err := db.DB.Query(query, args...)
 	if err != nil {
@@ -337,12 +342,14 @@ func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 }
 
 // QueryRowx queries the database and returns an *sqlx.Row.
+// Any placeholder parameters are replaced with supplied args.
 func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
 	rows, err := db.DB.Query(query, args...)
 	return &Row{rows: rows, err: err, unsafe: db.unsafe, Mapper: db.Mapper}
 }
 
 // MustExec (panic) runs MustExec using this database.
+// Any placeholder parameters are replaced with supplied args.
 func (db *DB) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(db, query, args...)
 }
@@ -387,21 +394,25 @@ func (tx *Tx) BindNamed(query string, arg interface{}) (string, []interface{}, e
 }
 
 // NamedQuery within a transaction.
+// Any named placeholder parameters are replaced with fields from arg.
 func (tx *Tx) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(tx, query, arg)
 }
 
 // NamedExec a named query within a transaction.
+// Any named placeholder parameters are replaced with fields from arg.
 func (tx *Tx) NamedExec(query string, arg interface{}) (sql.Result, error) {
 	return NamedExec(tx, query, arg)
 }
 
 // Select within a transaction.
+// Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(tx, dest, query, args...)
 }
 
 // Queryx within a transaction.
+// Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
 	r, err := tx.Tx.Query(query, args...)
 	if err != nil {
@@ -411,17 +422,20 @@ func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
 }
 
 // QueryRowx within a transaction.
+// Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
 	rows, err := tx.Tx.Query(query, args...)
 	return &Row{rows: rows, err: err, unsafe: tx.unsafe, Mapper: tx.Mapper}
 }
 
 // Get within a transaction.
+// Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(tx, dest, query, args...)
 }
 
 // MustExec runs MustExec within a transaction.
+// Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(tx, query, args...)
 }
@@ -478,28 +492,33 @@ func (s *Stmt) Unsafe() *Stmt {
 }
 
 // Select using the prepared statement.
+// Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 	return Select(&qStmt{s}, dest, "", args...)
 }
 
 // Get using the prepared statement.
+// Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) Get(dest interface{}, args ...interface{}) error {
 	return Get(&qStmt{s}, dest, "", args...)
 }
 
 // MustExec (panic) using this statement.  Note that the query portion of the error
 // output will be blank, as Stmt does not expose its query.
+// Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) MustExec(args ...interface{}) sql.Result {
 	return MustExec(&qStmt{s}, "", args...)
 }
 
 // QueryRowx using this statement.
+// Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) QueryRowx(args ...interface{}) *Row {
 	qs := &qStmt{s}
 	return qs.QueryRowx("", args...)
 }
 
 // Queryx using this statement.
+// Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) Queryx(args ...interface{}) (*Rows, error) {
 	qs := &qStmt{s}
 	return qs.Queryx("", args...)
@@ -626,6 +645,7 @@ func Preparex(p Preparer, query string) (*Stmt, error) {
 // into dest, which must be a slice.  If the slice elements are scannable, then
 // the result set must have only one column.  Otherwise, StructScan is used.
 // The *sql.Rows are closed automatically.
+// Any placeholder parameters are replaced with supplied args.
 func Select(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	rows, err := q.Queryx(query, args...)
 	if err != nil {
@@ -639,6 +659,7 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 // Get does a QueryRow using the provided Queryer, and scans the resulting row
 // to dest.  If dest is scannable, the result must only have one column.  Otherwise,
 // StructScan is used.  Get will return sql.ErrNoRows like row.Scan would.
+// Any placeholder parameters are replaced with supplied args.
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	r := q.QueryRowx(query, args...)
 	return r.scanAny(dest, false)
@@ -669,6 +690,7 @@ func LoadFile(e Execer, path string) (*sql.Result, error) {
 }
 
 // MustExec execs the query using e and panics if there was an error.
+// Any placeholder parameters are replaced with supplied args.
 func MustExec(e Execer, query string, args ...interface{}) sql.Result {
 	res, err := e.Exec(query, args...)
 	if err != nil {

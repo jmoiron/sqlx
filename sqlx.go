@@ -902,6 +902,9 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 			v = reflect.Indirect(vp)
 
 			err = fieldsByTraversal(v, fields, values, true)
+			if err != nil {
+				return err
+			}
 
 			// scan into the struct field pointers and append to our results
 			err = rows.Scan(values...)
@@ -919,6 +922,9 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 		for rows.Next() {
 			vp = reflect.New(base)
 			err = rows.Scan(vp.Interface())
+			if err != nil {
+				return err
+			}
 			// append
 			if isPtr {
 				direct.Set(reflect.Append(direct, vp))

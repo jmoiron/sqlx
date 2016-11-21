@@ -36,6 +36,7 @@ func (n *NamedStmt) Close() error {
 }
 
 // Exec executes a named statement using the struct passed.
+// Any named placeholder parameters are replaced with fields from arg.
 func (n *NamedStmt) Exec(arg interface{}) (sql.Result, error) {
 	args, err := bindAnyArgs(n.Params, arg, n.Stmt.Mapper)
 	if err != nil {
@@ -45,6 +46,7 @@ func (n *NamedStmt) Exec(arg interface{}) (sql.Result, error) {
 }
 
 // Query executes a named statement using the struct argument, returning rows.
+// Any named placeholder parameters are replaced with fields from arg.
 func (n *NamedStmt) Query(arg interface{}) (*sql.Rows, error) {
 	args, err := bindAnyArgs(n.Params, arg, n.Stmt.Mapper)
 	if err != nil {
@@ -56,6 +58,7 @@ func (n *NamedStmt) Query(arg interface{}) (*sql.Rows, error) {
 // QueryRow executes a named statement against the database.  Because sqlx cannot
 // create a *sql.Row with an error condition pre-set for binding errors, sqlx
 // returns a *sqlx.Row instead.
+// Any named placeholder parameters are replaced with fields from arg.
 func (n *NamedStmt) QueryRow(arg interface{}) *Row {
 	args, err := bindAnyArgs(n.Params, arg, n.Stmt.Mapper)
 	if err != nil {
@@ -65,6 +68,7 @@ func (n *NamedStmt) QueryRow(arg interface{}) *Row {
 }
 
 // MustExec execs a NamedStmt, panicing on error
+// Any named placeholder parameters are replaced with fields from arg.
 func (n *NamedStmt) MustExec(arg interface{}) sql.Result {
 	res, err := n.Exec(arg)
 	if err != nil {
@@ -74,6 +78,7 @@ func (n *NamedStmt) MustExec(arg interface{}) sql.Result {
 }
 
 // Queryx using this NamedStmt
+// Any named placeholder parameters are replaced with fields from arg.
 func (n *NamedStmt) Queryx(arg interface{}) (*Rows, error) {
 	r, err := n.Query(arg)
 	if err != nil {
@@ -84,11 +89,13 @@ func (n *NamedStmt) Queryx(arg interface{}) (*Rows, error) {
 
 // QueryRowx this NamedStmt.  Because of limitations with QueryRow, this is
 // an alias for QueryRow.
+// Any named placeholder parameters are replaced with fields from arg.
 func (n *NamedStmt) QueryRowx(arg interface{}) *Row {
 	return n.QueryRow(arg)
 }
 
 // Select using this NamedStmt
+// Any named placeholder parameters are replaced with fields from arg.
 func (n *NamedStmt) Select(dest interface{}, arg interface{}) error {
 	rows, err := n.Queryx(arg)
 	if err != nil {
@@ -100,6 +107,7 @@ func (n *NamedStmt) Select(dest interface{}, arg interface{}) error {
 }
 
 // Get using this NamedStmt
+// Any named placeholder parameters are replaced with fields from arg.
 func (n *NamedStmt) Get(dest interface{}, arg interface{}) error {
 	r := n.QueryRowx(arg)
 	return r.scanAny(dest, false)

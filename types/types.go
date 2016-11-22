@@ -140,7 +140,7 @@ func (n *NullJSONText) Scan(value interface{}) error {
 }
 
 // Value implements the driver Valuer interface.
-func (n *NullJSONText) Value() (driver.Value, error) {
+func (n NullJSONText) Value() (driver.Value, error) {
 	if !n.Valid {
 		return nil, nil
 	}

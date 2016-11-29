@@ -308,6 +308,7 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 
 // Get using this DB.
 // Any placeholder parameters are replaced with supplied args.
+// An error is returned if the result set is empty.
 func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
 }
@@ -430,6 +431,7 @@ func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
 
 // Get within a transaction.
 // Any placeholder parameters are replaced with supplied args.
+// An error is returned if the result set is empty.
 func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(tx, dest, query, args...)
 }
@@ -499,6 +501,7 @@ func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 
 // Get using the prepared statement.
 // Any placeholder parameters are replaced with supplied args.
+// An error is returned if the result set is empty.
 func (s *Stmt) Get(dest interface{}, args ...interface{}) error {
 	return Get(&qStmt{s}, dest, "", args...)
 }
@@ -660,6 +663,7 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 // to dest.  If dest is scannable, the result must only have one column.  Otherwise,
 // StructScan is used.  Get will return sql.ErrNoRows like row.Scan would.
 // Any placeholder parameters are replaced with supplied args.
+// An error is returned if the result set is empty.
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	r := q.QueryRowx(query, args...)
 	return r.scanAny(dest, false)

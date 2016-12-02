@@ -592,7 +592,7 @@ func TestNamedQuery(t *testing.T) {
 	var schema = Schema{
 		create: `
 			CREATE TABLE place (
-				id integer AUTO_INCREMENT PRIMARY KEY,
+				id integer PRIMARY KEY,
 				name text NULL
 			);
 			CREATE TABLE person (
@@ -768,18 +768,15 @@ func TestNamedQuery(t *testing.T) {
 			Email:     sql.NullString{String: "ben@doe.com", Valid: true},
 		}
 
-		q2 := `INSERT INTO place (name) VALUES (:name)`
-		result, err := db.NamedExec(q2, pl)
+		q2 := `INSERT INTO place (id, name) VALUES (1, :name)`
+		_, err = db.NamedExec(q2, pl)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		id, err := result.LastInsertId()
-		if err != nil {
-			log.Fatal(err)
-		}
+		id := 1
+		pp.Place.ID = id
 
-		pp.Place.ID = int(id)
 		q3 := `INSERT INTO placeperson (first_name, last_name, email, place_id) VALUES (:first_name, :last_name, :email, :place.id)`
 		_, err = db.NamedExec(q3, pp)
 		if err != nil {

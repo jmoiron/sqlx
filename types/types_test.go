@@ -107,7 +107,7 @@ func TestBitBool(t *testing.T) {
 		t.Errorf("Was not expecting an error")
 	}
 	if !b {
-		t.Errorf("Was expecting the bool we sent in (true), got %b", b)
+		t.Errorf("Was expecting the bool we sent in (true), got %v", b)
 	}
 
 	// Test false value
@@ -122,6 +122,6 @@ func TestBitBool(t *testing.T) {
 		t.Errorf("Was not expecting an error")
 	}
 	if b {
-		t.Errorf("Was expecting the bool we sent in (false), got %b", b)
+		t.Errorf("Was expecting the bool we sent in (false), got %v", b)
 	}
 }

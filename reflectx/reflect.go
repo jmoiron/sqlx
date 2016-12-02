@@ -241,12 +241,6 @@ func methodName() string {
 	return f.Name()
 }
 
-type typeQueue struct {
-	t  reflect.Type
-	fi *FieldInfo
-	pp string // Parent path
-}
-
 // A copying append that creates a new slice each time.
 func apnd(is []int, i int) []int {
 	x := make([]int, len(is)+1)
@@ -321,19 +315,48 @@ func parseOptions(tag string) map[string]string {
 	return options
 }
 
-// getMapping returns a mapping for the t type, using the tagName, mapFunc and
-// tagMapFunc to determine the canonical names of fields.
+type typeField struct {
+	t  reflect.Type
+	fi *FieldInfo
+	pp string
+}
+
+type typeQueue []typeField
+
+func newTypeQueue(items ...typeField) *typeQueue {
+	tq := make(typeQueue, 0, len(items))
+	for _, item := range items {
+		tq = append(tq, item)
+	}
+	return &tq
+}
+
+func (t typeQueue) len() int {
+	return len(t)
+}
+
+func (t *typeQueue) pop() typeField {
+	item := (*t)[0]
+	*t = (*t)[1:]
+	return item
+}
+
+func (t *typeQueue) append(tf typeField) {
+	*t = append(*t, tf)
+}
+
+// getMapping returns a mapping for the t type, which is a struct or a pointer
+// to a struct, using the tagName, mapFunc and tagMapFunc to determine the
+// canonical names of fields.
 func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc mapf) *StructMap {
 	m := []*FieldInfo{}
-
 	root := &FieldInfo{}
-	queue := []typeQueue{}
-	queue = append(queue, typeQueue{Deref(t), root, ""})
+	queue := newTypeQueue(typeField{Deref(t), root, ""})
 
-	for len(queue) != 0 {
+	for queue.len() != 0 {
 		// pop the first item off of the queue
-		tq := queue[0]
-		queue = queue[1:]
+		tq := queue.pop()
+
 		nChildren := 0
 		if tq.t.Kind() == reflect.Struct {
 			nChildren = tq.t.NumField()
@@ -353,7 +376,7 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc mapf) *Struc
 				continue
 			}
 
-			fi := FieldInfo{
+			fi := &FieldInfo{
 				Field:   f,
 				Name:    name,
 				Zero:    reflect.New(f.Type).Elem(),
@@ -381,33 +404,43 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc mapf) *Struc
 
 				fi.Embedded = true
 				fi.Index = apnd(tq.fi.Index, fieldPos)
-				nChildren := 0
-				ft := Deref(f.Type)
-				if ft.Kind() == reflect.Struct {
-					nChildren = ft.NumField()
+
+				if ft := Deref(f.Type); ft.Kind() == reflect.Struct {
+					fi.Children = make([]*FieldInfo, ft.NumField())
 				}
-				fi.Children = make([]*FieldInfo, nChildren)
-				queue = append(queue, typeQueue{Deref(f.Type), &fi, pp})
-			} else if fi.Zero.Kind() == reflect.Struct || (fi.Zero.Kind() == reflect.Ptr && fi.Zero.Type().Elem().Kind() == reflect.Struct) {
+				queue.append(typeField{Deref(f.Type), fi, pp})
+			} else if fi.Zero.Kind() == reflect.Struct || Deref(fi.Zero.Type()).Kind() == reflect.Struct {
+				// this code is responsible for non-embedded structs also being traversed
 				fi.Index = apnd(tq.fi.Index, fieldPos)
 				fi.Children = make([]*FieldInfo, Deref(f.Type).NumField())
-				queue = append(queue, typeQueue{Deref(f.Type), &fi, fi.Path})
+				queue.append(typeField{Deref(f.Type), fi, fi.Path})
 			}
 
 			fi.Index = apnd(tq.fi.Index, fieldPos)
 			fi.Parent = tq.fi
-			tq.fi.Children[fieldPos] = &fi
-			m = append(m, &fi)
+			tq.fi.Children[fieldPos] = fi
+			m = append(m, fi)
 		}
 	}
 
-	flds := &StructMap{Index: m, Tree: root, Paths: map[string]*FieldInfo{}, Names: map[string]*FieldInfo{}}
-	for _, fi := range flds.Index {
-		flds.Paths[fi.Path] = fi
-		if fi.Name != "" && !fi.Embedded {
-			flds.Names[fi.Path] = fi
+	sm := &StructMap{
+		Index: m,
+		Tree:  root,
+		Paths: map[string]*FieldInfo{},
+		Names: map[string]*FieldInfo{},
+	}
+
+	for _, fi := range sm.Index {
+		// NOTE: very important here, these paths are in traversed order, and we did
+		// a breadth-first search, so any destination paths that already exist in the
+		// map are "shallower" and should therefore win.
+		if _, ok := sm.Paths[fi.Path]; !ok {
+			sm.Paths[fi.Path] = fi
+			if fi.Name != "" && !fi.Embedded {
+				sm.Names[fi.Path] = fi
+			}
 		}
 	}
 
-	return flds
+	return sm
 }

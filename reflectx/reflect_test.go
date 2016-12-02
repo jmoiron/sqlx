@@ -136,13 +136,22 @@ func TestBasicEmbeddedWithTags(t *testing.T) {
 		t.Errorf("Expecting 5 fields")
 	}
 
-	// for _, fi := range fields.index {
-	// 	log.Println(fi)
-	// }
-
 	v := m.FieldByName(zv, "a")
-	if ival(v) != z.Bar.Foo.A { // the dominant field
-		t.Errorf("Expecting %d, got %d", z.Bar.Foo.A, ival(v))
+	// NOTE: sqlx explains in its documentation that it uses the golang attribute
+	// access rules for embedded attributes.  These are:
+	//
+	//   For a value x of type T or *T where T is not a pointer or interface type,
+	//   x.f denotes the field or method at the shallowest depth in T where there
+	//   is such an f. If there is not exactly one f with shallowest depth, the
+	//   selector expression is illegal.
+	// -- https://golang.org/ref/spec#Selectors
+	//
+	// As such, z.A should be "dominant" over z.Bar.Foo.A since it is at a shallower
+	// depth. This test previously confirmed the wrong behaviour and has been
+	// changed to confirm the right one.  More testing of this is done in the
+	// TestIssue230 test below.
+	if ival(v) != z.A {
+		t.Errorf("Expecting %d, got %d", z.A, ival(v))
 	}
 	v = m.FieldByName(zv, "b")
 	if ival(v) != z.B {
@@ -814,7 +823,50 @@ func TestMustBe(t *testing.T) {
 
 	typ = reflect.TypeOf("string")
 	mustBe(typ, reflect.Struct)
-	t.Error("got here, didn't expect to")
+	t.Fatal("got here, didn't expect to")
+}
+
+// tests https://github.com/jmoiron/sqlx/issues/230
+func TestIssue230(t *testing.T) {
+
+	// here we have two types, a "Stack" type that has some
+	// simple metadata..
+	type Stack struct {
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		Status    int    `json:"status"`
+		CreatedAt int    `json:"created_at"`
+		UpdatedAt int    `json:"updated_at"`
+	}
+
+	// and a "stack" type, which embeds the Stack, but defines its own
+	// Status field, which _should_ take precedence over the Stack's Status
+	type stack struct {
+		Stack
+		Status string
+	}
+
+	s := stack{}
+	m := NewMapperFunc("json", strings.ToLower)
+
+	// the names we will pull out via type map, and the _types_ we expect
+	// crucially, we expect that "status" will be the string in `stack`
+	// and *not* the int in `Stack`
+	names := []string{"id", "name", "status", "created_at"}
+	typeNames := []string{"string", "string", "string", "int"}
+
+	values := m.FieldsByName(reflect.ValueOf(s), names)
+
+	if len(values) != len(names) {
+		t.Errorf("expected %d values but got %d", len(names), len(values))
+	}
+	for i, v := range values {
+		if v.Type().Name() != typeNames[i] {
+			t.Errorf("expected name %s to have type %s, but has type %s\n",
+				names[i], typeNames[i], v.Type().Name())
+		}
+	}
+
 }
 
 type E1 struct {

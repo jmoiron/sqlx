@@ -247,6 +247,15 @@ func TestInlineStruct(t *testing.T) {
 	}
 }
 
+func TestRecursiveStruct(t *testing.T) {
+	type Person struct {
+		Parent *Person
+	}
+	m := NewMapperFunc("db", strings.ToLower)
+	var p *Person
+	m.TypeMap(reflect.TypeOf(p))
+}
+
 func TestFieldsEmbedded(t *testing.T) {
 	m := NewMapper("db")
 

@@ -60,11 +60,11 @@ type JSONText json.RawMessage
 var emptyJSON = JSONText("{}")
 
 // MarshalJSON returns the *j as the JSON encoding of j.
-func (j *JSONText) MarshalJSON() ([]byte, error) {
-	if len(*j) == 0 {
-		*j = emptyJSON
+func (j JSONText) MarshalJSON() ([]byte, error) {
+	if len(j) == 0 {
+		j = emptyJSON
 	}
-	return *j, nil
+	return j, nil
 }
 
 // UnmarshalJSON sets *j to a copy of data

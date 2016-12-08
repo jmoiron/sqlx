@@ -717,6 +717,10 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 	if r.err != nil {
 		return r.err
 	}
+	if r.rows == nil {
+		r.err = sql.ErrNoRows
+		return r.err
+	}
 	defer r.rows.Close()
 
 	v := reflect.ValueOf(dest)

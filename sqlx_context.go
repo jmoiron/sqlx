@@ -28,6 +28,14 @@ type ExecerContext interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
+// ExtContext is a union interface which can bind, query, and exec, with Context
+// used by NamedQueryContext and NamedExecContext.
+type ExtContext interface {
+	binder
+	QueryerContext
+	ExecerContext
+}
+
 // SelectContext executes a query using the provided Queryer, and StructScans
 // each row into dest, which must be a slice.  If the slice elements are
 // scannable, then the result set must have only one column.  Otherwise,
@@ -104,10 +112,29 @@ func (db *DB) PrepareNamedContext(ctx context.Context, query string) (*NamedStmt
 	return prepareNamedContext(ctx, db, query)
 }
 
+// NamedQueryContext using this DB.
+// Any named placeholder parameters are replaced with fields from arg.
+func (db *DB) NamedQueryContext(ctx context.Context, query string, arg interface{}) (*Rows, error) {
+	return NamedQueryContext(ctx, db, query, arg)
+}
+
+// NamedExecContext using this DB.
+// Any named placeholder parameters are replaced with fields from arg.
+func (db *DB) NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error) {
+	return NamedExecContext(ctx, db, query, arg)
+}
+
 // SelectContext using this DB.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
 	return SelectContext(ctx, db, dest, query, args...)
+}
+
+// GetContext using this DB.
+// Any placeholder parameters are replaced with supplied args.
+// An error is returned if the result set is empty.
+func (db *DB) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	return GetContext(ctx, db, dest, query, args...)
 }
 
 // PreparexContext returns an sqlx.Stmt instead of a sql.Stmt.
@@ -148,6 +175,12 @@ func (db *DB) MustBeginTx(ctx context.Context, opts *sql.TxOptions) *Tx {
 		panic(err)
 	}
 	return tx
+}
+
+// MustExecContext (panic) runs MustExec using this database.
+// Any placeholder parameters are replaced with supplied args.
+func (db *DB) MustExecContext(ctx context.Context, query string, args ...interface{}) sql.Result {
+	return MustExecContext(ctx, db, query, args...)
 }
 
 // BeginTxx begins a transaction and returns an *sqlx.Tx instead of an
@@ -192,6 +225,12 @@ func (tx *Tx) NamedStmtContext(ctx context.Context, stmt *NamedStmt) *NamedStmt 
 		Params:      stmt.Params,
 		Stmt:        tx.StmtxContext(ctx, stmt.Stmt),
 	}
+}
+
+// MustExecContext runs MustExecContext within a transaction.
+// Any placeholder parameters are replaced with supplied args.
+func (tx *Tx) MustExecContext(ctx context.Context, query string, args ...interface{}) sql.Result {
+	return MustExecContext(ctx, tx, query, args...)
 }
 
 // SelectContext using the prepared statement.

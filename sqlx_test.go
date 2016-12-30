@@ -791,7 +791,7 @@ func TestNamedQuery(t *testing.T) {
 				email,
 				place.id AS "place.id",
 				place.name AS "place.name"
-			FROM placeperson 
+			FROM placeperson
 			INNER JOIN place ON place.id = placeperson.place_id
 			WHERE
 				place.id=:place.id`, pp)
@@ -967,6 +967,9 @@ func TestUsage(t *testing.T) {
 			t.Error("Expected an error")
 		}
 		err = stmt1.Get(&jason, "DoesNotExist User 2")
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		stmt2, err := db.Preparex(db.Rebind("SELECT * FROM person WHERE first_name=?"))
 		if err != nil {
@@ -987,6 +990,10 @@ func TestUsage(t *testing.T) {
 
 		places := []*Place{}
 		err = db.Select(&places, "SELECT telcode FROM place ORDER BY telcode ASC")
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		usa, singsing, honkers := places[0], places[1], places[2]
 
 		if usa.TelCode != 1 || honkers.TelCode != 852 || singsing.TelCode != 65 {
@@ -1004,6 +1011,10 @@ func TestUsage(t *testing.T) {
 		// this test also verifies that you can use either a []Struct{} or a []*Struct{}
 		places2 := []Place{}
 		err = db.Select(&places2, "SELECT * FROM place ORDER BY telcode ASC")
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		usa, singsing, honkers = &places2[0], &places2[1], &places2[2]
 
 		// this should return a type error that &p is not a pointer to a struct slice

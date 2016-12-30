@@ -793,6 +793,9 @@ func TestUsageContext(t *testing.T) {
 			t.Error("Expected an error")
 		}
 		err = stmt1.GetContext(ctx, &jason, "DoesNotExist User 2")
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		stmt2, err := db.PreparexContext(ctx, db.Rebind("SELECT * FROM person WHERE first_name=?"))
 		if err != nil {
@@ -813,6 +816,10 @@ func TestUsageContext(t *testing.T) {
 
 		places := []*Place{}
 		err = db.SelectContext(ctx, &places, "SELECT telcode FROM place ORDER BY telcode ASC")
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		usa, singsing, honkers := places[0], places[1], places[2]
 
 		if usa.TelCode != 1 || honkers.TelCode != 852 || singsing.TelCode != 65 {
@@ -830,6 +837,10 @@ func TestUsageContext(t *testing.T) {
 		// this test also verifies that you can use either a []Struct{} or a []*Struct{}
 		places2 := []Place{}
 		err = db.SelectContext(ctx, &places2, "SELECT * FROM place ORDER BY telcode ASC")
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		usa, singsing, honkers = &places2[0], &places2[1], &places2[2]
 
 		// this should return a type error that &p is not a pointer to a struct slice

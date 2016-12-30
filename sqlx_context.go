@@ -11,6 +11,16 @@ import (
 	"reflect"
 )
 
+// ConnectContext to a database and verify with a ping.
+func ConnectContext(ctx context.Context, driverName, dataSourceName string) (*DB, error) {
+	db, err := Open(driverName, dataSourceName)
+	if err != nil {
+		return db, err
+	}
+	err = db.PingContext(ctx)
+	return db, err
+}
+
 // QueryerContext is an interface used by GetContext and SelectContext
 type QueryerContext interface {
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)

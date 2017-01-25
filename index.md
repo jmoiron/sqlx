@@ -120,7 +120,7 @@ db.MustExec(cityState, "Singapore", 65)
 db.MustExec(countryCity, "South Africa", "Johannesburg", 27)
 ```
 
-The [result](http://golang.org/pkg/database/sql/#Result) has two possible pieces of data: `LastInsertedId()` or `RowsAffected()`, the availability of which is driver dependent.  In MySQL, for instance, `LastInsertedId()` will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the `RETURNING` clause.
+The [result](http://golang.org/pkg/database/sql/#Result) has two possible pieces of data: `LastInsertId()` or `RowsAffected()`, the availability of which is driver dependent.  In MySQL, for instance, `LastInsertId()` will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the `RETURNING` clause.
 
 #### bindvars <a href="#bindvars" class="permalink" id="bindvars">&para;</a>
 

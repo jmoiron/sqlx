@@ -68,8 +68,6 @@ func ConnectAll() {
 			fmt.Printf("Disabling PG tests:\n    %v\n", err)
 			TestPostgres = false
 		}
-		_, err := pgdb.Exec("INSERT INTO foo (a, b) VALUES ($1, $2)", "xyz", nil)
-		fmt.Println(err)
 	} else {
 		fmt.Println("Disabling Postgres tests.")
 	}

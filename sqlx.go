@@ -602,7 +602,7 @@ func (r *Rows) StructScan(dest interface{}) error {
 		}
 		m := r.Mapper
 
-		r.fields = m.TraversalsByName(v.Type(), columns)
+		r.fields, _ = m.TraversalsByName(v.Type(), columns)
 		// if we are not unsafe and are missing fields, return an error
 		if f, err := missingFields(r.fields); err != nil && !r.unsafe {
 			return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
@@ -760,7 +760,7 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 
 	m := r.Mapper
 
-	fields := m.TraversalsByName(v.Type(), columns)
+	fields, _ := m.TraversalsByName(v.Type(), columns)
 	// if we are not unsafe and are missing fields, return an error
 	if f, err := missingFields(fields); err != nil && !r.unsafe {
 		return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
@@ -926,7 +926,7 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 			m = mapper()
 		}
 
-		fields := m.TraversalsByName(base, columns)
+		fields, _ := m.TraversalsByName(base, columns)
 		// if we are not unsafe and are missing fields, return an error
 		if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
 			return fmt.Errorf("missing destination name %s in %T", columns[f], dest)

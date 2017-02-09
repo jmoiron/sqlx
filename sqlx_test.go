@@ -68,6 +68,8 @@ func ConnectAll() {
 			fmt.Printf("Disabling PG tests:\n    %v\n", err)
 			TestPostgres = false
 		}
+		_, err := pgdb.Exec("INSERT INTO foo (a, b) VALUES ($1, $2)", "xyz", nil)
+		fmt.Println(err)
 	} else {
 		fmt.Println("Disabling Postgres tests.")
 	}
@@ -1642,6 +1644,27 @@ func TestBindStruct(t *testing.T) {
 	}
 	if args[2].(string) != "World" {
 		t.Errorf("Expected 'World', got %s\n", args[0].(string))
+	}
+}
+
+func TestBindStructOmitEmpty(t *testing.T) {
+	type tt2 struct {
+		Field1 string `db:"field_1"`
+		Field2 string `db:"field_2,omitempty"`
+	}
+
+	am2 := tt2{"Hello", ""}
+	bq, args, _ := bindStruct(QUESTION, "INSERT INTO foo (a, b) VALUES (:field_1, :field_2)", am2, mapper())
+	expect := `INSERT INTO foo (a, b) VALUES (?, ?)`
+	if bq != expect {
+		t.Errorf("Interpolation of query failed: got `%v`, expected `%v`\n", bq, expect)
+	}
+
+	if args[0].(string) != "Hello" {
+		t.Errorf("Expected 'World', got %s\n", args[0].(string))
+	}
+	if args[1] != nil {
+		t.Errorf("Expected nil, got \"%s\"\n", args[1])
 	}
 }
 

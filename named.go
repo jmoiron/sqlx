@@ -163,16 +163,39 @@ func bindArgs(names []string, arg interface{}, m *reflectx.Mapper) ([]interface{
 		v = v.Elem()
 	}
 
-	fields := m.TraversalsByName(v.Type(), names)
+	fields, omitempty := m.TraversalsByName(v.Type(), names)
 	for i, t := range fields {
 		if len(t) == 0 {
 			return arglist, fmt.Errorf("could not find name %s in %#v", names[i], arg)
 		}
 		val := reflectx.FieldByIndexesReadOnly(v, t)
-		arglist = append(arglist, val.Interface())
+		if omitempty[i] && isEmptyValue(val) {
+			arglist = append(arglist, nil)
+		} else {
+			arglist = append(arglist, val.Interface())
+		}
 	}
 
 	return arglist, nil
+}
+
+// copied from https://golang.org/src/encoding/json/encode.go
+func isEmptyValue(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
+		return v.Len() == 0
+	case reflect.Bool:
+		return !v.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return v.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return v.Float() == 0
+	case reflect.Interface, reflect.Ptr:
+		return v.IsNil()
+	}
+	return false
 }
 
 // like bindArgs, but for maps.

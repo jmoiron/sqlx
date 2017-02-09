@@ -340,7 +340,7 @@ func TestFieldsEmbedded(t *testing.T) {
 		t.Errorf("Expecting required option to be set")
 	}
 
-	trs := m.TraversalsByName(reflect.TypeOf(pp), []string{"person.name", "name", "title"})
+	trs, _ := m.TraversalsByName(reflect.TypeOf(pp), []string{"person.name", "name", "title"})
 	if !reflect.DeepEqual(trs, [][]int{{0, 0}, {1, 0}, {2, 0}}) {
 		t.Errorf("Expecting traversal: %v", trs)
 	}

@@ -165,21 +165,28 @@ func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {
 // TraversalsByName returns a slice of int slices which represent the struct
 // traversals for each mapped name.  Panics if t is not a struct or Indirectable
 // to a struct.  Returns empty int slice for each name not found.
-func (m *Mapper) TraversalsByName(t reflect.Type, names []string) [][]int {
+func (m *Mapper) TraversalsByName(t reflect.Type, names []string) ([][]int, []bool) {
 	t = Deref(t)
 	mustBe(t, reflect.Struct)
 	tm := m.TypeMap(t)
 
 	r := make([][]int, 0, len(names))
+	isOmitEmpty := make([]bool, 0, len(names))
 	for _, name := range names {
 		fi, ok := tm.Names[name]
 		if !ok {
 			r = append(r, []int{})
+			isOmitEmpty = append(isOmitEmpty, false)
 		} else {
 			r = append(r, fi.Index)
+			var omitempty bool
+			if _, ok := fi.Options["omitempty"]; ok {
+				omitempty = true
+			}
+			isOmitEmpty = append(isOmitEmpty, omitempty)
 		}
 	}
-	return r
+	return r, isOmitEmpty
 }
 
 // FieldByIndexes returns a value for the field given by the struct traversal

@@ -43,27 +43,28 @@ func Rebind(bindType int, query string) string {
 		return query
 	}
 
-	qb := []byte(query)
 	// Add space enough for 10 params before we have to allocate
-	rqb := make([]byte, 0, len(qb)+10)
-	j := 1
-	for _, b := range qb {
-		if b == '?' {
-			switch bindType {
-			case DOLLAR:
-				rqb = append(rqb, '$')
-			case NAMED:
-				rqb = append(rqb, ':', 'a', 'r', 'g')
-			}
-			for _, b := range strconv.Itoa(j) {
-				rqb = append(rqb, byte(b))
-			}
-			j++
-		} else {
-			rqb = append(rqb, b)
+	rqb := make([]byte, 0, len(query)+10)
+
+	var i, j int
+
+	for i = strings.Index(query, "?"); i != -1; i = strings.Index(query, "?") {
+		rqb = append(rqb, query[:i]...)
+
+		switch bindType {
+		case DOLLAR:
+			rqb = append(rqb, '$')
+		case NAMED:
+			rqb = append(rqb, ':', 'a', 'r', 'g')
 		}
+
+		j++
+		rqb = strconv.AppendInt(rqb, int64(j), 10)
+
+		query = query[i+1:]
 	}
-	return string(rqb)
+
+	return string(append(rqb, query...))
 }
 
 // Experimental implementation of Rebind which uses a bytes.Buffer.  The code is

@@ -967,7 +967,7 @@ func TestUsage(t *testing.T) {
 			t.Error("Expected an error")
 		}
 		err = stmt1.Get(&jason, "DoesNotExist User 2")
-		if err != nil {
+		if err == nil {
 			t.Fatal(err)
 		}
 

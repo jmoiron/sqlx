@@ -793,7 +793,7 @@ func TestUsageContext(t *testing.T) {
 			t.Error("Expected an error")
 		}
 		err = stmt1.GetContext(ctx, &jason, "DoesNotExist User 2")
-		if err != nil {
+		if err == nil {
 			t.Fatal(err)
 		}
 

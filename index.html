@@ -155,7 +155,7 @@ db.MustExec(cityState, "Singapore", 65)
 db.MustExec(countryCity, "South Africa", "Johannesburg", 27)
 </pre>
 
-<p>The <a href="http://golang.org/pkg/database/sql/#Result">result</a> has two possible pieces of data: <code>LastInsertedId()</code> or <code>RowsAffected()</code>, the availability of which is driver dependent.  In MySQL, for instance, <code>LastInsertedId()</code> will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the <code>RETURNING</code> clause.</p>
+<p>The <a href="http://golang.org/pkg/database/sql/#Result">result</a> has two possible pieces of data: <code>LastInsertId()</code> or <code>RowsAffected()</code>, the availability of which is driver dependent.  In MySQL, for instance, <code>LastInsertId()</code> will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the <code>RETURNING</code> clause.</p>
 <h4>bindvars <a href="#bindvars" class="permalink" id="bindvars">&para;</a></h4>
 <p>The <code>?</code> query placeholders, called <code>bindvars</code> internally, are important;  you should <em>always</em> use these to send values to the database, as they will prevent <a href="http://en.wikipedia.org/wiki/SQL_injection">SQL injection</a> attacks.  databse/sql does not attempt <em>any</em> validation on the query text;  it is sent to the server as is, along with the encoded parameters.  Unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific:</p>
 <ul>

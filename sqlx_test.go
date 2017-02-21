@@ -1726,6 +1726,36 @@ func BenchmarkIn(b *testing.B) {
 	}
 }
 
+func BenchmarkIn1k(b *testing.B) {
+	q := `SELECT * FROM foo WHERE x = ? AND v in (?) AND y = ?`
+
+	var vals [1000]interface{}
+
+	for i := 0; i < b.N; i++ {
+		_, _, _ = In(q, []interface{}{"foo", vals[:], "bar"}...)
+	}
+}
+
+func BenchmarkIn1kInt(b *testing.B) {
+	q := `SELECT * FROM foo WHERE x = ? AND v in (?) AND y = ?`
+
+	var vals [1000]int
+
+	for i := 0; i < b.N; i++ {
+		_, _, _ = In(q, []interface{}{"foo", vals[:], "bar"}...)
+	}
+}
+
+func BenchmarkIn1kString(b *testing.B) {
+	q := `SELECT * FROM foo WHERE x = ? AND v in (?) AND y = ?`
+
+	var vals [1000]string
+
+	for i := 0; i < b.N; i++ {
+		_, _, _ = In(q, []interface{}{"foo", vals[:], "bar"}...)
+	}
+}
+
 func BenchmarkRebind(b *testing.B) {
 	b.StopTimer()
 	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`

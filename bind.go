@@ -136,9 +136,9 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 	}
 
 	newArgs := make([]interface{}, 0, flatArgsCount)
+	buf := bytes.NewBuffer(make([]byte, 0, len(query)+len(", ?")*flatArgsCount))
 
 	var arg, offset int
-	var buf bytes.Buffer
 
 	for i := strings.IndexByte(query[offset:], '?'); i != -1; i = strings.IndexByte(query[offset:], '?') {
 		if arg >= len(meta) {
@@ -164,12 +164,11 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		// write everything up to and including our ? character
 		buf.WriteString(query[:offset+i+1])
 
-		newArgs = append(newArgs, argMeta.v.Index(0).Interface())
-
 		for si := 1; si < argMeta.length; si++ {
 			buf.WriteString(", ?")
-			newArgs = append(newArgs, argMeta.v.Index(si).Interface())
 		}
+
+		newArgs = appendReflectSlice(newArgs, argMeta.v, argMeta.length)
 
 		// slice the query and reset the offset. this avoids some bookkeeping for
 		// the write after the loop
@@ -184,4 +183,25 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 	}
 
 	return buf.String(), newArgs, nil
+}
+
+func appendReflectSlice(args []interface{}, v reflect.Value, vlen int) []interface{} {
+	switch val := v.Interface().(type) {
+	case []interface{}:
+		args = append(args, val...)
+	case []int:
+		for i := range val {
+			args = append(args, val[i])
+		}
+	case []string:
+		for i := range val {
+			args = append(args, val[i])
+		}
+	default:
+		for si := 0; si < vlen; si++ {
+			args = append(args, v.Index(si).Interface())
+		}
+	}
+
+	return args
 }

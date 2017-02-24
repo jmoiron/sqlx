@@ -504,12 +504,8 @@ These are the standard interfaces, and using them will ensure portability to any
 
 ## The Connection Pool <a href="#connectionPool" class="permalink" id="connectionPool">&para;</a>
 
-Statement preparation and query execution require a connection, and the DB object will manage a pool of them so that it can be safely used for concurrent querying.  There are two ways to control the size of the connection pool as of Go 1.2:
-
-* `DB.SetMaxIdleConns(n int)`
-* `DB.SetMaxOpenConns(n int)`
-
-By default, the pool grows unbounded, and connections will be created whenever there isn't a free connection available in the pool.  You can use `DB.SetMaxOpenConns` to set the maximum size of the pool.  Connections that are not being used are marked idle and then closed if they aren't required.  To avoid making and closing lots of connections, set the maximum idle size with `DB.SetMaxIdleConns` to a size that is sensible for your query loads.
+Statement preparation and query execution require a connection, and the DB object will manage a pool of them so that it can be safely used for concurrent querying.
+By default, the pool grows unbounded, and connections will be created whenever there isn't a free connection available in the pool.  You can use `DB.SetMaxOpenConns` to set the maximum size of the pool.  Connections that are not being used are marked idle and then closed if they aren't required.  To avoid making and closing lots of connections you can set the maximum idle size with `DB.SetMaxIdleConns` to a size that is sensible for your query loads, but beware: if you prepare statements and have a high count idle connection pool you can exhaust the limit for prepared statements on some database drivers (most notably [MySQL](https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_max_prepared_stmt_count)).
 
 It is easy to get into trouble by accidentally holding on to connections.  To prevent this:
 

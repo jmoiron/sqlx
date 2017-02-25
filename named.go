@@ -235,6 +235,9 @@ func bindArray(bindType int, query string, arg interface{}, m *reflectx.Mapper) 
 	}
 	arrayValue := reflect.ValueOf(arg)
 	arrayLen := arrayValue.Len()
+	if arrayLen == 0 {
+		return "", []interface{}{}, fmt.Errorf("length of array is 0: %#v", arg)
+	}
 	var arglist []interface{}
 	for i := 0; i < arrayLen; i++ {
 		elemArglist, err := bindArgs(names, arrayValue.Index(i).Interface(), m)

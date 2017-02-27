@@ -243,6 +243,36 @@ func (tx *Tx) MustExecContext(ctx context.Context, query string, args ...interfa
 	return MustExecContext(ctx, tx, query, args...)
 }
 
+// QueryxContext within a transaction and context.
+// Any placeholder parameters are replaced with supplied args.
+func (tx *Tx) QueryxContext(ctx context.Context, query string, args ...interface{}) (*Rows, error) {
+	r, err := tx.Tx.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return &Rows{Rows: r, unsafe: tx.unsafe, Mapper: tx.Mapper}, err
+}
+
+// SelectContext within a transaction and context.
+// Any placeholder parameters are replaced with supplied args.
+func (tx *Tx) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	return SelectContext(ctx, tx, dest, query, args...)
+}
+
+// GetContext within a transaction and context.
+// Any placeholder parameters are replaced with supplied args.
+// An error is returned if the result set is empty.
+func (tx *Tx) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	return GetContext(ctx, tx, dest, query, args...)
+}
+
+// QueryRowxContext within a transaction and context.
+// Any placeholder parameters are replaced with supplied args.
+func (tx *Tx) QueryRowxContext(ctx context.Context, query string, args ...interface{}) *Row {
+	rows, err := tx.Tx.QueryContext(ctx, query, args...)
+	return &Row{rows: rows, err: err, unsafe: tx.unsafe, Mapper: tx.Mapper}
+}
+
 // SelectContext using the prepared statement.
 // Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) SelectContext(ctx context.Context, dest interface{}, args ...interface{}) error {

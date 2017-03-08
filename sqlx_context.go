@@ -256,8 +256,8 @@ func (tx *Tx) QueryRowxContext(ctx context.Context, query string, args ...interf
 	return &Row{rows: rows, err: err, unsafe: tx.unsafe, Mapper: tx.Mapper}
 }
 
-func (tx *Tx) GetContext(ctx context.Context, dest interface{}, args ...interface{}) error {
-	return GetContext(ctx, tx, dest, "", args...)
+func (tx *Tx) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	return GetContext(ctx, tx, dest, query, args...)
 }
 
 // SelectContext using the prepared statement.

@@ -160,6 +160,7 @@ for rows.Next() {
     var telcode int
     err = rows.Scan(&country, &city, &telcode)
 }
+err = rows.Err()
 ```
 
 You should treat the Rows like a database cursor rather than a materialized list of results.  Although driver buffering behavior can vary, iterating via `Next()` is a good way to bound the memory usage of large result sets, as you're only scanning a single row at a time.  `Scan()` uses [reflect](http://golang.org/pkg/reflect) to map sql column return types to Go types like `string`, `[]byte`, et al.  If you do not iterate over a whole rows result, be sure to call `rows.Close()` to return the connection back to the pool!
@@ -184,6 +185,7 @@ for rows.Next() {
     var p Place
     err = rows.<a href="#advancedScanning">StructScan</a>(&p)
 }
+err = rows.Err()
 ```
 
 The primary extension on sqlx.Rows is `StructScan()`, which automatically scans results into struct fields.  Note that the fields must be [exported](http://golang.org/doc/effective_go.html#names) (capitalized) in order for sqlx to be able to write into them, something true of *all* marshallers in Go.  You can use the `db` struct tag to specify which column name maps to each struct field, or set a new default mapping with [db.MapperFunc()](#mapping).  The default behavior is to use `strings.Lower` on the field name to match against the column names.  For more information about `StructScan`, `SliceScan`, and `MapScan`, see the [section on advanced scanning](#advancedScanning).
@@ -483,12 +485,14 @@ for rows.Next() {
     // cols is an []interface{} of all of the column results
     cols, err := rows.SliceScan()
 }
+err = rows.Err()
 
 rows, err := db.Queryx("SELECT * FROM place")
 for rows.Next() {
     results := make(map[string]interface{})
     err = rows.MapScan(results)
 }
+err = rows.Err()
 ```
 
 SliceScan returns an `[]interface{}` of all columns, which can be useful in [situations](http://wts.jmoiron.net) where you are executing queries on behalf of a third party and have no way of knowing what columns may be returned.  MapScan behaves the same way, but maps the column names to interface{} values.  An important caveat here is that the results returned by `rows.Columns()` does not include fully qualified names, such that `SELECT a.id, b.id FROM a NATURAL JOIN b` will result in a Columns result of `[]string{"id", "id"}`, clobbering one of the results in your map.

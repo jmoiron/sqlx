@@ -1225,7 +1225,7 @@ func TestUsage(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		err = scanAll(rows, &sdest, false)
+		err = ScanAll(rows, &sdest, false)
 		if err != nil {
 			t.Error(err)
 		}

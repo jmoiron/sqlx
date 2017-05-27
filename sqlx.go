@@ -313,11 +313,31 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(db, dest, query, args...)
 }
 
+// Select using this DB, and panic on error.
+func (db *DB) MustSelect(dest interface{}, query string, args ...interface{}) {
+	MustSelect(db, dest, query, args...)
+}
+
 // Get using this DB.
 // Any placeholder parameters are replaced with supplied args.
 // An error is returned if the result set is empty.
 func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
+}
+
+// MustGet using this DB.
+func (db *DB) MustGet(dest interface{}, query string, args ...interface{}) {
+	MustGet(db, dest, query, args...)
+}
+
+// Get using this DB. Result will be stored in a newly allocated struct.
+func (db *DB) GetAlloc(destpp interface{}, query string, args ...interface{}) error {
+	return GetAlloc(db, destpp, query, args...)
+}
+
+// Call GetAlloc(), and panic on error
+func (db *DB) MustGetAlloc(destpp interface{}, query string, args ...interface{}) {
+	MustGetAlloc(db, destpp, query, args...)
 }
 
 // MustBegin starts a transaction, and panics on error.  Returns an *sqlx.Tx instead
@@ -360,6 +380,16 @@ func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(db, query, args...)
+}
+
+// ExecGetId runs ExecGetId using this database.
+func (db *DB) ExecGetId(query string, args ...interface{}) (int64, error) {
+	return ExecGetId(db, query, args...)
+}
+
+// MustExecGetId (panic) runs MustExecGetId using this database.
+func (db *DB) MustExecGetId(query string, args ...interface{}) int64 {
+	return MustExecGetId(db, query, args...)
 }
 
 // Preparex returns an sqlx.Stmt instead of a sql.Stmt
@@ -443,10 +473,55 @@ func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(tx, dest, query, args...)
 }
 
+// GetAlloc within a transaction.
+func (tx *Tx) GetAlloc(dest interface{}, query string, args ...interface{}) error {
+	return GetAlloc(tx, dest, query, args...)
+}
+
 // MustExec runs MustExec within a transaction.
 // Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) MustExec(query string, args ...interface{}) sql.Result {
 	return MustExec(tx, query, args...)
+}
+
+// ExecGetId runs ExecGetId within a transaction.
+func (tx *Tx) ExecGetId(query string, args ...interface{}) (int64, error) {
+	return ExecGetId(tx, query, args...)
+}
+
+// MustExecGetId (panic) runs ExecGetId within a transaction.
+func (tx *Tx) MustExecGetId(query string, args ...interface{}) int64 {
+	return MustExecGetId(tx, query, args...)
+}
+
+// MustExecGetIdOrRollback (panic) runs ExecGetId and panics on error. In
+// addition it will rollback current transaction before panicing.
+func (tx *Tx) MustExecGetIdOrRollback(query string, args ...interface{}) int64 {
+	id, err := ExecGetId(tx, query, args...)
+	if err != nil {
+		tx.Rollback()
+		panic(err)
+	}
+	return id
+}
+
+// MustExecOrRollback runs Exec within a transaction. On error it rollbacks the
+// transaction and panics.
+func (tx *Tx) MustExecOrRollback(query string, args ...interface{}) sql.Result {
+	res, err := tx.Exec(query, args...)
+	if err != nil {
+		tx.Rollback()
+		panic(err)
+	}
+	return res
+}
+
+// MustCommit (panic) calls Commit on a transaction and panics on error.
+func (tx *Tx) MustCommit() {
+	err := tx.Commit()
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Preparex  a statement within a transaction.
@@ -666,6 +741,14 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	return scanAll(rows, dest, false)
 }
 
+// Same as Select() except it panics on error.
+func MustSelect(q Queryer, dest interface{}, query string, args ...interface{}) {
+	err := Select(q, dest, query, args...)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Get does a QueryRow using the provided Queryer, and scans the resulting row
 // to dest.  If dest is scannable, the result must only have one column.  Otherwise,
 // StructScan is used.  Get will return sql.ErrNoRows like row.Scan would.
@@ -674,6 +757,63 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	r := q.QueryRowx(query, args...)
 	return r.scanAny(dest, false)
+}
+
+// MustGet is same as Get but panics on error.
+func MustGet(q Queryer, dest interface{}, query string, args ...interface{}) {
+	err := Get(q, dest, query, args...)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// Same as Get(), but instead of pointer to interface, duoble pointer should be
+// be passed. Results of the query is stored in newly allocated struct, and
+// passed pointer is updated to point to the data. If query results no rows
+// pointer is changed to point to nil.
+//
+// Usage example:
+//   ...
+//   var query = "SELECT ..."
+//   var person *Person
+//
+//   GetAlloc(db, &person, query)
+//
+//   if person == nil {
+//       log.Print("Person not found")
+//   } else {
+//       log.Person("Person is: ", person)
+//   }
+//   ...
+func GetAlloc(q Queryer, destpp interface{}, query string, args ...interface{}) error {
+	t := reflect.TypeOf(destpp)
+
+	if t.Kind() != reflect.Ptr {
+		return errors.New("must pass a double pointer to destination value, not a value")
+	}
+	if t.Elem().Kind() != reflect.Ptr {
+		return errors.New("must pass a double pointer to destination value, not a pointer to value")
+	}
+
+	destp := reflect.New(t.Elem().Elem())
+	err := Get(q, destp.Interface(), query, args...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			reflect.ValueOf(destpp).Elem().Set(reflect.Zero(t.Elem()))
+			return nil
+		}
+		return err
+	}
+	reflect.ValueOf(destpp).Elem().Set(destp)
+	return nil
+}
+
+// Same as GetAlloc() except panics on error.
+func MustGetAlloc(q Queryer, destpp interface{}, query string, args ...interface{}) {
+	err := GetAlloc(q, destpp, query, args...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // LoadFile exec's every statement in a file (as a single call to Exec).
@@ -708,6 +848,29 @@ func MustExec(e Execer, query string, args ...interface{}) sql.Result {
 		panic(err)
 	}
 	return res
+}
+
+// ExecGetId runs Exec, but returns the result from LastInsertId() call instead
+// of normal sql.Result.
+func ExecGetId(e Execer, query string, args ...interface{}) (int64, error) {
+	r, err := e.Exec(query, args...)
+	if err != nil {
+		return 0, err
+	}
+	id, err := r.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// MustExecGetId (panic) runs ExecGetId but panics on error.
+func MustExecGetId(e Execer, query string, args ...interface{}) int64 {
+	id, err := ExecGetId(e, query, args...)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 // SliceScan using this Rows.

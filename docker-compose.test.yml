@@ -1,0 +1,32 @@
+version: "2"
+
+services:
+  mysql:
+    container_name: sqlx_sut_mysql
+    image: "mysql"
+    environment:
+      MYSQL_ROOT_PASSWORD: "root_password"
+      MYSQL_DATABASE: "sqlx_test"
+
+  postgres:
+    container_name: sqlx_sut_postgres
+    image: "postgres"
+    environment:
+      POSTGRES_USER: "root"
+      POSTGRES_PASSWORD: "root_password"
+      POSTGRES_DB: "sqlx_test"
+
+  sut:
+    container_name: sqlx_sut
+    image: sqlx_sut:latest
+    build:
+      context: .
+      dockerfile: ./Dockerfile.test
+    env_file:
+      - ./default.test.env
+    depends_on:
+      - mysql
+      - postgres
+    links:
+      - mysql
+      - postgres

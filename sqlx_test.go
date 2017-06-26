@@ -1698,6 +1698,55 @@ func TestEmbeddedLiterals(t *testing.T) {
 	})
 }
 
+func assertPanic(functionName string, t *testing.T) {
+	r := recover()
+	if r == nil {
+		t.Error(functionName + " should panic on error")
+	}
+}
+
+func TestDB_MustGet(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		defer assertPanic("MustGet", t)
+
+		people := Person{}
+		db.MustGet(&people, "SELECT shoulgowrong()")
+
+	})
+}
+
+func TestDB_MustSelect(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		defer assertPanic("MustSelect", t)
+
+		people := Person{}
+		db.MustSelect(&people, "SELECT shoulgowrong()")
+
+	})
+}
+
+func TestRow_MustScan(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+
+		defer assertPanic("Row.MustScan", t)
+
+		person := Person{}
+		db.QueryRowx("SELECT shoulgowrong()").MustScan(&person)
+	})
+}
+
+func TestDB_MustQueryx(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+
+		defer assertPanic("DB.MustQueryx", t)
+
+		people := []Person{}
+		db.MustQueryx("SELECT shoulgowrong()").Scan(&people)
+	})
+}
+
 func BenchmarkBindStruct(b *testing.B) {
 	b.StopTimer()
 	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`

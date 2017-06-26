@@ -219,6 +219,14 @@ func (r *Row) Scan(dest ...interface{}) error {
 	return nil
 }
 
+// Executes Scan and panics on error
+func (r *Row) MustScan(dest ...interface{}) {
+	err := r.Scan(dest...)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Columns returns the underlying sql.Rows.Columns(), or the deferred error usually
 // returned by Row.Scan()
 func (r *Row) Columns() ([]string, error) {
@@ -313,11 +321,20 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(db, dest, query, args...)
 }
 
+// MustSelect executes Select and panics on error
+func (db *DB) MustSelect(dest interface{}, query string, args ...interface{}) {
+	MustSelect(db, dest, query, args...)
+}
+
 // Get using this DB.
 // Any placeholder parameters are replaced with supplied args.
 // An error is returned if the result set is empty.
 func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
+}
+
+func (db *DB) MustGet(dest interface{}, query string, args ...interface{}) {
+	MustGet(db, dest, query, args...)
 }
 
 // MustBegin starts a transaction, and panics on error.  Returns an *sqlx.Tx instead
@@ -347,6 +364,16 @@ func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 		return nil, err
 	}
 	return &Rows{Rows: r, unsafe: db.unsafe, Mapper: db.Mapper}, err
+}
+
+// Queryx queries the database and returns an *sqlx.Rows.
+// Any placeholder parameters are replaced with supplied args.
+func (db *DB) MustQueryx(query string, args ...interface{}) *Rows {
+	r, err := db.DB.Query(query, args...)
+	if err != nil {
+		panic(err)
+	}
+	return &Rows{Rows: r, unsafe: db.unsafe, Mapper: db.Mapper}
 }
 
 // QueryRowx queries the database and returns an *sqlx.Row.
@@ -419,6 +446,11 @@ func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(tx, dest, query, args...)
 }
 
+// Executes Select and panics on error, this does not perform Rollback when error occurs
+func (tx *Tx) MustSelect(dest interface{}, query string, args ...interface{}) {
+	MustSelect(tx, dest, query, args...)
+}
+
 // Queryx within a transaction.
 // Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
@@ -441,6 +473,11 @@ func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
 // An error is returned if the result set is empty.
 func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(tx, dest, query, args...)
+}
+
+// Executes Get ant panics on error
+func (tx *Tx) MustGet(dest interface{}, query string, args ...interface{}) {
+	Get(tx, dest, query, args...)
 }
 
 // MustExec runs MustExec within a transaction.
@@ -666,6 +703,14 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	return scanAll(rows, dest, false)
 }
 
+// MustSelect executes Select and panics on error
+func MustSelect(q Queryer, dest interface{}, query string, args ...interface{}) {
+	err := Select(q, dest, query, args...)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Get does a QueryRow using the provided Queryer, and scans the resulting row
 // to dest.  If dest is scannable, the result must only have one column.  Otherwise,
 // StructScan is used.  Get will return sql.ErrNoRows like row.Scan would.
@@ -674,6 +719,14 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	r := q.QueryRowx(query, args...)
 	return r.scanAny(dest, false)
+}
+
+// MustGet does Get panics on error
+func MustGet(q Queryer, dest interface{}, query string, args ...interface{}) {
+	err := Get(q, dest, query, args...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // LoadFile exec's every statement in a file (as a single call to Exec).

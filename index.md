@@ -34,7 +34,7 @@ $ go get github.com/mattn/go-sqlite3
 
 ## Handle Types <a href="#handles" class="permalink" id="handles">&para;</a>
 
-`sqlx` is intended to have the same *feel* as `databse/sql`.  There are 4 main *handle* types:
+`sqlx` is intended to have the same *feel* as `database/sql`.  There are 4 main *handle* types:
 
 * `sqlx.DB` - analagous to `sql.DB`, a representation of a database
 * `sqlx.Tx` - analagous to `sql.Tx`, a representation of a transaction

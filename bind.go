@@ -110,6 +110,9 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 	meta := make([]argMeta, len(args))
 
 	for i, arg := range args {
+		if a, ok := arg.(driver.Valuer); ok {
+			arg, _ = a.Value()
+		}
 		v := reflect.ValueOf(arg)
 		t := reflectx.Deref(v.Type())
 

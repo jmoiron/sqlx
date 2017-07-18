@@ -113,7 +113,7 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		v := reflect.ValueOf(arg)
 		t := reflectx.Deref(v.Type())
 
-		if t.Kind() == reflect.Slice {
+		if t.Kind() == reflect.Slice && t != reflect.TypeOf([]byte{}) {
 			meta[i].length = v.Len()
 			meta[i].v = v
 

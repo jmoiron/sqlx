@@ -41,7 +41,7 @@ func mapper() *reflectx.Mapper {
 
 	if mpr == nil {
 		mpr = reflectx.NewMapperFunc("db", NameMapper)
-	} else if origMapper != reflect.ValueOf(NameMapper) {
+	} else if origMapper.Interface() != reflect.ValueOf(NameMapper).Interface() {
 		// if NameMapper has changed, create a new mapper
 		mpr = reflectx.NewMapperFunc("db", NameMapper)
 		origMapper = reflect.ValueOf(NameMapper)

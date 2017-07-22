@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/jmoiron/sqlx/reflectx"
 )
@@ -22,31 +23,37 @@ import (
 
 // NameMapper is used to map column names to struct field names.  By default,
 // it uses strings.ToLower to lowercase struct field names.  It can be set
-// to whatever you want, but it is encouraged to be set before sqlx is used
-// as name-to-field mappings are cached after first use on a type.
+// to whatever you want, but it is must be set before sqlx is used.
+// Changing NameMapper afterwards has no effect, to change the default mapper
+// for new connections use SetNameMapper.
 var NameMapper = strings.ToLower
-var origMapper = reflect.ValueOf(NameMapper)
 
-// Rather than creating on init, this is created when necessary so that
-// importers have time to customize the NameMapper.
-var mpr *reflectx.Mapper
+var (
+	mpr atomic.Value
+	// mprOnce guards mpr initialization using deprecated NameMapper value.
+	mprOnce sync.Once
+	// mprMu protects writes to mpr.
+	mprMu sync.Mutex
+)
 
-// mprMu protects mpr.
-var mprMu sync.Mutex
-
-// mapper returns a valid mapper using the configured NameMapper func.
+// mapper returns a valid mapper using the configured default mapper stored in mpr.
 func mapper() *reflectx.Mapper {
+	mprOnce.Do(func() {
+		// Rather than creating on init, this is created on first use so that
+		// importers have time to customize the NameMapper.
+
+		mpr.Store(reflectx.NewMapperFunc("db", NameMapper))
+	})
+	return mpr.Load().(*reflectx.Mapper)
+}
+
+// SetNameMapper changes the column names to struct field names mapping in
+// a thread-safe way. It should be used instead of direcly assigning NameMapper.
+// SetNameMapper only affects new DB instances, to modifiy existing ones use DB.MapperFunc.
+func SetNameMapper(newMapper func(string) string) {
 	mprMu.Lock()
 	defer mprMu.Unlock()
-
-	if mpr == nil {
-		mpr = reflectx.NewMapperFunc("db", NameMapper)
-	} else if origMapper != reflect.ValueOf(NameMapper) {
-		// if NameMapper has changed, create a new mapper
-		mpr = reflectx.NewMapperFunc("db", NameMapper)
-		origMapper = reflect.ValueOf(NameMapper)
-	}
-	return mpr
+	mpr.Store(reflectx.NewMapperFunc("db", newMapper))
 }
 
 // isScannable takes the reflect.Type and the actual dest value and returns

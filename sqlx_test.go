@@ -656,6 +656,20 @@ func TestNamedQuery(t *testing.T) {
 			}
 		}
 
+		var f string
+		row, err := db.NamedQueryRow("SELECT first_name FROM person WHERE first_name=:first_name", p)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = row.Scan(&f)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if f != p.FirstName.String {
+			t.Error("Expected first name of `" + p.FirstName.String + "`, got " + f)
+		}
+
 		// these are tests for #73;  they verify that named queries work if you've
 		// changed the db mapper.  This code checks both NamedQuery "ad-hoc" style
 		// queries and NamedStmt queries, which use different code paths internally.

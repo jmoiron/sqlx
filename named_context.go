@@ -120,6 +120,17 @@ func NamedQueryContext(ctx context.Context, e ExtContext, query string, arg inte
 	return e.QueryxContext(ctx, q, args...)
 }
 
+// NamedQueryRowContext binds a named query and then runs QueryRow on the result
+// using the provided Ext (sqlx.Tx, sqlx.Db).  It works with both structs and with
+// map[string]interface{} types.
+func NamedQueryRowContext(ctx context.Context, e ExtContext, query string, arg interface{}) (*Row, error) {
+	q, args, err := bindNamedMapper(BindType(e.DriverName()), query, arg, mapperFor(e))
+	if err != nil {
+		return nil, err
+	}
+	return e.QueryRowxContext(ctx, q, args...), nil
+}
+
 // NamedExecContext uses BindStruct to get a query executable by the driver and
 // then runs Exec on the result.  Returns an error from the binding
 // or the query excution itself.

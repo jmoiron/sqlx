@@ -228,6 +228,12 @@ func (r *Row) Columns() ([]string, error) {
 	return r.rows.Columns()
 }
 
+// Close allows to close the rows by exposing the Close method from the
+// underlying rows.
+func (r *Row) Close() error {
+	return r.rows.Close()
+}
+
 // Err returns the error encountered while scanning.
 func (r *Row) Err() error {
 	return r.err

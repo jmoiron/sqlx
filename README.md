@@ -66,10 +66,12 @@ usage.
 package main
 
 import (
-    _ "github.com/lib/pq"
     "database/sql"
-    "github.com/jmoiron/sqlx"
+    "fmt"
     "log"
+    
+    _ "github.com/lib/pq"
+    "github.com/jmoiron/sqlx"
 )
 
 var schema = `

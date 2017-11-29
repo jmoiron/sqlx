@@ -1296,9 +1296,12 @@ type Product struct {
 // tests that sqlx will not panic when the wrong driver is passed because
 // of an automatic nil dereference in sqlx.Open(), which was fixed.
 func TestDoNotPanicOnConnect(t *testing.T) {
-	_, err := Connect("bogus", "hehe")
+	db, err := Connect("bogus", "hehe")
 	if err == nil {
 		t.Errorf("Should return error when using bogus driverName")
+	}
+	if db != nil {
+		t.Errorf("Should not return the db on a connect failure")
 	}
 }
 

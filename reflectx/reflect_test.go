@@ -903,3 +903,72 @@ func BenchmarkFieldByIndexL4(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkTraversalsByName(b *testing.B) {
+	type A struct {
+		Value int
+	}
+
+	type B struct {
+		A A
+	}
+
+	type C struct {
+		B B
+	}
+
+	type D struct {
+		C C
+	}
+
+	m := NewMapper("")
+	t := reflect.TypeOf(D{})
+	names := []string{"C", "B", "A", "Value"}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		if l := len(m.TraversalsByName(t, names)); l != len(names) {
+			b.Errorf("expected %d values, got %d", len(names), l)
+		}
+	}
+}
+
+func BenchmarkTraversalsByNameFunc(b *testing.B) {
+	type A struct {
+		Z int
+	}
+
+	type B struct {
+		A A
+	}
+
+	type C struct {
+		B B
+	}
+
+	type D struct {
+		C C
+	}
+
+	m := NewMapper("")
+	t := reflect.TypeOf(D{})
+	names := []string{"C", "B", "A", "Z", "Y"}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var l int
+
+		if err := m.TraversalsByNameFunc(t, names, func(_ int, _ []int) error {
+			l++
+			return nil
+		}); err != nil {
+			b.Errorf("unexpected error %s", err)
+		}
+
+		if l != len(names) {
+			b.Errorf("expected %d values, got %d", len(names), l)
+		}
+	}
+}

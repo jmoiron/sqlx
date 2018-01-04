@@ -168,13 +168,13 @@ func main() {
     // which takes into account the dbtype based on the driverName on sqlx.Open/Connect
     _, err = db.NamedExec(`INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)`, 
         map[string]interface{}{
-            "first": "Bin",
-            "last": "Smuth",
+            "first": "Ben",
+            "last": "Smith",
             "email": "bensmith@allblacks.nz",
     })
 
     // Selects Mr. Smith from the database
-    rows, err = db.NamedQuery(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Bin"})
+    rows, err = db.NamedQuery(`SELECT * FROM person WHERE first_name=:fn`, map[string]interface{}{"fn": "Ben"})
 
     // Named queries can also use structs.  Their bind names follow the same rules
     // as the name -> db mapping, so struct fields are lowercased and the `db` tag

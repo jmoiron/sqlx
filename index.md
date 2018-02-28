@@ -34,7 +34,7 @@ $ go get github.com/mattn/go-sqlite3
 
 ## Handle Types <a href="#handles" class="permalink" id="handles">&para;</a>
 
-`sqlx` is intended to have the same *feel* as `databse/sql`.  There are 4 main *handle* types:
+`sqlx` is intended to have the same *feel* as `database/sql`.  There are 4 main *handle* types:
 
 * `sqlx.DB` - analagous to `sql.DB`, a representation of a database
 * `sqlx.Tx` - analagous to `sql.Tx`, a representation of a transaction
@@ -124,7 +124,7 @@ The [result](http://golang.org/pkg/database/sql/#Result) has two possible pieces
 
 #### bindvars <a href="#bindvars" class="permalink" id="bindvars">&para;</a>
 
-The `?` query placeholders, called `bindvars` internally, are important;  you should *always* use these to send values to the database, as they will prevent [SQL injection](http://en.wikipedia.org/wiki/SQL_injection) attacks.  databse/sql does not attempt *any* validation on the query text;  it is sent to the server as is, along with the encoded parameters.  Unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific:
+The `?` query placeholders, called `bindvars` internally, are important;  you should *always* use these to send values to the database, as they will prevent [SQL injection](http://en.wikipedia.org/wiki/SQL_injection) attacks.  database/sql does not attempt *any* validation on the query text;  it is sent to the server as is, along with the encoded parameters.  Unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific:
 
 * MySQL uses the `?` variant shown above
 * PostgreSQL uses an enumerated `$1`, `$2`, etc bindvar syntax

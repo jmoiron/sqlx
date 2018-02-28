@@ -77,7 +77,7 @@ $ go get github.com/mattn/go-sqlite3
 </pre>
 
 <h2>Handle Types <a href="#handles" class="permalink" id="handles">&para;</a></h2>
-<p><code>sqlx</code> is intended to have the same <em>feel</em> as <code>databse/sql</code>.  There are 4 main <em>handle</em> types:</p>
+<p><code>sqlx</code> is intended to have the same <em>feel</em> as <code>database/sql</code>.  There are 4 main <em>handle</em> types:</p>
 <ul>
 <li><code>sqlx.DB</code> - analagous to <code>sql.DB</code>, a representation of a database</li>
 <li><code>sqlx.Tx</code> - analagous to <code>sql.Tx</code>, a representation of a transaction</li>
@@ -157,7 +157,7 @@ db.MustExec(countryCity, "South Africa", "Johannesburg", 27)
 
 <p>The <a href="http://golang.org/pkg/database/sql/#Result">result</a> has two possible pieces of data: <code>LastInsertId()</code> or <code>RowsAffected()</code>, the availability of which is driver dependent.  In MySQL, for instance, <code>LastInsertId()</code> will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the <code>RETURNING</code> clause.</p>
 <h4>bindvars <a href="#bindvars" class="permalink" id="bindvars">&para;</a></h4>
-<p>The <code>?</code> query placeholders, called <code>bindvars</code> internally, are important;  you should <em>always</em> use these to send values to the database, as they will prevent <a href="http://en.wikipedia.org/wiki/SQL_injection">SQL injection</a> attacks.  databse/sql does not attempt <em>any</em> validation on the query text;  it is sent to the server as is, along with the encoded parameters.  Unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific:</p>
+<p>The <code>?</code> query placeholders, called <code>bindvars</code> internally, are important;  you should <em>always</em> use these to send values to the database, as they will prevent <a href="http://en.wikipedia.org/wiki/SQL_injection">SQL injection</a> attacks.  database/sql does not attempt <em>any</em> validation on the query text;  it is sent to the server as is, along with the encoded parameters.  Unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific:</p>
 <ul>
 <li>MySQL uses the <code>?</code> variant shown above</li>
 <li>PostgreSQL uses an enumerated <code>$1</code>, <code>$2</code>, etc bindvar syntax</li>

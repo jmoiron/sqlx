@@ -1387,13 +1387,17 @@ func (p PropertyMap) Value() (driver.Value, error) {
 
 func (p PropertyMap) Scan(src interface{}) error {
 	v := reflect.ValueOf(src)
-	if !v.IsValid() || v.IsNil() {
+	if !v.IsValid() || v.CanAddr() && v.IsNil() {
 		return nil
 	}
-	if data, ok := src.([]byte); ok {
-		return json.Unmarshal(data, &p)
+	switch ts := src.(type) {
+	case []byte:
+		return json.Unmarshal(ts, &p)
+	case string:
+		return json.Unmarshal([]byte(ts), &p)
+	default:
+		return fmt.Errorf("Could not not decode type %T -> %T", src, p)
 	}
-	return fmt.Errorf("Could not not decode type %T -> %T", src, p)
 }
 
 func TestEmbeddedMaps(t *testing.T) {

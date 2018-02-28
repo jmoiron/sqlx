@@ -12,18 +12,15 @@ before_install:
   - mysql -e 'CREATE DATABASE IF NOT EXISTS sqlxtest;'
   - psql -c 'create database sqlxtest;' -U postgres
   - go get github.com/mattn/goveralls
+  - export SQLX_MYSQL_DSN="travis:@/sqlxtest?parseTime=true"
+  - export SQLX_POSTGRES_DSN="postgres://postgres:@localhost/sqlxtest?sslmode=disable"
+  - export SQLX_SQLITE_DSN="$HOME/sqlxtest.db"
 
 # go versions to test
 go:
   - "1.8"
   - "1.9"
   - "1.10.x"
-
-# environment to test everything at once;  we want to avoid build matrixes
-env:
-  - SQLX_MYSQL_DSN="travis:@/sqlxtest?parseTime=true"
-  - SQLX_POSTGRES_DSN="postgres://postgres:@localhost/sqlxtest?sslmode=disable"
-  - SQLX_SQLITE_DSN="$HOME/sqlxtest.db"
 
 # run tests w/ coverage
 script:

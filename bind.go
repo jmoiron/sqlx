@@ -21,7 +21,7 @@ const (
 // BindType returns the bindtype for a given database given a drivername.
 func BindType(driverName string) int {
 	switch driverName {
-	case "postgres", "pgx", "pq-timeouts":
+	case "postgres", "pgx", "pq-timeouts", "cloudsqlpostgres":
 		return DOLLAR
 	case "mysql":
 		return QUESTION

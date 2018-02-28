@@ -237,6 +237,19 @@ func (tx *Tx) NamedStmtContext(ctx context.Context, stmt *NamedStmt) *NamedStmt 
 	}
 }
 
+// PreparexContext returns an sqlx.Stmt instead of a sql.Stmt.
+//
+// The provided context is used for the preparation of the statement, not for
+// the execution of the statement.
+func (tx *Tx) PreparexContext(ctx context.Context, query string) (*Stmt, error) {
+	return PreparexContext(ctx, tx, query)
+}
+
+// PrepareNamedContext returns an sqlx.NamedStmt
+func (tx *Tx) PrepareNamedContext(ctx context.Context, query string) (*NamedStmt, error) {
+	return prepareNamedContext(ctx, tx, query)
+}
+
 // MustExecContext runs MustExecContext within a transaction.
 // Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) MustExecContext(ctx context.Context, query string, args ...interface{}) sql.Result {

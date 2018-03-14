@@ -601,7 +601,7 @@ func (r *Rows) StructScan(dest interface{}) error {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
 	}
 
-	v = reflect.Indirect(v)
+	v = v.Elem()
 
 	if !r.started {
 		columns, err := r.Columns()

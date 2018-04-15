@@ -287,6 +287,12 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 					rebound = append(rebound, byte(b))
 				}
 				currentVar++
+			case AT:
+				rebound = append(rebound, '@', 'p')
+				for _, b := range strconv.Itoa(currentVar) {
+					rebound = append(rebound, byte(b))
+				}
+				currentVar++
 			}
 			// add this byte to string unless it was not part of the name
 			if i != last {

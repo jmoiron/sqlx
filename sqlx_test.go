@@ -1320,6 +1320,17 @@ func TestRebind(t *testing.T) {
 		t.Errorf("q2 failed")
 	}
 
+	s1 = Rebind(AT, q1)
+	s2 = Rebind(AT, q2)
+
+	if s1 != `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10)` {
+		t.Errorf("q1 failed")
+	}
+
+	if s2 != `INSERT INTO foo (a, b, c) VALUES (@p1, @p2, "foo"), ("Hi", @p3, @p4)` {
+		t.Errorf("q2 failed")
+	}
+
 	s1 = Rebind(NAMED, q1)
 	s2 = Rebind(NAMED, q2)
 

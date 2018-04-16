@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -33,6 +34,8 @@ var mpr *reflectx.Mapper
 
 // mprMu protects mpr.
 var mprMu sync.Mutex
+
+var selectAsteriskRegex = regexp.MustCompile("(?is)(\\s*select\\s+)(\\*)(.*)")
 
 // mapper returns a valid mapper using the configured NameMapper func.
 func mapper() *reflectx.Mapper {
@@ -319,6 +322,33 @@ func (db *DB) NamedExec(query string, arg interface{}) (sql.Result, error) {
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(db, dest, query, args...)
+}
+
+func replaceAsterisk(dest interface{}, query string) string {
+	matches := selectAsteriskRegex.FindStringSubmatch(query)
+	if len(matches) != 4 {
+		return query
+	}
+	t := reflectx.UnderlyingType(dest)
+	var tags []string
+	for i := 0; i < t.NumField(); i++ {
+		tag := t.Field(i).Tag.Get("db")
+		if tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	formattedTags := strings.Join(tags, ", ")
+	return matches[1] + formattedTags + matches[3]
+}
+
+// SelectResolveAsterisk using this DB.
+// Same as Select but with the asterisk in the 'select *' part of the query
+// replaced by the db:"..." tags from dest, to avoid trying to read database
+// fields that have no counterpart in the receiver. For statements without an
+// asterisk select the method behaves exactly like Select.
+func (db *DB) SelectResolveAsterisk(dest interface{}, query string, args ...interface{}) error {
+	query = replaceAsterisk(dest, query)
+	return db.Select(dest, query, args...)
 }
 
 // Get using this DB.

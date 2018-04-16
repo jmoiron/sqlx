@@ -1327,6 +1327,54 @@ func TestMissingDestination(t *testing.T) {
 	})
 }
 
+func TestResolveAsterisk(t *testing.T) {
+	testCases := []struct {
+		TestName       string
+		GivenStatement string
+	}{
+		{
+			TestName:       "SimpleSelect",
+			GivenStatement: `SELECT first_name FROM person`,
+		},
+		{
+			TestName:       "AsteriskSelect",
+			GivenStatement: `SELECT * FROM person`,
+		},
+		{
+			TestName: "AsteriskSelectNewline",
+			GivenStatement: `
+SELECT *
+FROM person`,
+		},
+		{
+			TestName: "AsteriskSelectComplexFormatting",
+			GivenStatement: `
+    SELECT
+     *
+    FROM
+     person`,
+		},
+	}
+
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		for _, tc := range testCases {
+			t.Run(tc.TestName, func(t *testing.T) {
+				var people []Person3
+				err := db.SelectResolveAsterisk(&people, tc.GivenStatement)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, p := range people {
+					if len(p.FirstName) == 0 {
+						t.Errorf("Expected non-zero lengthed first name.")
+					}
+				}
+			})
+		}
+	})
+}
+
 type Product struct {
 	ProductID int
 }

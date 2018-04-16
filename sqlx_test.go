@@ -166,6 +166,12 @@ type Person2 struct {
 	Email     sql.NullString
 }
 
+type Person3 struct {
+	FirstName string `db:"first_name"`
+	Email     string
+	AddedAt   time.Time `db:"added_at"`
+}
+
 type Place struct {
 	Country string
 	City    sql.NullString
@@ -1285,6 +1291,38 @@ func TestUsage(t *testing.T) {
 			if val.Valid && val.String != "New York" {
 				t.Errorf("expected single valid result to be `New York`, but got %s", val.String)
 			}
+		}
+	})
+}
+
+func TestMissingDestination(t *testing.T) {
+	testCases := []struct {
+		TestName      string
+		Given         interface{}
+		ExpectedError string
+	}{
+		{
+			TestName:      "BasicSlice",
+			Given:         &[]Person3{},
+			ExpectedError: "missing destination field 'last_name' in sqlx.Person3",
+		},
+		{
+			TestName:      "SliceOfPointers",
+			Given:         &[]*Person3{},
+			ExpectedError: "missing destination field 'last_name' in sqlx.Person3",
+		},
+	}
+
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		for _, tc := range testCases {
+			t.Run(tc.TestName, func(t *testing.T) {
+				var statement = `SELECT * FROM person`
+				err := db.Select(tc.Given, statement)
+				if err.Error() != tc.ExpectedError {
+					t.Fatalf("unexpected error %q, expected %q", err.Error(), tc.ExpectedError)
+				}
+			})
 		}
 	})
 }

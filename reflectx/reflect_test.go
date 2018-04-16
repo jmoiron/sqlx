@@ -972,3 +972,53 @@ func BenchmarkTraversalsByNameFunc(b *testing.B) {
 		}
 	}
 }
+
+func TestUnderlyingType(t *testing.T) {
+	type A struct {
+		A1 int
+	}
+
+	var a A
+	var i int
+
+	testCases := []struct {
+		TestName     string
+		Given        interface{}
+		ExpectedType reflect.Type
+	}{
+		{
+			TestName:     "IntSlice",
+			Given:        []int{},
+			ExpectedType: reflect.TypeOf(i),
+		},
+		{
+			TestName:     "SimpleStruct",
+			Given:        a,
+			ExpectedType: reflect.TypeOf(a),
+		},
+		{
+			TestName:     "Slice",
+			Given:        []A{},
+			ExpectedType: reflect.TypeOf(a),
+		},
+		{
+			TestName:     "SliceOfPointers",
+			Given:        []*A{},
+			ExpectedType: reflect.TypeOf(a),
+		},
+		{
+			TestName:     "AddressOfSlice",
+			Given:        &[]*A{},
+			ExpectedType: reflect.TypeOf(a),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.TestName, func(t *testing.T) {
+			actualType := UnderlyingType(tc.Given)
+			if actualType != tc.ExpectedType {
+				t.Errorf("expected %s, got %s", actualType, tc.ExpectedType)
+			}
+		})
+	}
+}

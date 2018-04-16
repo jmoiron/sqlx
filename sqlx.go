@@ -939,7 +939,8 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 		fields := m.TraversalsByName(base, columns)
 		// if we are not unsafe and are missing fields, return an error
 		if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
-			return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
+			destType := reflectx.UnderlyingType(dest).String()
+			return fmt.Errorf("missing destination field '%s' in %s", columns[f], destType)
 		}
 		values = make([]interface{}, len(columns))
 

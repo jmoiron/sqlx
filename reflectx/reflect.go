@@ -439,3 +439,17 @@ QueueLoop:
 
 	return flds
 }
+
+// UnderlyingType returns the underlying type for any combination of array,
+// slice, map and pointer indirections.
+func UnderlyingType(i interface{}) reflect.Type {
+	t := reflect.TypeOf(i)
+	for {
+		switch t.Kind() {
+		case reflect.Array, reflect.Chan, reflect.Map, reflect.Ptr, reflect.Slice:
+			t = t.Elem()
+		default:
+			return t
+		}
+	}
+}

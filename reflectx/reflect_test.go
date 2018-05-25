@@ -603,7 +603,6 @@ func TestMapperMethodsByName(t *testing.T) {
 		A0 *B `db:"A0"`
 		B  `db:"A1"`
 		A2 int
-		a3 int
 	}
 
 	val := &A{
@@ -810,8 +809,6 @@ func TestMustBe(t *testing.T) {
 				t.Errorf("unexpected Method: %s", valueErr.Method)
 				t.Error("expected panic with *reflect.ValueError")
 				return
-			}
-			if valueErr.Method != "github.com/jmoiron/sqlx/reflectx.TestMustBe" {
 			}
 			if valueErr.Kind != reflect.String {
 				t.Errorf("unexpected Kind: %s", valueErr.Kind)

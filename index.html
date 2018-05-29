@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <title>Illustrated Guide to SQLX</title>
-        <link href='http://fonts.googleapis.com/css?family=PT+Sans:400,700' rel='stylesheet' type='text/css'>
+        <link href='https://fonts.googleapis.com/css?family=PT+Sans:400,700' rel='stylesheet' type='text/css'>
         
         <link href="assets/css/prettify.css" rel="stylesheet">
         <script src="assets/js/prettify.js"></script>
@@ -59,14 +59,14 @@
 <h2>Resources <a href="#resources" class="permalink" id="resources">&para;</a></h2>
 <p>There are other resources of excellent information about using SQL in Go:</p>
 <ul>
-<li><a href="http://golang.org/pkg/database/sql/">database/sql documentation</a></li>
+<li><a href="https://golang.org/pkg/database/sql/">database/sql documentation</a></li>
 <li><a href="http://go-database-sql.org/">go-database-sql tutorial</a></li>
 </ul>
 <p>If you need help getting started with Go itself, I recommend these resources:</p>
 <ul>
-<li><a href="http://tour.golang.org">The Go tour</a></li>
-<li><a href="http://golang.org/doc/code.html">How to write Go code</a></li>
-<li><a href="http://golang.org/doc/effective_go.html">Effective Go</a></li>
+<li><a href="https://tour.golang.org">The Go tour</a></li>
+<li><a href="https://golang.org/doc/code.html">How to write Go code</a></li>
+<li><a href="https://golang.org/doc/effective_go.html">Effective Go</a></li>
 </ul>
 <p>Because the <code>database/sql</code> interface is a subset of sqlx, all of the advice in these documents about <code>database/sql</code> usage also apply to usage of sqlx.</p>
 <h2>Getting Started <a href="#gettingStarted" class="permalink" id="gettingStarted">&para;</a></h2>
@@ -85,7 +85,7 @@ $ go get github.com/mattn/go-sqlite3
 <li><code>sqlx.NamedStmt</code> - a representation of a prepared statement with support for <a href="#namedParams">named
   parameters</a></li>
 </ul>
-<p>Handle types all <a href="http://golang.org/doc/effective_go.html#embedding">embed</a> their <code>database/sql</code> equivalents, meaning that when you call <code>sqlx.DB.Query</code>, you are calling the <em>same</em> code as <code>sql.DB.Query</code>.  This makes it easy to introduce into an existing codebase.</p>
+<p>Handle types all <a href="https://golang.org/doc/effective_go.html#embedding">embed</a> their <code>database/sql</code> equivalents, meaning that when you call <code>sqlx.DB.Query</code>, you are calling the <em>same</em> code as <code>sql.DB.Query</code>.  This makes it easy to introduce into an existing codebase.</p>
 <p>In addition to these, there are 2 <em>cursor</em> types:</p>
 <ul>
 <li><code>sqlx.Rows</code> - analagous to <code>sql.Rows</code>, a cursor returned from <code>Queryx</code></li>
@@ -155,9 +155,9 @@ db.MustExec(cityState, "Singapore", 65)
 db.MustExec(countryCity, "South Africa", "Johannesburg", 27)
 </pre>
 
-<p>The <a href="http://golang.org/pkg/database/sql/#Result">result</a> has two possible pieces of data: <code>LastInsertId()</code> or <code>RowsAffected()</code>, the availability of which is driver dependent.  In MySQL, for instance, <code>LastInsertId()</code> will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the <code>RETURNING</code> clause.</p>
+<p>The <a href="https://golang.org/pkg/database/sql/#Result">result</a> has two possible pieces of data: <code>LastInsertId()</code> or <code>RowsAffected()</code>, the availability of which is driver dependent.  In MySQL, for instance, <code>LastInsertId()</code> will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the <code>RETURNING</code> clause.</p>
 <h4>bindvars <a href="#bindvars" class="permalink" id="bindvars">&para;</a></h4>
-<p>The <code>?</code> query placeholders, called <code>bindvars</code> internally, are important;  you should <em>always</em> use these to send values to the database, as they will prevent <a href="http://en.wikipedia.org/wiki/SQL_injection">SQL injection</a> attacks.  database/sql does not attempt <em>any</em> validation on the query text;  it is sent to the server as is, along with the encoded parameters.  Unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific:</p>
+<p>The <code>?</code> query placeholders, called <code>bindvars</code> internally, are important;  you should <em>always</em> use these to send values to the database, as they will prevent <a href="https://en.wikipedia.org/wiki/SQL_injection">SQL injection</a> attacks.  database/sql does not attempt <em>any</em> validation on the query text;  it is sent to the server as is, along with the encoded parameters.  Unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific:</p>
 <ul>
 <li>MySQL uses the <code>?</code> variant shown above</li>
 <li>PostgreSQL uses an enumerated <code>$1</code>, <code>$2</code>, etc bindvar syntax</li>
@@ -165,7 +165,7 @@ db.MustExec(countryCity, "South Africa", "Johannesburg", 27)
 <li>Oracle uses a <code>:name</code> syntax</li>
 </ul>
 <p>Other databases may vary.  You can use the <code>sqlx.DB.Rebind(string) string</code> function with the <code>?</code> bindvar syntax to get a query which is suitable for execution on your current database type.</p>
-<p>A common misconception with bindvars is that they are used for interpolation.  They are only for <em>parameterization</em>, and are not allowed to <a href="http://use-the-index-luke.com/sql/where-clause/bind-parameters">change the structure of an SQL statement</a>.  For instance, using bindvars to try and parameterize column or table names will not work:</p>
+<p>A common misconception with bindvars is that they are used for interpolation.  They are only for <em>parameterization</em>, and are not allowed to <a href="https://use-the-index-luke.com/sql/where-clause/bind-parameters">change the structure of an SQL statement</a>.  For instance, using bindvars to try and parameterize column or table names will not work:</p>
 <pre class="prettyprint linenums">
 // doesn't work
 db.Query("SELECT * FROM ?", "mytable")
@@ -190,8 +190,8 @@ for rows.Next() {
 }
 </pre>
 
-<p>You should treat the Rows like a database cursor rather than a materialized list of results.  Although driver buffering behavior can vary, iterating via <code>Next()</code> is a good way to bound the memory usage of large result sets, as you're only scanning a single row at a time.  <code>Scan()</code> uses <a href="http://golang.org/pkg/reflect">reflect</a> to map sql column return types to Go types like <code>string</code>, <code>[]byte</code>, et al.  If you do not iterate over a whole rows result, be sure to call <code>rows.Close()</code> to return the connection back to the pool!</p>
-<p>The error returned by Query is any error that might have happened while preparing or executing on the server.  This can include grabbing a bad connection from the pool, although database/sql will <a href="http://golang.org/src/pkg/database/sql/sql.go?s=23888:23957#L885">retry 10 times</a> to attempt to find or create a working connection.  Generally, the error will be due to bad SQL syntax, type mismatches, or incorrect field and table names.</p>
+<p>You should treat the Rows like a database cursor rather than a materialized list of results.  Although driver buffering behavior can vary, iterating via <code>Next()</code> is a good way to bound the memory usage of large result sets, as you're only scanning a single row at a time.  <code>Scan()</code> uses <a href="https://golang.org/pkg/reflect">reflect</a> to map sql column return types to Go types like <code>string</code>, <code>[]byte</code>, et al.  If you do not iterate over a whole rows result, be sure to call <code>rows.Close()</code> to return the connection back to the pool!</p>
+<p>The error returned by Query is any error that might have happened while preparing or executing on the server.  This can include grabbing a bad connection from the pool, although database/sql will <a href="https://golang.org/src/pkg/database/sql/sql.go?s=23888:23957#L885">retry 10 times</a> to attempt to find or create a working connection.  Generally, the error will be due to bad SQL syntax, type mismatches, or incorrect field and table names.</p>
 <p>In most cases, Rows.Scan will copy the data it gets from the driver, as it is not aware of how the driver may reuse its buffers.  The special type <code>sql.RawBytes</code> can be used to get a <em>zero-copy</em> slice of bytes from the actual data returned by the driver.  After the next call to Next(), such a value is no longer valid, as that memory might have been overwritten by the driver.</p>
 <p>The connection used by the Query remains active until <em>either</em> all rows are exhausted by the iteration via Next, or <code>rows.Close()</code> is called, at which point it is released.  For more information, see the section on <a href="#connectionPool">the connection pool</a>.</p>
 <p>The sqlx extension <code>Queryx</code> behaves exactly as Query does, but returns an <code>sqlx.Rows</code>, which has extended scanning behaviors:</p>
@@ -209,7 +209,7 @@ for rows.Next() {
 }
 </pre>
 
-<p>The primary extension on sqlx.Rows is <code>StructScan()</code>, which automatically scans results into struct fields.  Note that the fields must be <a href="http://golang.org/doc/effective_go.html#names">exported</a> (capitalized) in order for sqlx to be able to write into them, something true of <em>all</em> marshallers in Go.  You can use the <code>db</code> struct tag to specify which column name maps to each struct field, or set a new default mapping with <a href="#mapping">db.MapperFunc()</a>.  The default behavior is to use <code>strings.Lower</code> on the field name to match against the column names.  For more information about <code>StructScan</code>, <code>SliceScan</code>, and <code>MapScan</code>, see the <a href="#advancedScanning">section on advanced scanning</a>.</p>
+<p>The primary extension on sqlx.Rows is <code>StructScan()</code>, which automatically scans results into struct fields.  Note that the fields must be <a href="https://golang.org/doc/effective_go.html#names">exported</a> (capitalized) in order for sqlx to be able to write into them, something true of <em>all</em> marshallers in Go.  You can use the <code>db</code> struct tag to specify which column name maps to each struct field, or set a new default mapping with <a href="#mapping">db.MapperFunc()</a>.  The default behavior is to use <code>strings.Lower</code> on the field name to match against the column names.  For more information about <code>StructScan</code>, <code>SliceScan</code>, and <code>MapScan</code>, see the <a href="#advancedScanning">section on advanced scanning</a>.</p>
 <h3>QueryRow <a href="#queryrow" class="permalink" id="queryrow">&para;</a></h3>
 <p>QueryRow fetches one row from the server.  It takes a connection from the connection pool and executes the query using Query, returning a <code>Row</code> object which has its own internal Rows object:</p>
 <pre class="prettyprint linenums">
@@ -281,7 +281,7 @@ err = tx.Commit()
 <p><code>sqlx.Tx</code> has all of the handle extensions that <code>sqlx.DB</code> has.</p>
 <p>Since transactions are connection state, the Tx object must bind and control a single connection from the pool.  A Tx will maintain that single connection for its entire life cycle, releasing it only when <code>Commit()</code> or <code>Rollback()</code> is called.  You should take care to call at least one of these, or else the connection will be held until garbage collection.</p>
 <p>Because you only have one connection to use in a transaction, you can only execute one statement at a time;  the cursor types Row and Rows must be Scanned or Closed, respectively, before executing another query.  If you attempt to send the server data while it is sending you a result, it can potentially corrupt the connection.</p>
-<p>Finally, Tx objects do not actually imply any behavior on the server;  they merely execute a BEGIN statement and bind a single connection.  The actual behavior of the transaction, including things like locking and <a href="http://en.wikipedia.org/wiki/Isolation_(database_systems)">isolation</a>, is completely unspecified and database dependent.</p>
+<p>Finally, Tx objects do not actually imply any behavior on the server;  they merely execute a BEGIN statement and bind a single connection.  The actual behavior of the transaction, including things like locking and <a href="https://en.wikipedia.org/wiki/Isolation_(database_systems)">isolation</a>, is completely unspecified and database dependent.</p>
 <h2>Prepared Statements <a href="#preparedStmts" class="permalink" id="preparedStmts">&para;</a></h2>
 <p>On most databases, statements will actually be prepared behind the scenes whenever a query is executed.  However, you may also explicitly prepare statements for reuse elsewhere with <code>sqlx.DB.Prepare()</code>:</p>
 <pre class="prettyprint linenums">
@@ -404,7 +404,7 @@ type Child struct {
 }
 </pre>
 
-<p>This causes some problems.  In Go, it's legal to shadow descendent fields;  if Employee from the embedded example defined a <code>Name</code>, it would take precedence over the Person's Name.  But <em>ambiguous</em> selectors are illegal and cause <a href="http://play.golang.org/p/MGRxdjLaUc">a runtime error</a>.  If we wanted to create a quick JOIN type for Person and Place, where would we put the <code>id</code> column, which is defined in both via their embedded AutoIncr?  Would there be an error?</p>
+<p>This causes some problems.  In Go, it's legal to shadow descendent fields;  if Employee from the embedded example defined a <code>Name</code>, it would take precedence over the Person's Name.  But <em>ambiguous</em> selectors are illegal and cause <a href="https://play.golang.org/p/MGRxdjLaUc">a runtime error</a>.  If we wanted to create a quick JOIN type for Person and Place, where would we put the <code>id</code> column, which is defined in both via their embedded AutoIncr?  Would there be an error?</p>
 <p>Because of the way that sqlx builds the mapping of field name to field address, by the time you Scan into a struct, it no longer knows whether or not a name was encountered twice during its traversal of the struct tree.  So unlike Go, StructScan will choose the "first" field encountered which has that name.  Since Go struct fields are ordered from top to bottom, and sqlx does a breadth-first traversal in order to maintain precedence rules, it would happen in the shallowest, top-most definition.  For example, in the type:</p>
 <pre class="prettyprint linenums">
 type PersonPlace struct {
@@ -440,7 +440,7 @@ copy := sqlx.NewDb(db.DB, db.DriverName())
 copy.MapperFunc(strings.ToLower)
 </pre>
 
-<p>Each <code>sqlx.DB</code> uses the <code>sqlx/reflectx</code> package's <a href="http://godoc.org/github.com/jmoiron/sqlx/reflectx#Mapper">Mapper</a> to achieve this mapping underneath, and exposes the active mapper as <code>sqlx.DB.Mapper</code>.  You can further customize the mapping on a DB by setting it directly:</p>
+<p>Each <code>sqlx.DB</code> uses the <code>sqlx/reflectx</code> package's <a href="https://godoc.org/github.com/jmoiron/sqlx/reflectx#Mapper">Mapper</a> to achieve this mapping underneath, and exposes the active mapper as <code>sqlx.DB.Mapper</code>.  You can further customize the mapping on a DB by setting it directly:</p>
 <pre class="prettyprint linenums">
 import "github.com/jmoiron/sqlx/reflectx"
 

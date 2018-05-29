@@ -12,14 +12,14 @@ Finally, the standard `err` variable will be used to indicate that errors are be
 
 There are other resources of excellent information about using SQL in Go:
 
-* [database/sql documentation](http://golang.org/pkg/database/sql/)
+* [database/sql documentation](https://golang.org/pkg/database/sql/)
 * [go-database-sql tutorial](http://go-database-sql.org/)
 
 If you need help getting started with Go itself, I recommend these resources:
 
-- [The Go tour](http://tour.golang.org)
-- [How to write Go code](http://golang.org/doc/code.html)
-- [Effective Go](http://golang.org/doc/effective_go.html)
+- [The Go tour](https://tour.golang.org)
+- [How to write Go code](https://golang.org/doc/code.html)
+- [Effective Go](https://golang.org/doc/effective_go.html)
 
 Because the `database/sql` interface is a subset of sqlx, all of the advice in these documents about `database/sql` usage also apply to usage of sqlx.
 
@@ -42,7 +42,7 @@ $ go get github.com/mattn/go-sqlite3
 * `sqlx.NamedStmt` - a representation of a prepared statement with support for [named
   parameters](#namedParams)
 
-Handle types all [embed](http://golang.org/doc/effective_go.html#embedding) their `database/sql` equivalents, meaning that when you call `sqlx.DB.Query`, you are calling the *same* code as `sql.DB.Query`.  This makes it easy to introduce into an existing codebase.
+Handle types all [embed](https://golang.org/doc/effective_go.html#embedding) their `database/sql` equivalents, meaning that when you call `sqlx.DB.Query`, you are calling the *same* code as `sql.DB.Query`.  This makes it easy to introduce into an existing codebase.
 
 In addition to these, there are 2 *cursor* types:
 
@@ -120,11 +120,11 @@ db.MustExec(cityState, "Singapore", 65)
 db.MustExec(countryCity, "South Africa", "Johannesburg", 27)
 ```
 
-The [result](http://golang.org/pkg/database/sql/#Result) has two possible pieces of data: `LastInsertId()` or `RowsAffected()`, the availability of which is driver dependent.  In MySQL, for instance, `LastInsertId()` will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the `RETURNING` clause.
+The [result](https://golang.org/pkg/database/sql/#Result) has two possible pieces of data: `LastInsertId()` or `RowsAffected()`, the availability of which is driver dependent.  In MySQL, for instance, `LastInsertId()` will be available on inserts with an auto-increment key, but in PostgreSQL, this information can only be retrieved from a normal row cursor by using the `RETURNING` clause.
 
 #### bindvars <a href="#bindvars" class="permalink" id="bindvars">&para;</a>
 
-The `?` query placeholders, called `bindvars` internally, are important;  you should *always* use these to send values to the database, as they will prevent [SQL injection](http://en.wikipedia.org/wiki/SQL_injection) attacks.  database/sql does not attempt *any* validation on the query text;  it is sent to the server as is, along with the encoded parameters.  Unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific:
+The `?` query placeholders, called `bindvars` internally, are important;  you should *always* use these to send values to the database, as they will prevent [SQL injection](https://en.wikipedia.org/wiki/SQL_injection) attacks.  database/sql does not attempt *any* validation on the query text;  it is sent to the server as is, along with the encoded parameters.  Unless drivers implement a special interface, the query is prepared on the server first before execution.  Bindvars are therefore database specific:
 
 * MySQL uses the `?` variant shown above
 * PostgreSQL uses an enumerated `$1`, `$2`, etc bindvar syntax
@@ -133,7 +133,7 @@ The `?` query placeholders, called `bindvars` internally, are important;  you sh
 
 Other databases may vary.  You can use the `sqlx.DB.Rebind(string) string` function with the `?` bindvar syntax to get a query which is suitable for execution on your current database type.
 
-A common misconception with bindvars is that they are used for interpolation.  They are only for *parameterization*, and are not allowed to [change the structure of an SQL statement](http://use-the-index-luke.com/sql/where-clause/bind-parameters).  For instance, using bindvars to try and parameterize column or table names will not work:
+A common misconception with bindvars is that they are used for interpolation.  They are only for *parameterization*, and are not allowed to [change the structure of an SQL statement](https://use-the-index-luke.com/sql/where-clause/bind-parameters).  For instance, using bindvars to try and parameterize column or table names will not work:
 
 ```
 // doesn't work
@@ -162,9 +162,9 @@ for rows.Next() {
 }
 ```
 
-You should treat the Rows like a database cursor rather than a materialized list of results.  Although driver buffering behavior can vary, iterating via `Next()` is a good way to bound the memory usage of large result sets, as you're only scanning a single row at a time.  `Scan()` uses [reflect](http://golang.org/pkg/reflect) to map sql column return types to Go types like `string`, `[]byte`, et al.  If you do not iterate over a whole rows result, be sure to call `rows.Close()` to return the connection back to the pool!
+You should treat the Rows like a database cursor rather than a materialized list of results.  Although driver buffering behavior can vary, iterating via `Next()` is a good way to bound the memory usage of large result sets, as you're only scanning a single row at a time.  `Scan()` uses [reflect](https://golang.org/pkg/reflect) to map sql column return types to Go types like `string`, `[]byte`, et al.  If you do not iterate over a whole rows result, be sure to call `rows.Close()` to return the connection back to the pool!
 
-The error returned by Query is any error that might have happened while preparing or executing on the server.  This can include grabbing a bad connection from the pool, although database/sql will [retry 10 times](http://golang.org/src/pkg/database/sql/sql.go?s=23888:23957#L885) to attempt to find or create a working connection.  Generally, the error will be due to bad SQL syntax, type mismatches, or incorrect field and table names.
+The error returned by Query is any error that might have happened while preparing or executing on the server.  This can include grabbing a bad connection from the pool, although database/sql will [retry 10 times](https://golang.org/src/pkg/database/sql/sql.go?s=23888:23957#L885) to attempt to find or create a working connection.  Generally, the error will be due to bad SQL syntax, type mismatches, or incorrect field and table names.
 
 In most cases, Rows.Scan will copy the data it gets from the driver, as it is not aware of how the driver may reuse its buffers.  The special type `sql.RawBytes` can be used to get a *zero-copy* slice of bytes from the actual data returned by the driver.  After the next call to Next(), such a value is no longer valid, as that memory might have been overwritten by the driver.
 
@@ -186,7 +186,7 @@ for rows.Next() {
 }
 ```
 
-The primary extension on sqlx.Rows is `StructScan()`, which automatically scans results into struct fields.  Note that the fields must be [exported](http://golang.org/doc/effective_go.html#names) (capitalized) in order for sqlx to be able to write into them, something true of *all* marshallers in Go.  You can use the `db` struct tag to specify which column name maps to each struct field, or set a new default mapping with [db.MapperFunc()](#mapping).  The default behavior is to use `strings.Lower` on the field name to match against the column names.  For more information about `StructScan`, `SliceScan`, and `MapScan`, see the [section on advanced scanning](#advancedScanning).
+The primary extension on sqlx.Rows is `StructScan()`, which automatically scans results into struct fields.  Note that the fields must be [exported](https://golang.org/doc/effective_go.html#names) (capitalized) in order for sqlx to be able to write into them, something true of *all* marshallers in Go.  You can use the `db` struct tag to specify which column name maps to each struct field, or set a new default mapping with [db.MapperFunc()](#mapping).  The default behavior is to use `strings.Lower` on the field name to match against the column names.  For more information about `StructScan`, `SliceScan`, and `MapScan`, see the [section on advanced scanning](#advancedScanning).
 
 ### QueryRow <a href="#queryrow" class="permalink" id="queryrow">&para;</a>
 
@@ -275,7 +275,7 @@ Since transactions are connection state, the Tx object must bind and control a s
 
 Because you only have one connection to use in a transaction, you can only execute one statement at a time;  the cursor types Row and Rows must be Scanned or Closed, respectively, before executing another query.  If you attempt to send the server data while it is sending you a result, it can potentially corrupt the connection.
 
-Finally, Tx objects do not actually imply any behavior on the server;  they merely execute a BEGIN statement and bind a single connection.  The actual behavior of the transaction, including things like locking and [isolation](http://en.wikipedia.org/wiki/Isolation_(database_systems)), is completely unspecified and database dependent.
+Finally, Tx objects do not actually imply any behavior on the server;  they merely execute a BEGIN statement and bind a single connection.  The actual behavior of the transaction, including things like locking and [isolation](https://en.wikipedia.org/wiki/Isolation_(database_systems)), is completely unspecified and database dependent.
 
 ## Prepared Statements <a href="#preparedStmts" class="permalink" id="preparedStmts">&para;</a>
 
@@ -418,7 +418,7 @@ type Child struct {
 }
 ```
 
-This causes some problems.  In Go, it's legal to shadow descendent fields;  if Employee from the embedded example defined a `Name`, it would take precedence over the Person's Name.  But *ambiguous* selectors are illegal and cause [a runtime error](http://play.golang.org/p/MGRxdjLaUc).  If we wanted to create a quick JOIN type for Person and Place, where would we put the `id` column, which is defined in both via their embedded AutoIncr?  Would there be an error?
+This causes some problems.  In Go, it's legal to shadow descendent fields;  if Employee from the embedded example defined a `Name`, it would take precedence over the Person's Name.  But *ambiguous* selectors are illegal and cause [a runtime error](https://play.golang.org/p/MGRxdjLaUc).  If we wanted to create a quick JOIN type for Person and Place, where would we put the `id` column, which is defined in both via their embedded AutoIncr?  Would there be an error?
 
 Because of the way that sqlx builds the mapping of field name to field address, by the time you Scan into a struct, it no longer knows whether or not a name was encountered twice during its traversal of the struct tree.  So unlike Go, StructScan will choose the "first" field encountered which has that name.  Since Go struct fields are ordered from top to bottom, and sqlx does a breadth-first traversal in order to maintain precedence rules, it would happen in the shallowest, top-most definition.  For example, in the type:
 
@@ -464,7 +464,7 @@ copy := sqlx.NewDb(db.DB, db.DriverName())
 copy.MapperFunc(strings.ToLower)
 ```
 
-Each `sqlx.DB` uses the `sqlx/reflectx` package's [Mapper](http://godoc.org/github.com/jmoiron/sqlx/reflectx#Mapper) to achieve this mapping underneath, and exposes the active mapper as `sqlx.DB.Mapper`.  You can further customize the mapping on a DB by setting it directly:
+Each `sqlx.DB` uses the `sqlx/reflectx` package's [Mapper](https://godoc.org/github.com/jmoiron/sqlx/reflectx#Mapper) to achieve this mapping underneath, and exposes the active mapper as `sqlx.DB.Mapper`.  You can further customize the mapping on a DB by setting it directly:
 
 ```go
 import "github.com/jmoiron/sqlx/reflectx"

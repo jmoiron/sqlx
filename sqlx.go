@@ -141,6 +141,10 @@ func isUnsafe(i interface{}) bool {
 		return v.unsafe
 	case *Tx:
 		return v.unsafe
+	case Conn:
+		return v.unsafe
+	case *Conn:
+		return v.unsafe
 	case sql.Rows, *sql.Rows:
 		return false
 	default:
@@ -158,6 +162,10 @@ func mapperFor(i interface{}) *reflectx.Mapper {
 		return i.(Tx).Mapper
 	case *Tx:
 		return i.(*Tx).Mapper
+	case Conn:
+		return i.(Conn).Mapper
+	case *Conn:
+		return i.(*Conn).Mapper
 	default:
 		return mapper()
 	}

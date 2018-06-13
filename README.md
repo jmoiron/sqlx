@@ -1,6 +1,6 @@
-#sqlx
+# sqlx
 
-[![Build Status](https://drone.io/github.com/jmoiron/sqlx/status.png)](https://drone.io/github.com/jmoiron/sqlx/latest) [![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/jmoiron/sqlx) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/jmoiron/sqlx/master/LICENSE)
+[![Build Status](https://travis-ci.org/jmoiron/sqlx.svg?branch=master)](https://travis-ci.org/jmoiron/sqlx) [![Coverage Status](https://coveralls.io/repos/github/jmoiron/sqlx/badge.svg?branch=master)](https://coveralls.io/github/jmoiron/sqlx?branch=master) [![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/jmoiron/sqlx) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/jmoiron/sqlx/master/LICENSE)
 
 sqlx is a library which provides a set of extensions on go's standard
 `database/sql` library.  The sqlx versions of `sql.DB`, `sql.TX`, `sql.Stmt`,
@@ -26,9 +26,7 @@ This breaks backwards compatibility, but it's in a way that is trivially fixable
 (`s/JsonText/JSONText/g`).  The `types` package is both experimental and not in
 active development currently.
 
-More importantly, [golang bug #13905](https://github.com/golang/go/issues/13905)
-makes `types.JSONText` and `types.GzippedText` _potentially unsafe_, **especially**
-when used with common auto-scan sqlx idioms like `Select` and `Get`.
+* Using Go 1.6 and below with `types.JSONText` and `types.GzippedText` can be _potentially unsafe_, **especially** when used with common auto-scan sqlx idioms like `Select` and `Get`. See [golang bug #13905](https://github.com/golang/go/issues/13905).
 
 ### Backwards Compatibility
 
@@ -68,10 +66,12 @@ usage.
 package main
 
 import (
-    _ "github.com/lib/pq"
     "database/sql"
-    "github.com/jmoiron/sqlx"
+    "fmt"
     "log"
+    
+    _ "github.com/lib/pq"
+    "github.com/jmoiron/sqlx"
 )
 
 var schema = `

@@ -127,7 +127,7 @@ func (m *Mapper) FieldMap(v reflect.Value) map[string]reflect.Value {
 	return r
 }
 
-// FieldByName returns a field by the its mapped name as a reflect.Value.
+// FieldByName returns a field by its mapped name as a reflect.Value.
 // Panics if v's Kind is not Struct or v is not Indirectable to a struct Kind.
 // Returns zero Value if the name is not found.
 func (m *Mapper) FieldByName(v reflect.Value, name string) reflect.Value {
@@ -166,20 +166,39 @@ func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {
 // traversals for each mapped name.  Panics if t is not a struct or Indirectable
 // to a struct.  Returns empty int slice for each name not found.
 func (m *Mapper) TraversalsByName(t reflect.Type, names []string) [][]int {
+	r := make([][]int, 0, len(names))
+	m.TraversalsByNameFunc(t, names, func(_ int, i []int) error {
+		if i == nil {
+			r = append(r, []int{})
+		} else {
+			r = append(r, i)
+		}
+
+		return nil
+	})
+	return r
+}
+
+// TraversalsByNameFunc traverses the mapped names and calls fn with the index of
+// each name and the struct traversal represented by that name. Panics if t is not
+// a struct or Indirectable to a struct. Returns the first error returned by fn or nil.
+func (m *Mapper) TraversalsByNameFunc(t reflect.Type, names []string, fn func(int, []int) error) error {
 	t = Deref(t)
 	mustBe(t, reflect.Struct)
 	tm := m.TypeMap(t)
-
-	r := make([][]int, 0, len(names))
-	for _, name := range names {
+	for i, name := range names {
 		fi, ok := tm.Names[name]
 		if !ok {
-			r = append(r, []int{})
+			if err := fn(i, nil); err != nil {
+				return err
+			}
 		} else {
-			r = append(r, fi.Index)
+			if err := fn(i, fi.Index); err != nil {
+				return err
+			}
 		}
 	}
-	return r
+	return nil
 }
 
 // FieldByIndexes returns a value for the field given by the struct traversal
@@ -330,10 +349,19 @@ func getMapping(t reflect.Type, tagName string, mapFunc, tagMapFunc mapf) *Struc
 	queue := []typeQueue{}
 	queue = append(queue, typeQueue{Deref(t), root, ""})
 
+QueueLoop:
 	for len(queue) != 0 {
 		// pop the first item off of the queue
 		tq := queue[0]
 		queue = queue[1:]
+
+		// ignore recursive field
+		for p := tq.fi.Parent; p != nil; p = p.Parent {
+			if tq.fi.Field.Type == p.Field.Type {
+				continue QueueLoop
+			}
+		}
+
 		nChildren := 0
 		if tq.t.Kind() == reflect.Struct {
 			nChildren = tq.t.NumField()

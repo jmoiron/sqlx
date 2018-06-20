@@ -12,25 +12,37 @@ import (
 
 // Bindvar types supported by Rebind, BindMap and BindStruct.
 const (
-	UNKNOWN = iota
+	UNKNOWN  = iota
 	QUESTION
 	DOLLAR
 	NAMED
 )
 
+// Default bind types for supported drivers
+var bindTypeMap = map[string]int{
+	"postgres":         DOLLAR,
+	"pgx":              DOLLAR,
+	"pq-timeouts":      DOLLAR,
+	"cloudsqlpostgres": DOLLAR,
+	"mysql":            QUESTION,
+	"sqlite3":          QUESTION,
+	"oci8":             NAMED,
+	"ora":              NAMED,
+	"goracle":          NAMED,
+}
+
+// RegisterBindType assigns bind types for custom driver names
+func RegisterBindType(driverName string, bindType int) {
+	bindTypeMap[driverName] = bindType
+}
+
 // BindType returns the bindtype for a given database given a drivername.
 func BindType(driverName string) int {
-	switch driverName {
-	case "postgres", "pgx", "pq-timeouts", "cloudsqlpostgres":
-		return DOLLAR
-	case "mysql":
-		return QUESTION
-	case "sqlite3":
-		return QUESTION
-	case "oci8", "ora", "goracle":
-		return NAMED
+	bindType, ok := bindTypeMap[driverName]
+	if !ok {
+		return UNKNOWN
 	}
-	return UNKNOWN
+	return bindType
 }
 
 // FIXME: this should be able to be tolerant of escaped ?'s in queries without

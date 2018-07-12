@@ -429,9 +429,14 @@ QueueLoop:
 
 	flds := &StructMap{Index: m, Tree: root, Paths: map[string]*FieldInfo{}, Names: map[string]*FieldInfo{}}
 	for _, fi := range flds.Index {
-		flds.Paths[fi.Path] = fi
-		if fi.Name != "" && !fi.Embedded {
-			flds.Names[fi.Path] = fi
+		// check if nothing has already been pushed with the same path
+		// sometimes you can choose to override a type using embedded struct
+		fld, ok := flds.Paths[fi.Path]
+		if !ok || fld.Embedded {
+			flds.Paths[fi.Path] = fi
+			if fi.Name != "" && !fi.Embedded {
+				flds.Names[fi.Path] = fi
+			}
 		}
 	}
 

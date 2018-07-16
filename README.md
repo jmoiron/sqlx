@@ -169,7 +169,7 @@ func main() {
     _, err = db.NamedExec(`INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)`, 
         map[string]interface{}{
             "first": "Bin",
-            "last": "Smuth",
+            "last": "Smith",
             "email": "bensmith@allblacks.nz",
     })
 

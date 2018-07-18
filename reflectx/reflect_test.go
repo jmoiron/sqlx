@@ -972,3 +972,51 @@ func BenchmarkTraversalsByNameFunc(b *testing.B) {
 		}
 	}
 }
+
+type IntPtr *int
+type InterfaceType interface{ V() int }
+type StructType struct{ T int }
+
+func (t StructType) V() int {
+	return t.T
+}
+func TestDeref(t *testing.T) {
+
+	var t0 = 1
+	var t1 IntPtr = &t0
+	var t2 = StructType{T: 1}
+	var t3 interface{} = &t2
+	var t4 = t3.(InterfaceType)
+
+	tests := []struct {
+		want reflect.Type
+		t    reflect.Type
+	}{
+		{
+			t:    reflect.TypeOf(t0),
+			want: reflect.TypeOf(t0),
+		},
+		{
+			t:    reflect.TypeOf(t1),
+			want: reflect.TypeOf(t0),
+		},
+		{
+			t:    reflect.TypeOf(t2),
+			want: reflect.TypeOf(t2),
+		},
+		{
+			t:    reflect.TypeOf(t3),
+			want: reflect.TypeOf(t2),
+		},
+		{
+			t:    reflect.TypeOf(t4),
+			want: reflect.TypeOf(t2),
+		},
+	}
+
+	for _, tt := range tests {
+		if got := Deref(tt.t); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("Deref() = %v, want %v", got, tt.want)
+		}
+	}
+}

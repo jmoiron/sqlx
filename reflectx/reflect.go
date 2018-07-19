@@ -232,6 +232,9 @@ func FieldByIndexesReadOnly(v reflect.Value, indexes []int) reflect.Value {
 func Deref(t reflect.Type) reflect.Type {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
+		if t.Kind() == reflect.Interface {
+			t = t.Elem()
+		}
 	}
 	return t
 }

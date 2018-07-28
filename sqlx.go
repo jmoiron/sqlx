@@ -585,6 +585,9 @@ func (r *Rows) SliceScan() ([]interface{}, error) {
 }
 
 // MapScan using this Rows.
+// An important caveat here is that the results returned by rows.Columns() does not include
+// fully qualified names, such that SELECT a.id, b.id FROM a NATURAL JOIN b will result in 
+// a Columns result of []string{"id", "id"}, clobbering one of the results in your map.
 func (r *Rows) MapScan(dest map[string]interface{}) error {
 	return MapScan(r, dest)
 }
@@ -728,6 +731,9 @@ func (r *Row) SliceScan() ([]interface{}, error) {
 }
 
 // MapScan using this Rows.
+// An important caveat here is that the results returned by rows.Columns() does not include
+// fully qualified names, such that SELECT a.id, b.id FROM a NATURAL JOIN b will result in 
+// a Columns result of []string{"id", "id"}, clobbering one of the results in your map.
 func (r *Row) MapScan(dest map[string]interface{}) error {
 	return MapScan(r, dest)
 }

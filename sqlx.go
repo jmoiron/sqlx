@@ -589,6 +589,16 @@ func (r *Rows) MapScan(dest map[string]interface{}) error {
 	return MapScan(r, dest)
 }
 
+// NextResultSet moves to the next resultset if available and resets the field cache.
+func (r *Rows) NextResultSet() bool {
+	if !r.Rows.NextResultSet() {
+		return false
+	}
+	// reset fields cache
+	r.started = false
+	return true
+}
+
 // StructScan is like sql.Rows.Scan, but scans a single Row into a single Struct.
 // Use this and iterate over Rows manually when the memory load of Select() might be
 // prohibitive.  *Rows.StructScan caches the reflect work of matching up column

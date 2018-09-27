@@ -40,6 +40,13 @@ func TestCompileQuery(t *testing.T) {
 			N: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
 			V: []string{"first_name", "last_name"},
 		},
+		{
+			Q: `INSERT INTO foo (a,b,c,d) SELECT @name := "name", :age, :first, :last`,
+			R: `INSERT INTO foo (a,b,c,d) SELECT @name := "name", ?, ?, ?`,
+			D: `INSERT INTO foo (a,b,c,d) SELECT @name := "name", $1, $2, $3`,
+			N: `INSERT INTO foo (a,b,c,d) SELECT @name := "name", :age, :first, :last`,
+			V: []string{"age", "first", "last"},
+		},
 		/* This unicode awareness test sadly fails, because of our byte-wise worldview.
 		 * We could certainly iterate by Rune instead, though it's a great deal slower,
 		 * it's probably the RightWay(tm)

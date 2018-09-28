@@ -41,10 +41,10 @@ func TestCompileQuery(t *testing.T) {
 			V: []string{"first_name", "last_name"},
 		},
 		{
-			Q: `INSERT INTO foo (a,b,c,d) SELECT @name := "name", :age, :first, :last`,
-			R: `INSERT INTO foo (a,b,c,d) SELECT @name := "name", ?, ?, ?`,
-			D: `INSERT INTO foo (a,b,c,d) SELECT @name := "name", $1, $2, $3`,
-			N: `INSERT INTO foo (a,b,c,d) SELECT @name := "name", :age, :first, :last`,
+			Q: `SELECT @name := "name", :age, :first, :last`,
+			R: `SELECT @name := "name", ?, ?, ?`,
+			D: `SELECT @name := "name", $1, $2, $3`,
+			N: `SELECT @name := "name", :age, :first, :last`,
 			V: []string{"age", "first", "last"},
 		},
 		/* This unicode awareness test sadly fails, because of our byte-wise worldview.

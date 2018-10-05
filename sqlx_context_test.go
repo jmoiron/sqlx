@@ -984,7 +984,7 @@ func TestUsageContext(t *testing.T) {
 		person := &Person{}
 		err = db.GetContext(ctx, person, "SELECT * FROM person WHERE first_name=$1", "does-not-exist")
 		if err == nil {
-			t.Fatal("Should have got an error for Get on non-existant row.")
+			t.Fatal("Should have got an error for Get on non-existent row.")
 		}
 
 		// lets test prepared statements some more

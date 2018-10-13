@@ -15,6 +15,12 @@ import (
 	"github.com/jmoiron/sqlx/reflectx"
 )
 
+// ErrMultiRows is returned by functions which are expected to work with result sets
+// that only contain a single row but multiple rows were returned.
+// This typically indicates an issue with the query such as a missing join criteria or
+// limit condition or the use of Get(...) when Select(...) was intended.
+var ErrMultiRows = errors.New("sql: multiple rows returned")
+
 // Although the NameMapper is convenient, in practice it should not
 // be relied on except for application code.  If you are writing a library
 // that uses sqlx, you should be aware that the name mappings you expect
@@ -177,6 +183,7 @@ type Row struct {
 
 // Scan is a fixed implementation of sql.Row.Scan, which does not discard the
 // underlying error from the internal rows object if it exists.
+// Returns ErrMultiRows if the result set contains more than one row.
 func (r *Row) Scan(dest ...interface{}) error {
 	if r.err != nil {
 		return r.err
@@ -208,10 +215,16 @@ func (r *Row) Scan(dest ...interface{}) error {
 		}
 		return sql.ErrNoRows
 	}
-	err := r.rows.Scan(dest...)
-	if err != nil {
+	if err := r.rows.Scan(dest...); err != nil {
 		return err
 	}
+
+	if r.rows.Next() {
+		return ErrMultiRows
+	} else if err := r.rows.Err(); err != nil {
+		return err
+	}
+
 	// Make sure the query can be processed to completion with no errors.
 	if err := r.rows.Close(); err != nil {
 		return err
@@ -323,7 +336,7 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 
 // Get using this DB.
 // Any placeholder parameters are replaced with supplied args.
-// An error is returned if the result set is empty.
+// An error is returned if the result set is empty or contains more than one row.
 func (db *DB) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(db, dest, query, args...)
 }
@@ -446,7 +459,7 @@ func (tx *Tx) QueryRowx(query string, args ...interface{}) *Row {
 
 // Get within a transaction.
 // Any placeholder parameters are replaced with supplied args.
-// An error is returned if the result set is empty.
+// An error is returned if the result set is empty or contains more than one row.
 func (tx *Tx) Get(dest interface{}, query string, args ...interface{}) error {
 	return Get(tx, dest, query, args...)
 }
@@ -516,7 +529,7 @@ func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 
 // Get using the prepared statement.
 // Any placeholder parameters are replaced with supplied args.
-// An error is returned if the result set is empty.
+// An error is returned if the result set is empty or contains more than one row.
 func (s *Stmt) Get(dest interface{}, args ...interface{}) error {
 	return Get(&qStmt{s}, dest, "", args...)
 }
@@ -682,7 +695,7 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 // to dest.  If dest is scannable, the result must only have one column.  Otherwise,
 // StructScan is used.  Get will return sql.ErrNoRows like row.Scan would.
 // Any placeholder parameters are replaced with supplied args.
-// An error is returned if the result set is empty.
+// An error is returned if the result set is empty or contains more than one row.
 func Get(q Queryer, dest interface{}, query string, args ...interface{}) error {
 	r := q.QueryRowx(query, args...)
 	return r.scanAny(dest, false)

@@ -16,6 +16,7 @@ const (
 	QUESTION
 	DOLLAR
 	NAMED
+	AT
 )
 
 // BindType returns the bindtype for a given database given a drivername.
@@ -29,6 +30,8 @@ func BindType(driverName string) int {
 		return QUESTION
 	case "oci8", "ora", "goracle":
 		return NAMED
+	case "sqlserver":
+		return AT
 	}
 	return UNKNOWN
 }
@@ -56,6 +59,8 @@ func Rebind(bindType int, query string) string {
 			rqb = append(rqb, '$')
 		case NAMED:
 			rqb = append(rqb, ':', 'a', 'r', 'g')
+		case AT:
+			rqb = append(rqb, '@', 'p')
 		}
 
 		j++

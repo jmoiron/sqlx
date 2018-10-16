@@ -2,6 +2,7 @@ package sqlx
 
 import (
 	"bytes"
+	"database/sql/driver"
 	"errors"
 	"reflect"
 	"strconv"

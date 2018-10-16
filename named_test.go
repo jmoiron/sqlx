@@ -49,6 +49,7 @@ func TestCompileQuery(t *testing.T) {
 			R: `SELECT @name := "name", ?, ?, ?`,
 			D: `SELECT @name := "name", $1, $2, $3`,
 			N: `SELECT @name := "name", :age, :first, :last`,
+			T: `SELECT @name := "name", @p1, @p2, @p3`,
 			V: []string{"age", "first", "last"},
 		},
 		/* This unicode awareness test sadly fails, because of our byte-wise worldview.

@@ -20,6 +20,8 @@ explains how to use `database/sql` along with sqlx.
 
 ## Recent Changes
 
+* The [introduction](https://github.com/jmoiron/sqlx/pull/387) of `sql.ColumnType` sets the required minimum Go version to 1.8.
+
 * sqlx/types.JsonText has been renamed to JSONText to follow Go naming conventions.
 
 This breaks backwards compatibility, but it's in a way that is trivially fixable

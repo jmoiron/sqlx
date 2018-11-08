@@ -16,7 +16,7 @@ type namedPreparerContext interface {
 
 func prepareNamedContext(ctx context.Context, p namedPreparerContext, query string) (*NamedStmt, error) {
 	bindType := BindType(p.DriverName())
-	q, args, err := compileNamedQuery([]byte(query), bindType)
+	q, args, err := compileNamedQuery(query, bindType)
 	if err != nil {
 		return nil, err
 	}

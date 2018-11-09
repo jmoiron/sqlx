@@ -47,30 +47,32 @@ func Rebind(bindType int, query string) string {
 		return query
 	}
 
-	// Add space enough for 10 params before we have to allocate
-	rqb := make([]byte, 0, len(query)+10)
+	rebound := strings.Builder{}
+	currentVar := 1
+	byteOffset := 0
 
-	var i, j int
-
-	for i = strings.Index(query, "?"); i != -1; i = strings.Index(query, "?") {
-		rqb = append(rqb, query[:i]...)
-
-		switch bindType {
-		case DOLLAR:
-			rqb = append(rqb, '$')
-		case NAMED:
-			rqb = append(rqb, ':', 'a', 'r', 'g')
-		case AT:
-			rqb = append(rqb, '@', 'p')
+	lex := lexSQL(query)
+	for tok := range lex.items {
+		if tok.typ == itemIdentifier && tok.val == "?" {
+			rebound.WriteString(query[byteOffset:tok.pos])
+			switch bindType {
+			case DOLLAR:
+				rebound.WriteByte('$')
+			case NAMED:
+				rebound.WriteString(":arg")
+			case AT:
+				rebound.WriteString("@p")
+			}
+			rebound.WriteString(strconv.Itoa(currentVar))
+			currentVar++
+			byteOffset = tok.pos + len(tok.val)
 		}
-
-		j++
-		rqb = strconv.AppendInt(rqb, int64(j), 10)
-
-		query = query[i+1:]
 	}
-
-	return string(append(rqb, query...))
+	if byteOffset == 0 {
+		return query
+	}
+	rebound.WriteString(query[byteOffset:])
+	return rebound.String()
 }
 
 // Experimental implementation of Rebind which uses a bytes.Buffer.  The code is

@@ -12,11 +12,11 @@ package sqlx
 //  * bindArgs, bindMapArgs, bindAnyArgs - given a list of names, return an arglist
 //
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/jmoiron/sqlx/reflectx"
 )
@@ -214,7 +214,7 @@ func bindMap(bindType int, query string, args map[string]interface{}) (string, [
 // compile a NamedQuery into a unbound query (using the '?' bindvar) and
 // a list of names.
 func compileNamedQuery(qs string, bindType int) (query string, names []string) {
-	rebound := strings.Builder{}
+	rebound := bytes.Buffer{}
 	names = make([]string, 0, 10)
 	currentVar := 1
 	byteOffset := 0

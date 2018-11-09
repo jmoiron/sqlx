@@ -47,7 +47,7 @@ func Rebind(bindType int, query string) string {
 		return query
 	}
 
-	rebound := strings.Builder{}
+	rebound := bytes.Buffer{}
 	currentVar := 1
 	byteOffset := 0
 

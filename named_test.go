@@ -71,10 +71,7 @@ func TestCompileQuery(t *testing.T) {
 	}
 
 	for _, test := range table {
-		qr, names, err := compileNamedQuery(test.Q, QUESTION)
-		if err != nil {
-			t.Error(err)
-		}
+		qr, names := compileNamedQuery(test.Q, QUESTION)
 		if qr != test.R {
 			t.Errorf("expected %s, got %s", test.R, qr)
 		}
@@ -87,17 +84,17 @@ func TestCompileQuery(t *testing.T) {
 				}
 			}
 		}
-		qd, _, _ := compileNamedQuery(test.Q, DOLLAR)
+		qd, _ := compileNamedQuery(test.Q, DOLLAR)
 		if qd != test.D {
 			t.Errorf("\nexpected: `%s`\ngot:      `%s`", test.D, qd)
 		}
 
-		qt, _, _ := compileNamedQuery(test.Q, AT)
+		qt, _ := compileNamedQuery(test.Q, AT)
 		if qt != test.T {
 			t.Errorf("\nexpected: `%s`\ngot:      `%s`", test.T, qt)
 		}
 
-		qq, _, _ := compileNamedQuery(test.Q, NAMED)
+		qq, _ := compileNamedQuery(test.Q, NAMED)
 		if qq != test.N {
 			t.Errorf("\nexpected: `%s`\ngot:      `%s`\n(len: %d vs %d)", test.N, qq, len(test.N), len(qq))
 		}

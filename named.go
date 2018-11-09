@@ -128,10 +128,7 @@ type namedPreparer interface {
 
 func prepareNamed(p namedPreparer, query string) (*NamedStmt, error) {
 	bindType := BindType(p.DriverName())
-	q, args, err := compileNamedQuery(query, bindType)
-	if err != nil {
-		return nil, err
-	}
+	q, args := compileNamedQuery(query, bindType)
 	stmt, err := Preparex(p, q)
 	if err != nil {
 		return nil, err
@@ -194,10 +191,7 @@ func bindMapArgs(names []string, arg map[string]interface{}) ([]interface{}, err
 // The rules for binding field names to parameter names follow the same
 // conventions as for StructScan, including obeying the `db` struct tags.
 func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper) (string, []interface{}, error) {
-	bound, names, err := compileNamedQuery(query, bindType)
-	if err != nil {
-		return "", []interface{}{}, err
-	}
+	bound, names := compileNamedQuery(query, bindType)
 
 	arglist, err := bindArgs(names, arg, m)
 	if err != nil {
@@ -209,10 +203,7 @@ func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper)
 
 // bindMap binds a named parameter query with a map of arguments.
 func bindMap(bindType int, query string, args map[string]interface{}) (string, []interface{}, error) {
-	bound, names, err := compileNamedQuery(query, bindType)
-	if err != nil {
-		return "", []interface{}{}, err
-	}
+	bound, names := compileNamedQuery(query, bindType)
 
 	arglist, err := bindMapArgs(names, args)
 	return bound, arglist, err
@@ -222,7 +213,7 @@ func bindMap(bindType int, query string, args map[string]interface{}) (string, [
 
 // compile a NamedQuery into a unbound query (using the '?' bindvar) and
 // a list of names.
-func compileNamedQuery(qs string, bindType int) (query string, names []string, err error) {
+func compileNamedQuery(qs string, bindType int) (query string, names []string) {
 	rebound := strings.Builder{}
 	names = make([]string, 0, 10)
 	currentVar := 1
@@ -257,10 +248,10 @@ func compileNamedQuery(qs string, bindType int) (query string, names []string, e
 		}
 	}
 	if byteOffset == 0 {
-		return qs, names, err
+		return qs, names
 	}
 	rebound.WriteString(qs[byteOffset:])
-	return rebound.String(), names, err
+	return rebound.String(), names
 }
 
 // BindNamed binds a struct or a map to a query with named parameters.

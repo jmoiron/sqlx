@@ -29,7 +29,7 @@ func TestCompileQuery(t *testing.T) {
 			V: []string{"name1", "name2"},
 		},
 		{
-			Q: `SELECT "::foo" FROM a WHERE first_name=:name1 AND last_name=:name2`,
+			Q: `SELECT ":foo" FROM a WHERE first_name=:name1 AND last_name=:name2`,
 			R: `SELECT ":foo" FROM a WHERE first_name=? AND last_name=?`,
 			D: `SELECT ":foo" FROM a WHERE first_name=$1 AND last_name=$2`,
 			T: `SELECT ":foo" FROM a WHERE first_name=@p1 AND last_name=@p2`,
@@ -37,7 +37,7 @@ func TestCompileQuery(t *testing.T) {
 			V: []string{"name1", "name2"},
 		},
 		{
-			Q: `SELECT 'a::b::c' || first_name, '::::ABC::_::' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
+			Q: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
 			R: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=? AND last_name=?`,
 			D: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=$1 AND last_name=$2`,
 			T: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=@p1 AND last_name=@p2`,
@@ -52,23 +52,26 @@ func TestCompileQuery(t *testing.T) {
 			T: `SELECT @name := "name", @p1, @p2, @p3`,
 			V: []string{"age", "first", "last"},
 		},
-		/* This unicode awareness test sadly fails, because of our byte-wise worldview.
-		 * We could certainly iterate by Rune instead, though it's a great deal slower,
-		 * it's probably the RightWay(tm)
 		{
 			Q: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
 			R: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
 			D: `INSERT INTO foo (a,b,c,d) VALUES ($1, $2, $3, $4)`,
-			N: []string{"name", "age", "first", "last"},
+			N: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
+			T: `INSERT INTO foo (a,b,c,d) VALUES (@p1, @p2, @p3, @p4)`,
+			V: []string{"あ", "b", "キコ", "名前"},
 		},
-		*/
+		{
+			Q: `SELECT @name /* a block :comment /* with nesting */*/ := ":name", 'quote', :age, :first, :last`,
+			R: `SELECT @name /* a block :comment /* with nesting */*/ := ":name", 'quote', ?, ?, ?`,
+			D: `SELECT @name /* a block :comment /* with nesting */*/ := ":name", 'quote', $1, $2, $3`,
+			N: `SELECT @name /* a block :comment /* with nesting */*/ := ":name", 'quote', :age, :first, :last`,
+			T: `SELECT @name /* a block :comment /* with nesting */*/ := ":name", 'quote', @p1, @p2, @p3`,
+			V: []string{"age", "first", "last"},
+		},
 	}
 
 	for _, test := range table {
-		qr, names, err := compileNamedQuery([]byte(test.Q), QUESTION)
-		if err != nil {
-			t.Error(err)
-		}
+		qr, names := compileNamedQuery(test.Q, QUESTION)
 		if qr != test.R {
 			t.Errorf("expected %s, got %s", test.R, qr)
 		}
@@ -81,17 +84,17 @@ func TestCompileQuery(t *testing.T) {
 				}
 			}
 		}
-		qd, _, _ := compileNamedQuery([]byte(test.Q), DOLLAR)
+		qd, _ := compileNamedQuery(test.Q, DOLLAR)
 		if qd != test.D {
 			t.Errorf("\nexpected: `%s`\ngot:      `%s`", test.D, qd)
 		}
 
-		qt, _, _ := compileNamedQuery([]byte(test.Q), AT)
+		qt, _ := compileNamedQuery(test.Q, AT)
 		if qt != test.T {
 			t.Errorf("\nexpected: `%s`\ngot:      `%s`", test.T, qt)
 		}
 
-		qq, _, _ := compileNamedQuery([]byte(test.Q), NAMED)
+		qq, _ := compileNamedQuery(test.Q, NAMED)
 		if qq != test.N {
 			t.Errorf("\nexpected: `%s`\ngot:      `%s`\n(len: %d vs %d)", test.N, qq, len(test.N), len(qq))
 		}

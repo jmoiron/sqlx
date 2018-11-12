@@ -259,7 +259,7 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 			}
 			inName = true
 			name = []byte{}
-		} else if inName && i > 0 && b == '=' {
+		} else if inName && i > 0 && b == '=' && len(name) == 0 {
 			rebound = append(rebound, ':', '=')
 			inName = false
 			continue

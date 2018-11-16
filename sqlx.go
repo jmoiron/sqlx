@@ -900,7 +900,13 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 	if value.IsNil() {
 		return errors.New("nil pointer passed to StructScan destination")
 	}
-	direct := reflect.Indirect(value)
+	baseDirect := reflect.Indirect(value)
+	direct := baseDirect
+
+	if direct.Kind() == reflect.Interface {
+		value = direct.Elem()
+		direct = reflect.Indirect(value)
+	}
 
 	slice, err := baseType(value.Type(), reflect.Slice)
 	if err != nil {
@@ -960,25 +966,30 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 			}
 
 			if isPtr {
-				direct.Set(reflect.Append(direct, vp))
+				direct = reflect.Append(direct, vp)
 			} else {
-				direct.Set(reflect.Append(direct, v))
+				direct = reflect.Append(direct, v)
 			}
 		}
+		baseDirect.Set(direct)
 	} else {
 		for rows.Next() {
 			vp = reflect.New(base)
+			v = reflect.Indirect(vp)
+
 			err = rows.Scan(vp.Interface())
 			if err != nil {
 				return err
 			}
 			// append
 			if isPtr {
-				direct.Set(reflect.Append(direct, vp))
+				direct = reflect.Append(direct, vp)
 			} else {
-				direct.Set(reflect.Append(direct, reflect.Indirect(vp)))
+				direct = reflect.Append(direct, v)
 			}
 		}
+
+		baseDirect.Set(direct)
 	}
 
 	return rows.Err()

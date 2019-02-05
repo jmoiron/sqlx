@@ -1407,7 +1407,7 @@ func (p PropertyMap) Scan(src interface{}) error {
 	case string:
 		return json.Unmarshal([]byte(ts), &p)
 	default:
-		return fmt.Errorf("Could not not decode type %T -> %T", src, p)
+		return fmt.Errorf("could not not decode type %T -> %T", src, p)
 	}
 }
 

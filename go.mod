@@ -1,4 +1,4 @@
-module github.com/jmoiron/sqlx
+module github.com/snigle/sqlx
 
 require (
 	github.com/go-sql-driver/mysql v1.4.0

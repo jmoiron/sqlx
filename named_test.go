@@ -184,6 +184,26 @@ func TestNamedQueries(t *testing.T) {
 			t.Errorf("got %s, expected %s", p.Email, people[0].Email)
 		}
 
+		// test batch inserts
+		sls := []Person{
+			{FirstName: "Ardie", LastName: "Savea", Email: "asavea@ab.co.nz"},
+			{FirstName: "Sonny Bill", LastName: "Williams", Email: "sbw@ab.co.nz"},
+			{FirstName: "Ngani", LastName: "Laumape", Email: "nlaumape@ab.co.nz"},
+		}
+
+		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
+			VALUES (:first_name, :last_name, :email)`, sls)
+		test.Error(err)
+
+		for _, p := range sls {
+			dest := Person{}
+			err = db.Get(&dest, db.Rebind("SELECT * FROM person WHERE email=?"), p.Email)
+			test.Error(err)
+			if dest.Email != p.Email {
+				t.Errorf("expected %s, got %s", p.Email, dest.Email)
+			}
+		}
+
 		// test Exec
 		ns, err = db.PrepareNamed(`
 			INSERT INTO person (first_name, last_name, email)

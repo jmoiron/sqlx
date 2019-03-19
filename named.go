@@ -231,7 +231,9 @@ func fixBound(bound string, loop int) string {
 // bindArray binds a named parameter query with fields from an array or slice of
 // structs argument.
 func bindArray(bindType int, query string, arg interface{}, m *reflectx.Mapper) (string, []interface{}, error) {
-	bound, names, err := compileNamedQuery([]byte(query), bindType)
+	// do the initial binding with QUESTION;  if bindType is not question,
+	// we can rebind it at the end.
+	bound, names, err := compileNamedQuery([]byte(query), QUESTION)
 	if err != nil {
 		return "", []interface{}{}, err
 	}
@@ -250,6 +252,10 @@ func bindArray(bindType int, query string, arg interface{}, m *reflectx.Mapper) 
 	}
 	if arrayLen > 1 {
 		bound = fixBound(bound, arrayLen)
+	}
+	// adjust binding type if we weren't on question
+	if bindType != QUESTION {
+		bound = Rebind(bindType, bound)
 	}
 	return bound, arglist, nil
 }

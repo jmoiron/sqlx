@@ -21,6 +21,7 @@ go:
   - "1.8"
   - "1.9"
   - "1.10.x"
+  - "1.11.x"
 
 # run tests w/ coverage
 script:

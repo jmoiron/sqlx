@@ -403,7 +403,7 @@ func NamedQuery(e Ext, query string, arg interface{}) (*Rows, error) {
 
 // NamedExec uses BindStruct to get a query executable by the driver and
 // then runs Exec on the result.  Returns an error from the binding
-// or the query excution itself.
+// or the query execution itself.
 func NamedExec(e Ext, query string, arg interface{}) (sql.Result, error) {
 	q, args, err := bindNamedMapper(BindType(e.DriverName()), query, arg, mapperFor(e))
 	if err != nil {

@@ -389,7 +389,7 @@ func (db *DB) PrepareExecute(query string, args ...interface{}) (sql.Result, err
 
 	defer stmt.Close()
 
-	return stmt.Exec(args)
+	return stmt.Exec(args...)
 }
 
 // Tx is an sqlx wrapper around sql.Tx with extra functionality
@@ -482,7 +482,7 @@ func (tx *Tx) PrepareExecute(query string, args ...interface{}) (sql.Result, err
 	}
 
 	defer stmt.Close()
-	return stmt.Exec(args)
+	return stmt.Exec(args...)
 }
 
 // Stmtx returns a version of the prepared statement which runs within a transaction.  Provided

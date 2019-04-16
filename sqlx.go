@@ -380,6 +380,18 @@ func (db *DB) PrepareNamed(query string) (*NamedStmt, error) {
 	return prepareNamed(db, query)
 }
 
+// Prepared statement helper.  Wraps Preparex
+func (db *DB) PrepareExecute(query string, args ...interface{}) (sql.Result, error) {
+	stmt, err := db.Preparex(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer stmt.Close()
+
+	return stmt.Exec(args)
+}
+
 // Tx is an sqlx wrapper around sql.Tx with extra functionality
 type Tx struct {
 	*sql.Tx
@@ -460,6 +472,17 @@ func (tx *Tx) MustExec(query string, args ...interface{}) sql.Result {
 // Preparex  a statement within a transaction.
 func (tx *Tx) Preparex(query string) (*Stmt, error) {
 	return Preparex(tx, query)
+}
+
+// Prepared statement helper.  Wraps Preparex
+func (tx *Tx) PrepareExecute(query string, args ...interface{}) (sql.Result, error) {
+	stmt, err := tx.Preparex(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer stmt.Close()
+	return stmt.Exec(args)
 }
 
 // Stmtx returns a version of the prepared statement which runs within a transaction.  Provided

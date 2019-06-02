@@ -20,21 +20,39 @@ const (
 	AT
 )
 
+var (
+	ErrRebind = errors.New("binding already exists")
+
+	bindings = map[string]int{
+		"postgres":         DOLLAR,
+		"pgx":              DOLLAR,
+		"pq-timeouts":      DOLLAR,
+		"cloudsqlpostgres": DOLLAR,
+		"ql":               DOLLAR,
+		"mysql":            QUESTION,
+		"sqlite3":          QUESTION,
+		"oci8":             NAMED,
+		"ora":              NAMED,
+		"goracle":          NAMED,
+		"sqlserver":        AT,
+	}
+)
+
 // BindType returns the bindtype for a given database given a drivername.
 func BindType(driverName string) int {
-	switch driverName {
-	case "postgres", "pgx", "pq-timeouts", "cloudsqlpostgres", "ql":
-		return DOLLAR
-	case "mysql":
-		return QUESTION
-	case "sqlite3":
-		return QUESTION
-	case "oci8", "ora", "goracle":
-		return NAMED
-	case "sqlserver":
-		return AT
+	return bindings[driverName]
+}
+
+// BindDriver binds the bindtype for a given database drivername.
+// Returns ErrRebind if the binding already exists and the bindtype is different from the one supplied
+func BindDriver(driverName string, bindType int) error {
+	current, ok := bindings[driverName]
+	if ok && current != bindType {
+		return ErrRebind
 	}
-	return UNKNOWN
+
+	bindings[driverName] = bindType
+	return nil
 }
 
 // FIXME: this should be able to be tolerant of escaped ?'s in queries without

@@ -242,7 +242,7 @@ type kinder interface {
 	Kind() reflect.Kind
 }
 
-// mustBe checks a value against a kind, panicing with a reflect.ValueError
+// mustBe checks a value against a kind, panicking with a reflect.ValueError
 // if the kind isn't that which is required.
 func mustBe(v kinder, expected reflect.Kind) {
 	if k := v.Kind(); k != expected {

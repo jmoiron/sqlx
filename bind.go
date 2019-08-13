@@ -117,7 +117,11 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 
 	for i, arg := range args {
 		if a, ok := arg.(driver.Valuer); ok {
-			arg, _ = a.Value()
+			var err error
+			arg, err = a.Value()
+			if err != nil {
+				return "", nil, err
+			}
 		}
 		v := reflect.ValueOf(arg)
 		t := reflectx.Deref(v.Type())

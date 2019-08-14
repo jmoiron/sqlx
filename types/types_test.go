@@ -1,6 +1,9 @@
 package types
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestGzipText(t *testing.T) {
 	g := GzippedText("Hello, world")
@@ -60,6 +63,24 @@ func TestJSONText(t *testing.T) {
 	err = (&j).Scan(v)
 	if err != nil {
 		t.Errorf("Was not expecting an error")
+	}
+}
+
+func TestJSONText_UnmarshalJSON(t *testing.T) {
+	type S struct {
+		NullField JSONText
+		Field string
+	}
+	b := []byte(`{"field": "foo", "nullField": null}`)
+	var s S
+	if err := json.Unmarshal(b, &s); err != nil {
+		t.Errorf("Was not expecting an error")
+	}
+	if len(s.NullField) != 0 {
+		t.Errorf("null in JSON should have yielded empty slice")
+	}
+	if s.Field != "foo" {
+		t.Errorf("Failed to unmarshal normal string")
 	}
 }
 

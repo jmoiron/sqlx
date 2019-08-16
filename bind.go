@@ -98,6 +98,26 @@ func rebindBuff(bindType int, query string) string {
 	return rqb.String()
 }
 
+func asSliceToExpand(i interface{}) (v reflect.Value, ok bool) {
+	if i == nil {
+		ok = false
+		return
+	}
+
+	v = reflect.ValueOf(i)
+	t := reflectx.Deref(v.Type())
+
+	// []byte is a driver.Value type so it should not be expanded
+	ok = t.Kind() == reflect.Slice && t != reflect.TypeOf([]byte{})
+
+	if !ok {
+		// Don't return non-expandable values
+		v = reflect.Value{}
+	}
+
+	return
+}
+
 // In expands slice values in args, returning the modified query string
 // and a new arg list that can be executed by a database. The `query` should
 // use the `?` bindVar.  The return value uses the `?` bindVar.
@@ -119,11 +139,8 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		if a, ok := arg.(driver.Valuer); ok {
 			arg, _ = a.Value()
 		}
-		v := reflect.ValueOf(arg)
-		t := reflectx.Deref(v.Type())
 
-		// []byte is a driver.Value type so it should not be expanded
-		if t.Kind() == reflect.Slice && t != reflect.TypeOf([]byte{}) {
+		if v, ok := asSliceToExpand(arg); ok {
 			meta[i].length = v.Len()
 			meta[i].v = v
 

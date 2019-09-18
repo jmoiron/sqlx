@@ -1,6 +1,7 @@
 package sqlx
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -631,16 +632,7 @@ func (r *Rows) StructScan(dest interface{}) error {
 
 // Connect to a database and verify with a ping.
 func Connect(driverName, dataSourceName string) (*DB, error) {
-	db, err := Open(driverName, dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	err = db.Ping()
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	return db, nil
+	return ConnectContext(context.Background(), driverName, dataSourceName)
 }
 
 // MustConnect connects to a database and panics on error.

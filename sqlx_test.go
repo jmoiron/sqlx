@@ -1511,6 +1511,9 @@ func TestIn(t *testing.T) {
 		{"SELECT * FROM foo WHERE x = ? AND y in (?)",
 			[]interface{}{[]byte("foo"), []int{0, 5, 3}},
 			4},
+		{"SELECT * FROM foo WHERE x = ? AND y IN (?)",
+			[]interface{}{sql.NullString{Valid: false}, []string{"a", "b"}},
+			3},
 	}
 	for _, test := range tests {
 		q, a, err := In(test.q, test.args...)

@@ -52,16 +52,39 @@ func TestCompileQuery(t *testing.T) {
 			T: `SELECT @name := "name", @p1, @p2, @p3`,
 			V: []string{"age", "first", "last"},
 		},
-		/* This unicode awareness test sadly fails, because of our byte-wise worldview.
-		 * We could certainly iterate by Rune instead, though it's a great deal slower,
-		 * it's probably the RightWay(tm)
 		{
 			Q: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
 			R: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
 			D: `INSERT INTO foo (a,b,c,d) VALUES ($1, $2, $3, $4)`,
-			N: []string{"name", "age", "first", "last"},
+			N: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
+			T: `INSERT INTO foo (a,b,c,d) VALUES (@p1, @p2, @p3, @p4)`,
+			V: []string{"あ", "b", "キコ", "名前"},
 		},
-		*/
+		{
+			Q: "-- A Line Comment should be ignored for :params\nINSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)",
+			R: "-- A Line Comment should be ignored for :params\nINSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)",
+			D: "-- A Line Comment should be ignored for :params\nINSERT INTO foo (a,b,c,d) VALUES ($1, $2, $3, $4)",
+			N: "-- A Line Comment should be ignored for :params\nINSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)",
+			T: "-- A Line Comment should be ignored for :params\nINSERT INTO foo (a,b,c,d) VALUES (@p1, @p2, @p3, @p4)",
+			V: []string{"あ", "b", "キコ", "名前"},
+		},
+		{
+			Q: `/* A Block Comment should be ignored for :params */INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
+			R: `/* A Block Comment should be ignored for :params */INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
+			D: `/* A Block Comment should be ignored for :params */INSERT INTO foo (a,b,c,d) VALUES ($1, $2, $3, $4)`,
+			N: `/* A Block Comment should be ignored for :params */INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
+			T: `/* A Block Comment should be ignored for :params */INSERT INTO foo (a,b,c,d) VALUES (@p1, @p2, @p3, @p4)`,
+			V: []string{"あ", "b", "キコ", "名前"},
+		},
+		// Repeated names are not distinct in the names list
+		{
+			Q: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :name)`,
+			R: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?)`,
+			D: `INSERT INTO foo (a,b,c,d) VALUES ($1, $2, $3)`,
+			T: `INSERT INTO foo (a,b,c,d) VALUES (@p1, @p2, @p3)`,
+			N: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :name)`,
+			V: []string{"name", "age", "name"},
+		},
 	}
 
 	for _, test := range table {

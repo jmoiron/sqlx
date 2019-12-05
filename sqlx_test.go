@@ -230,15 +230,21 @@ func RunWithSchema(schema Schema, t *testing.T, test func(db *DB, t *testing.T))
 
 	if TestPostgres {
 		create, drop := schema.Postgres()
-		runner(pgdb, t, create, drop)
+		t.Run("postgres", func(t *testing.T) {
+			runner(pgdb, t, create, drop)
+		})
 	}
 	if TestSqlite {
 		create, drop := schema.Sqlite3()
-		runner(sldb, t, create, drop)
+		t.Run("sqlite", func(t *testing.T) {
+			runner(sldb, t, create, drop)
+		})
 	}
 	if TestMysql {
 		create, drop := schema.MySQL()
-		runner(mysqldb, t, create, drop)
+		t.Run("mysql", func(t *testing.T) {
+			runner(mysqldb, t, create, drop)
+		})
 	}
 }
 
@@ -626,6 +632,49 @@ func TestNamedQuery(t *testing.T) {
 			Email     sql.NullString
 		}
 
+		checkPersonRow := func(t *testing.T, expectedPerson Person, rows *Rows) {
+			t.Helper()
+
+			rowCount := 0
+			for rows.Next() {
+				rowCount++
+				var p Person
+				err := rows.StructScan(&p)
+				if err != nil {
+					t.Error(err)
+				}
+				if expectedPerson.FirstName.String != p.FirstName.String {
+					t.Errorf("Expected first name of %q, got %q", expectedPerson.FirstName.String, p.FirstName.String)
+				}
+				if expectedPerson.LastName.String != p.LastName.String {
+					t.Errorf("Expected last name of %q, got %q", expectedPerson.LastName.String, p.LastName.String)
+				}
+				if expectedPerson.Email.String != p.Email.String {
+					t.Errorf("Expected email of %q, got %q", expectedPerson.Email.String, p.Email.String)
+				}
+			}
+			if rowCount != 1 {
+				t.Errorf("Expected 1 row but got %d", rowCount)
+			}
+		}
+
+		checkPersonExists := func(
+			t *testing.T,
+			e interface {
+				NamedQuery(query string, arg interface{}) (*Rows, error)
+			},
+			expectedPerson Person,
+		) {
+			t.Helper()
+
+			rows, err := e.NamedQuery("SELECT * FROM person WHERE first_name=:first_name", expectedPerson)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			checkPersonRow(t, expectedPerson, rows)
+		}
+
 		p := Person{
 			FirstName: sql.NullString{String: "ben", Valid: true},
 			LastName:  sql.NullString{String: "doe", Valid: true},
@@ -638,28 +687,33 @@ func TestNamedQuery(t *testing.T) {
 			log.Fatal(err)
 		}
 
-		p2 := &Person{}
-		rows, err := db.NamedQuery("SELECT * FROM person WHERE first_name=:first_name", p)
+		checkPersonExists(t, db, p)
+
+		ps := []Person{
+			{
+				FirstName: sql.NullString{String: "jane", Valid: true},
+				LastName:  sql.NullString{String: "doe", Valid: true},
+				Email:     sql.NullString{String: "jane@doe.com", Valid: true},
+			},
+			Person{
+				FirstName: sql.NullString{String: "jim", Valid: true},
+				LastName:  sql.NullString{String: "doe", Valid: true},
+				Email:     sql.NullString{String: "jim@doe.com", Valid: true},
+			},
+		}
+
+		_, err = db.NamedExec(q1, ps)
 		if err != nil {
-			log.Fatal(err)
+			t.Fatalf("Failed to insert a slice of structs: %v", err)
 		}
-		for rows.Next() {
-			err = rows.StructScan(p2)
-			if err != nil {
-				t.Error(err)
-			}
-			if p2.FirstName.String != "ben" {
-				t.Error("Expected first name of `ben`, got " + p2.FirstName.String)
-			}
-			if p2.LastName.String != "doe" {
-				t.Error("Expected first name of `doe`, got " + p2.LastName.String)
-			}
-		}
+
+		checkPersonExists(t, db, ps[0])
+		checkPersonExists(t, db, ps[1])
 
 		// these are tests for #73;  they verify that named queries work if you've
 		// changed the db mapper.  This code checks both NamedQuery "ad-hoc" style
 		// queries and NamedStmt queries, which use different code paths internally.
-		old := *db.Mapper
+		old := db.Mapper
 
 		type JSONPerson struct {
 			FirstName sql.NullString `json:"FIRST"`
@@ -685,66 +739,114 @@ func TestNamedQuery(t *testing.T) {
 			return s
 		}
 
-		q1 = `INSERT INTO jsperson ("FIRST", last_name, "EMAIL") VALUES (:FIRST, :last_name, :EMAIL)`
-		_, err = db.NamedExec(pdb(q1, db), jp)
+		q1 = pdb(`INSERT INTO jsperson ("FIRST", last_name, "EMAIL") VALUES (:FIRST, :last_name, :EMAIL)`, db)
+		_, err = db.NamedExec(q1, jp)
+		if err != nil {
+			t.Fatal(err, db.DriverName())
+		}
+
+		jps := []JSONPerson{
+			{
+				FirstName: sql.NullString{String: "jane", Valid: true},
+				LastName:  sql.NullString{String: "smith", Valid: true},
+				Email:     sql.NullString{String: "jane@smith.com", Valid: true},
+			},
+			{
+				FirstName: sql.NullString{String: "jim", Valid: true},
+				LastName:  sql.NullString{String: "smith", Valid: true},
+				Email:     sql.NullString{String: "jim@smith.com", Valid: true},
+			},
+		}
+
+		_, err = db.NamedExec(q1, jps)
 		if err != nil {
 			t.Fatal(err, db.DriverName())
 		}
 
 		// Checks that a person pulled out of the db matches the one we put in
-		check := func(t *testing.T, rows *Rows) {
-			jp = JSONPerson{}
+		checkJSONPersonRow := func(t *testing.T, expectedPerson JSONPerson, rows *Rows) {
+			t.Helper()
+
+			rowCount := 0
 			for rows.Next() {
+				rowCount++
+				var jp JSONPerson
 				err = rows.StructScan(&jp)
 				if err != nil {
 					t.Error(err)
 				}
-				if jp.FirstName.String != "ben" {
-					t.Errorf("Expected first name of `ben`, got `%s` (%s) ", jp.FirstName.String, db.DriverName())
+				if expectedPerson.FirstName.String != jp.FirstName.String {
+					t.Errorf("Expected first name of %q, got %q (%s) ", expectedPerson.FirstName.String, jp.FirstName.String, db.DriverName())
 				}
-				if jp.LastName.String != "smith" {
-					t.Errorf("Expected LastName of `smith`, got `%s` (%s)", jp.LastName.String, db.DriverName())
+				if expectedPerson.LastName.String != jp.LastName.String {
+					t.Errorf("Expected last name of %q, got %q (%s)", expectedPerson.LastName.String, jp.LastName.String, db.DriverName())
 				}
-				if jp.Email.String != "ben@smith.com" {
-					t.Errorf("Expected first name of `doe`, got `%s` (%s)", jp.Email.String, db.DriverName())
+				if expectedPerson.Email.String != jp.Email.String {
+					t.Errorf("Expected email of %q, got %q (%s)", expectedPerson.Email.String, jp.Email.String, db.DriverName())
 				}
+			}
+			if rowCount != 1 {
+				t.Errorf("Expected 1 row but got %d", rowCount)
 			}
 		}
 
-		ns, err := db.PrepareNamed(pdb(`
+		query := pdb(`
 			SELECT * FROM jsperson
 			WHERE
 				"FIRST"=:FIRST AND
 				last_name=:last_name AND
 				"EMAIL"=:EMAIL
-		`, db))
+		`, db)
 
+		ns, err := db.PrepareNamed(query)
 		if err != nil {
 			t.Fatal(err)
 		}
-		rows, err = ns.Queryx(jp)
+		rows, err := ns.Queryx(jp)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		check(t, rows)
+		checkJSONPersonRow(t, jp, rows)
+
+		rows, err = ns.Queryx(jps[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		checkJSONPersonRow(t, jps[0], rows)
+
+		rows, err = ns.Queryx(jps[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		checkJSONPersonRow(t, jps[1], rows)
 
 		// Check exactly the same thing, but with db.NamedQuery, which does not go
 		// through the PrepareNamed/NamedStmt path.
-		rows, err = db.NamedQuery(pdb(`
-			SELECT * FROM jsperson
-			WHERE
-				"FIRST"=:FIRST AND
-				last_name=:last_name AND
-				"EMAIL"=:EMAIL
-		`, db), jp)
+		rows, err = db.NamedQuery(query, jp)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		check(t, rows)
+		checkJSONPersonRow(t, jp, rows)
 
-		db.Mapper = &old
+		rows, err = db.NamedQuery(query, jps[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		checkJSONPersonRow(t, jps[0], rows)
+
+		rows, err = db.NamedQuery(query, jps[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		checkJSONPersonRow(t, jps[1], rows)
+
+		db.Mapper = old
 
 		// Test nested structs
 		type Place struct {

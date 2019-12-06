@@ -29,7 +29,7 @@ func TestCompileQuery(t *testing.T) {
 			V: []string{"name1", "name2"},
 		},
 		{
-			Q: `SELECT "::foo" FROM a WHERE first_name=:name1 AND last_name=:name2`,
+			Q: `SELECT ":foo" FROM a WHERE first_name=:name1 AND last_name=:name2`,
 			R: `SELECT ":foo" FROM a WHERE first_name=? AND last_name=?`,
 			D: `SELECT ":foo" FROM a WHERE first_name=$1 AND last_name=$2`,
 			T: `SELECT ":foo" FROM a WHERE first_name=@p1 AND last_name=@p2`,
@@ -37,11 +37,11 @@ func TestCompileQuery(t *testing.T) {
 			V: []string{"name1", "name2"},
 		},
 		{
-			Q: `SELECT 'a::b::c' || first_name, '::::ABC::_::' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
-			R: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=? AND last_name=?`,
-			D: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=$1 AND last_name=$2`,
-			T: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=@p1 AND last_name=@p2`,
-			N: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
+			Q: `SELECT 'a:b:c' || first_name, ':ABC:_:' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
+			R: `SELECT 'a:b:c' || first_name, ':ABC:_:' FROM person WHERE first_name=? AND last_name=?`,
+			D: `SELECT 'a:b:c' || first_name, ':ABC:_:' FROM person WHERE first_name=$1 AND last_name=$2`,
+			T: `SELECT 'a:b:c' || first_name, ':ABC:_:' FROM person WHERE first_name=@p1 AND last_name=@p2`,
+			N: `SELECT 'a:b:c' || first_name, ':ABC:_:' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
 			V: []string{"first_name", "last_name"},
 		},
 		{
@@ -166,7 +166,7 @@ func TestNamedQueries(t *testing.T) {
 		test.Error(err)
 
 		ns, err = db.PrepareNamed(`
-			SELECT first_name, last_name, email 
+			SELECT first_name, last_name, email
 			FROM person WHERE first_name=:first_name AND email=:email`)
 		test.Error(err)
 

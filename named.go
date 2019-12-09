@@ -341,8 +341,12 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 		paramCount++
 	}
 
+	isRuneStartOfIdent := func(r rune) bool {
+		return unicode.In(r, unicode.Letter) || r == '_'
+	}
+
 	isRunePartOfIdent := func(r rune) bool {
-		return unicode.In(r, allowedBindRunes...) || r == '_' || r == '.'
+		return isRuneStartOfIdent(r) || unicode.In(r, allowedBindRunes...) || r == '_' || r == '.'
 	}
 
 	source := string(qs)
@@ -368,7 +372,7 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 		addCurrentRune := true
 		switch ctx.state {
 		case parseStateQuery:
-			if currentRune == colon && previousRune != colon && isRunePartOfIdent(nextRune) {
+			if currentRune == colon && previousRune != colon && isRuneStartOfIdent(nextRune) {
 				// :foo
 				addCurrentRune = false
 				setState(parseStateConsumingIdent, map[string]interface{}{

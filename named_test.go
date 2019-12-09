@@ -121,6 +121,48 @@ func TestCompileQuery(t *testing.T) {
 	}
 }
 
+func TestNamedQueryWithoutParams(t *testing.T) {
+	var queries []string = []string{
+		// Array Slice Syntax
+		`SELECT schedule[1:2][1:1] FROM sal_emp WHERE name = 'Bill';`,
+		`SELECT f1[1][-2][3] AS e1, f1[1][-1][5] AS e2 FROM (SELECT '[1:1][-2:-1][3:5]={{{1,2,3},{4,5,6}}}'::int[] AS f1) AS ss;`,
+		`SELECT array_dims(1 || '[0:1]={2,3}'::int[]);`,
+		// String Constant Syntax
+		`'Dianne'':not_a_parameter horse'`,
+		`'Dianne'''':not_a_parameter horse'`,
+		`SELECT ':not_an_parameter'`,
+		`$$Dia:not_an_parameter's horse$$`,
+		`$$Dianne's horse$$`,
+		`SELECT 'foo'
+			'bar';`,
+		`E'user\'s log'`,
+		`$$escape ' with ''$$`,
+		// Quoted Ident Syntax
+		`SELECT "addr:city" FROM "location";`,
+		// Type Cast Syntax
+		`select '1'   ::   numeric;`, `select '1'   ::  text :: numeric;`,
+		// Nested Block Quotes
+		`SELECT * FROM users
+		/* Ignore all things who aren't after a certain :date
+		 * More lines /* nested block comment
+		 */*/
+		WHERE some_text LIKE 'foo -- bar'`,
+	}
+
+	for _, q := range queries {
+		qr, names, err := compileNamedQuery([]byte(q), QUESTION)
+		if err != nil {
+			t.Error(err)
+		}
+		if qr != q {
+			t.Errorf("expected query to be unaltered\nexpected: %s\ngot:%s", q, qr)
+		}
+		if len(names) > 0 {
+			t.Errorf("expected params to be empty got: %v", names)
+		}
+	}
+}
+
 type Test struct {
 	t *testing.T
 }

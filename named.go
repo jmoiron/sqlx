@@ -314,9 +314,8 @@ const (
 // a list of names.
 func compileNamedQuery(qs []byte, bindType int) (query string, names []string, err error) {
 	var result strings.Builder
-
-	paramCount := 1
 	var params []string
+
 	addParam := func(paramName string) {
 		params = append(params, paramName)
 
@@ -329,13 +328,11 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 			result.WriteByte('?')
 		case DOLLAR:
 			result.WriteByte('$')
-			result.WriteString(strconv.Itoa(paramCount))
+			result.WriteString(strconv.Itoa(len(params)))
 		case AT:
 			result.WriteString("@p")
-			result.WriteString(strconv.Itoa(paramCount))
+			result.WriteString(strconv.Itoa(len(params)))
 		}
-
-		paramCount++
 	}
 
 	isRuneStartOfIdent := func(r rune) bool {

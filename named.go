@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -312,11 +313,7 @@ const (
 // compile a NamedQuery into an unbound query (using the '?' bindvar) and
 // a list of names.
 func compileNamedQuery(qs []byte, bindType int) (query string, names []string, err error) {
-	result := make([]byte, 0, len(qs))
-
-	addRuneToResult := func(r rune) {
-		result = append(result, []byte(string(r))...)
-	}
+	var result strings.Builder
 
 	paramCount := 1
 	var params []string
@@ -326,16 +323,16 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 		switch bindType {
 		// oracle only supports named type bind vars even for positional
 		case NAMED:
-			result = append(result, ':')
-			result = append(result, paramName...)
+			result.WriteByte(':')
+			result.WriteString(paramName)
 		case QUESTION, UNKNOWN:
-			result = append(result, '?')
+			result.WriteByte('?')
 		case DOLLAR:
-			result = append(result, '$')
-			result = append(result, []byte(strconv.Itoa(paramCount))...)
+			result.WriteByte('$')
+			result.WriteString(strconv.Itoa(paramCount))
 		case AT:
-			result = append(result, '@', 'p')
-			result = append(result, []byte(strconv.Itoa(paramCount))...)
+			result.WriteString("@p")
+			result.WriteString(strconv.Itoa(paramCount))
 		}
 
 		paramCount++
@@ -349,8 +346,6 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 		return isRuneStartOfIdent(r) || unicode.In(r, allowedBindRunes...) || r == '_' || r == '.'
 	}
 
-	source := string(qs)
-
 	ctx := parseNamedContext{state: parseStateQuery}
 
 	setState := func(s parseNamedState, d map[string]interface{}) {
@@ -359,24 +354,25 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 	}
 
 	var previousRune rune
+	maxIndex := len(qs)
 
-	for byteIndex, currentRune := range source {
-		nextRuneByteIndex := byteIndex + utf8.RuneLen(currentRune)
+	for byteIndex := 0; byteIndex < maxIndex; {
+		currentRune, runeWidth := utf8.DecodeRune(qs[byteIndex:])
+		nextRuneByteIndex := byteIndex + runeWidth
 
-		var remainingBytes []byte
-		if nextRuneByteIndex < len(source) {
-			remainingBytes = []byte(source[nextRuneByteIndex:])
+		nextRune := utf8.RuneError
+		if nextRuneByteIndex < maxIndex {
+			nextRune, _ = utf8.DecodeRune(qs[nextRuneByteIndex:])
 		}
 
-		nextRune, _ := utf8.DecodeRune(remainingBytes)
-		addCurrentRune := true
+		writeCurrentRune := true
 		switch ctx.state {
 		case parseStateQuery:
 			if currentRune == colon && previousRune != colon && isRuneStartOfIdent(nextRune) {
 				// :foo
-				addCurrentRune = false
+				writeCurrentRune = false
 				setState(parseStateConsumingIdent, map[string]interface{}{
-					"ident": []byte{},
+					"ident": &strings.Builder{},
 				})
 			} else if currentRune == singleQuote && previousRune != backSlash {
 				// \'
@@ -401,10 +397,10 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 			}
 		case parseStateConsumingIdent:
 			if isRunePartOfIdent(currentRune) {
-				ctx.data["ident"] = append(ctx.data["ident"].([]byte), []byte(string(currentRune))...)
-				addCurrentRune = false
+				ctx.data["ident"].(*strings.Builder).WriteRune(currentRune)
+				writeCurrentRune = false
 			} else {
-				addParam(string(ctx.data["ident"].([]byte)))
+				addParam(ctx.data["ident"].(*strings.Builder).String())
 				setState(parseStateQuery, nil)
 			}
 		case parseStateBlockComment:
@@ -438,19 +434,20 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 			setState(parseStateQuery, nil)
 		}
 
-		if addCurrentRune {
-			addRuneToResult(currentRune)
+		if writeCurrentRune {
+			result.WriteRune(currentRune)
 		}
 
 		previousRune = currentRune
+		byteIndex = nextRuneByteIndex
 	}
 
 	// If parsing left off while consuming an ident, add that ident to params
 	if ctx.state == parseStateConsumingIdent {
-		addParam(string(ctx.data["ident"].([]byte)))
+		addParam(ctx.data["ident"].(*strings.Builder).String())
 	}
 
-	return string(result), params, nil
+	return result.String(), params, nil
 }
 
 // BindNamed binds a struct or a map to a query with named parameters.

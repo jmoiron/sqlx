@@ -210,21 +210,21 @@ func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper)
 	return bound, arglist, nil
 }
 
-var (
-	EndBracketsReg = regexp.MustCompile(`\([^()]*\)\s*$`)
-)
+var valueBracketReg = regexp.MustCompile(`\([^(]*\?+[^)]*\)`)
 
 func fixBound(bound string, loop int) string {
-	endBrackets := EndBracketsReg.FindString(bound)
-	if endBrackets == "" {
+	loc := valueBracketReg.FindStringIndex(bound)
+	if len(loc) != 2 {
 		return bound
 	}
 	var buffer bytes.Buffer
-	buffer.WriteString(bound)
+
+	buffer.WriteString(bound[0:loc[1]])
 	for i := 0; i < loop-1; i++ {
 		buffer.WriteString(",")
-		buffer.WriteString(endBrackets)
+		buffer.WriteString(bound[loc[0]:loc[1]])
 	}
+	buffer.WriteString(bound[loc[1]:])
 	return buffer.String()
 }
 

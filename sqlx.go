@@ -392,6 +392,39 @@ func (db *DB) PrepareExecute(query string, args ...interface{}) (sql.Result, err
 	return stmt.Exec(args...)
 }
 
+func (db *DB) PrepareSelect(dest interface{}, query string, args ...interface{}) error {
+	stmt, err := db.Preparex(query)
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	return stmt.Select(dest, args...)
+}
+
+func (db *DB) PrepareGet(val interface{}, query string, args ...interface{}) error {
+	stmt, err := db.Preparex(query)
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	return stmt.Get(val, args...)
+}
+
+func (db *DB) PrepareQueryx(query string, args ...interface{}) (*Rows, error) {
+	stmt, err := db.Preparex(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer stmt.Close()
+
+	return stmt.Queryx(args...)
+}
+
 // Tx is an sqlx wrapper around sql.Tx with extra functionality
 type Tx struct {
 	*sql.Tx
@@ -483,6 +516,38 @@ func (tx *Tx) PrepareExecute(query string, args ...interface{}) (sql.Result, err
 
 	defer stmt.Close()
 	return stmt.Exec(args...)
+}
+
+func (tx *Tx) PrepareSelect(dest interface{}, query string, args ...interface{}) error {
+	stmt, err := tx.Preparex(query)
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+	return stmt.Select(dest, args...)
+}
+
+func (tx *Tx) PrepareGet(val interface{}, query string, args ...interface{}) error {
+	stmt, err := tx.Preparex(query)
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	return stmt.Get(val, args...)
+}
+
+func (tx *Tx) PrepareQueryx(query string, args ...interface{}) (*Rows, error) {
+	stmt, err := tx.Preparex(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer stmt.Close()
+
+	return stmt.Queryx(args...)
 }
 
 // Stmtx returns a version of the prepared statement which runs within a transaction.  Provided

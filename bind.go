@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -122,7 +123,7 @@ func asSliceForIn(i interface{}) (v reflect.Value, ok bool) {
 
 // In expands slice values in args, returning the modified query string
 // and a new arg list that can be executed by a database. The `query` should
-// use the `?` bindVar.  The return value uses the `?` bindVar.
+// use the `?` or `$n` bindVar.  The return values uses the `$n` bindVar if slices was found.
 func In(query string, args ...interface{}) (string, []interface{}, error) {
 	// argMeta stores reflect.Value and length for slices and
 	// the value itself for non-slice arguments
@@ -130,6 +131,7 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		v      reflect.Value
 		i      interface{}
 		length int
+		from   int
 	}
 
 	var flatArgsCount int
@@ -139,25 +141,41 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 
 	for i, arg := range args {
 		if a, ok := arg.(driver.Valuer); ok {
-			var err error
-			arg, err = a.Value()
-			if err != nil {
-				return "", nil, err
+			aVal := reflect.ValueOf(a)
+			switch aVal.Kind() {
+			case reflect.Ptr:
+				if aVal.IsNil() {
+					arg = nil
+				} else {
+					arg, _ = a.Value()
+				}
+			default:
+				arg, _ = a.Value()
 			}
 		}
 
-		if v, ok := asSliceForIn(arg); ok {
-			meta[i].length = v.Len()
+		isSlice := false
+		v := reflect.ValueOf(arg)
+		if arg != nil {
+			t := reflectx.Deref(v.Type())
+			// []byte is a driver.Value type so it should not be expanded
+			isSlice = t.Kind() == reflect.Slice && t != reflect.TypeOf([]byte{})
+		}
+		if isSlice {
+			vlen := v.Len()
+			meta[i].length = vlen
 			meta[i].v = v
 
 			anySlices = true
-			flatArgsCount += meta[i].length
+			meta[i].from = flatArgsCount + 1
+			flatArgsCount += vlen
 
-			if meta[i].length == 0 {
+			if vlen == 0 {
 				return "", nil, errors.New("empty slice passed to 'in' query")
 			}
 		} else {
 			meta[i].i = arg
+			meta[i].from = flatArgsCount + 1
 			flatArgsCount++
 		}
 	}
@@ -168,12 +186,12 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		return query, args, nil
 	}
 
-	newArgs := make([]interface{}, 0, flatArgsCount)
-	buf := make([]byte, 0, len(query)+len(", ?")*flatArgsCount)
+	newArgs := make([]interface{}, flatArgsCount)
+	buf := make([]byte, 0, len(query)+3*flatArgsCount)
 
 	var arg, offset int
 
-	for i := strings.IndexByte(query[offset:], '?'); i != -1; i = strings.IndexByte(query[offset:], '?') {
+	for i := strings.IndexAny(query, "?$"); i != -1; i = strings.IndexAny(query, "?$") {
 		if arg >= len(meta) {
 			// if an argument wasn't passed, lets return an error;  this is
 			// not actually how database/sql Exec/Query works, but since we are
@@ -181,60 +199,85 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 			// to catch these programmer errors earlier.
 			return "", nil, errors.New("number of bindVars exceeds arguments")
 		}
+		offset = 0
 
-		argMeta := meta[arg]
-		arg++
-
-		// not a slice, continue.
-		// our questionmark will either be written before the next expansion
-		// of a slice or after the loop when writing the rest of the query
-		if argMeta.length == 0 {
-			offset = offset + i + 1
-			newArgs = append(newArgs, argMeta.i)
-			continue
+		var argM argMeta
+		if query[i] == '?' {
+			if i+1 < len(query) && query[i+1] == '?' {
+				// skip ??
+				buf = append(buf, query[:i+2]...)
+				query = query[i+2:]
+				continue
+			}
+			argM = meta[arg]
+			arg++
+		} else {
+			numa := 0
+			for j := i + 1; j < len(query); j++ {
+				if c := query[j]; c >= '0' && c <= '9' {
+					numa = 10*numa + int(c-'0')
+					offset++
+				} else {
+					break
+				}
+			}
+			if numa > len(meta) {
+				// if an argument wasn't passed, lets return an error;  this is
+				// not actually how database/sql Exec/Query works, but since we are
+				// creating an argument list programmatically, we want to be able
+				// to catch these programmer errors earlier.
+				return "", nil, fmt.Errorf("argument number '$%d' out of range", numa)
+			}
+			argM = meta[numa-1]
 		}
 
 		// write everything up to and including our ? character
-		buf = append(buf, query[:offset+i+1]...)
+		buf = append(buf, query[:i]...)
+		buf = append(buf, '$')
+		buf = strconv.AppendInt(buf, int64(argM.from), 10)
 
-		for si := 1; si < argMeta.length; si++ {
-			buf = append(buf, ", ?"...)
+		if argM.length > 0 {
+			for si := 1; si < argM.length; si++ {
+				buf = append(buf, ',', '$')
+				buf = strconv.AppendInt(buf, int64(argM.from+si), 10)
+			}
+			putReflectSlice(newArgs, argM.v, argM.length, argM.from-1)
+		} else {
+			// not a slice
+			newArgs[argM.from-1] = argM.i
 		}
-
-		newArgs = appendReflectSlice(newArgs, argMeta.v, argMeta.length)
 
 		// slice the query and reset the offset. this avoids some bookkeeping for
 		// the write after the loop
 		query = query[offset+i+1:]
-		offset = 0
 	}
 
 	buf = append(buf, query...)
 
-	if arg < len(meta) {
-		return "", nil, errors.New("number of bindVars less than number arguments")
-	}
+	// if arg < len(meta) {
+	// 	return "", nil, errors.New("number of bindVars less than number arguments")
+	// }
 
 	return string(buf), newArgs, nil
 }
 
-func appendReflectSlice(args []interface{}, v reflect.Value, vlen int) []interface{} {
+func putReflectSlice(args []interface{}, v reflect.Value, vlen int, toidx int) {
 	switch val := v.Interface().(type) {
 	case []interface{}:
-		args = append(args, val...)
+		for i := range val {
+			args[i+toidx] = val[i]
+		}
 	case []int:
 		for i := range val {
-			args = append(args, val[i])
+			args[i+toidx] = val[i]
 		}
 	case []string:
 		for i := range val {
-			args = append(args, val[i])
+			args[i+toidx] = val[i]
 		}
 	default:
 		for si := 0; si < vlen; si++ {
-			args = append(args, v.Index(si).Interface())
+			args[si+toidx] = v.Index(si).Interface()
 		}
 	}
-
-	return args
 }

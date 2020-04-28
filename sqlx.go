@@ -800,32 +800,26 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 
 	for i, val := range values {
 		field := v.Elem().Field(i)
+		if len(val) == 0 {
+			continue
+		}
 		switch field.Kind() {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			if len(val) == 0 {
-				field.SetInt(0)
-				continue
-			}
+
 			var it int64
 			if it, err = strconv.ParseInt(string(val), 0, 64); err != nil {
 				return err
 			}
 			field.SetInt(it)
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			if len(val) == 0 {
-				field.SetInt(0)
-				continue
-			}
+
 			var ut uint64
 			if ut, err = strconv.ParseUint(string(val), 0, 64); err != nil {
 				return err
 			}
 			field.SetUint(ut)
 		case reflect.Float32, reflect.Float64:
-			if len(val) == 0 {
-				field.SetFloat(0)
-				continue
-			}
+
 			var ft float64
 			if ft, err = strconv.ParseFloat(string(val), 64); err != nil {
 				return err
@@ -835,9 +829,7 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 			field.SetString(string(val))
 		case reflect.Struct:
 			if field.Type().String() == "time.Time" {
-				if len(val) == 0 {
-					continue
-				}
+
 				var t time.Time
 
 				if t, err = time.ParseInLocation(time.RFC3339, string(val), time.Local); err != nil {
@@ -1036,32 +1028,28 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 
 			for i, val := range values {
 				field := vp.Elem().Field(i)
+
+				if len(val) == 0 {
+					continue
+				}
+
 				switch field.Kind() {
 				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-					if len(val) == 0 {
-						field.SetInt(0)
-						continue
-					}
+
 					var i int64
 					if i, err = strconv.ParseInt(string(val), 0, 64); err != nil {
 						return err
 					}
 					field.SetInt(i)
 				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-					if len(val) == 0 {
-						field.SetInt(0)
-						continue
-					}
+
 					var i uint64
 					if i, err = strconv.ParseUint(string(val), 0, 64); err != nil {
 						return err
 					}
 					field.SetUint(i)
 				case reflect.Float32, reflect.Float64:
-					if len(val) == 0 {
-						field.SetFloat(0)
-						continue
-					}
+
 					var i float64
 					if i, err = strconv.ParseFloat(string(val), 64); err != nil {
 						return err
@@ -1073,9 +1061,7 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 					// log.Println("struct嵌套不支持", filed.Kind().String())
 
 					if field.Type().String() == "time.Time" {
-						if len(val) == 0 {
-							continue
-						}
+
 						var t time.Time
 
 						if t, err = time.ParseInLocation(time.RFC3339, string(val), time.Local); err != nil {

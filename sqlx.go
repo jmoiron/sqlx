@@ -5,6 +5,8 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"strconv"
+	"time"
 
 	"io/ioutil"
 	"path/filepath"
@@ -196,11 +198,11 @@ func (r *Row) Scan(dest ...interface{}) error {
 	// they were obtained from the network anyway) But for now we
 	// don't care.
 	defer r.rows.Close()
-	for _, dp := range dest {
-		if _, ok := dp.(*sql.RawBytes); ok {
-			return errors.New("sql: RawBytes isn't allowed on Row.Scan")
-		}
-	}
+	// for _, dp := range dest {
+	// 	if _, ok := dp.(*sql.RawBytes); ok {
+	// 		return errors.New("sql: RawBytes isn't allowed on Row.Scan")
+	// 	}
+	// }
 
 	if !r.rows.Next() {
 		if err := r.rows.Err(); err != nil {
@@ -208,6 +210,7 @@ func (r *Row) Scan(dest ...interface{}) error {
 		}
 		return sql.ErrNoRows
 	}
+
 	err := r.rows.Scan(dest...)
 	if err != nil {
 		return err
@@ -775,14 +778,80 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 	if f, err := missingFields(fields); err != nil && !r.unsafe {
 		return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
 	}
-	values := make([]interface{}, len(columns))
+	// scanArgs := make([]interface{}, len(columns))
+	fmt.Println("columns==", columns)
 
-	err = fieldsByTraversal(v, fields, values, true)
-	if err != nil {
+	values := make([]sql.RawBytes, len(columns))
+
+	scanArgs := make([]interface{}, len(values))
+
+	// err = fieldsByTraversal(v, fields, values, true)
+	// if err != nil {
+	// 	return err
+	// }
+	for i := range values {
+		scanArgs[i] = &values[i]
+	}
+	fmt.Println("scan")
+	// scan into the struct field pointers and append to our results
+	if err = r.Scan(scanArgs...); err != nil {
 		return err
 	}
-	// scan into the struct field pointers and append to our results
-	return r.Scan(values...)
+
+	for i, val := range values {
+		field := v.Elem().Field(i)
+		switch field.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if len(val) == 0 {
+				field.SetInt(0)
+				continue
+			}
+			var it int64
+			if it, err = strconv.ParseInt(string(val), 0, 64); err != nil {
+				return err
+			}
+			field.SetInt(it)
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			if len(val) == 0 {
+				field.SetInt(0)
+				continue
+			}
+			var ut uint64
+			if ut, err = strconv.ParseUint(string(val), 0, 64); err != nil {
+				return err
+			}
+			field.SetUint(ut)
+		case reflect.Float32, reflect.Float64:
+			if len(val) == 0 {
+				field.SetFloat(0)
+				continue
+			}
+			var ft float64
+			if ft, err = strconv.ParseFloat(string(val), 64); err != nil {
+				return err
+			}
+			field.SetFloat(ft)
+		case reflect.String:
+			field.SetString(string(val))
+		case reflect.Struct:
+			if field.Type().String() == "time.Time" {
+				if len(val) == 0 {
+					continue
+				}
+				var t time.Time
+
+				if t, err = time.ParseInLocation(time.RFC3339, string(val), time.Local); err != nil {
+					return err
+				}
+
+				field.Set(reflect.ValueOf(time.Unix(t.Unix(), 0)))
+			}
+			// fmt.Println("struct嵌套不支持")
+		}
+
+	}
+
+	return err
 }
 
 // StructScan a single Row into dest.
@@ -926,7 +995,7 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 	}
 
 	if !scannable {
-		var values []interface{}
+		// var values []interface{}
 		var m *reflectx.Mapper
 
 		switch rows.(type) {
@@ -941,22 +1010,82 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 		if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
 			return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
 		}
-		values = make([]interface{}, len(columns))
+		values := make([]sql.RawBytes, len(columns))
+
+		scanArgs := make([]interface{}, len(values))
+		// Make a slice for the values
 
 		for rows.Next() {
 			// create a new struct type (which returns PtrTo) and indirect it
 			vp = reflect.New(base)
 			v = reflect.Indirect(vp)
+			// err = fieldsByTraversal(v, fields, values, true)
+			// if err != nil {
+			// 	return err
+			// }
 
-			err = fieldsByTraversal(v, fields, values, true)
+			for i := range values {
+				scanArgs[i] = &values[i]
+			}
+			// scan into the struct field pointers and append to our results
+			err = rows.Scan(scanArgs...)
+
 			if err != nil {
 				return err
 			}
 
-			// scan into the struct field pointers and append to our results
-			err = rows.Scan(values...)
-			if err != nil {
-				return err
+			for i, val := range values {
+				field := vp.Elem().Field(i)
+				switch field.Kind() {
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					if len(val) == 0 {
+						field.SetInt(0)
+						continue
+					}
+					var i int64
+					if i, err = strconv.ParseInt(string(val), 0, 64); err != nil {
+						return err
+					}
+					field.SetInt(i)
+				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+					if len(val) == 0 {
+						field.SetInt(0)
+						continue
+					}
+					var i uint64
+					if i, err = strconv.ParseUint(string(val), 0, 64); err != nil {
+						return err
+					}
+					field.SetUint(i)
+				case reflect.Float32, reflect.Float64:
+					if len(val) == 0 {
+						field.SetFloat(0)
+						continue
+					}
+					var i float64
+					if i, err = strconv.ParseFloat(string(val), 64); err != nil {
+						return err
+					}
+					field.SetFloat(i)
+				case reflect.String:
+					field.SetString(string(val))
+				case reflect.Struct:
+					// log.Println("struct嵌套不支持", filed.Kind().String())
+
+					if field.Type().String() == "time.Time" {
+						if len(val) == 0 {
+							continue
+						}
+						var t time.Time
+
+						if t, err = time.ParseInLocation(time.RFC3339, string(val), time.Local); err != nil {
+							return err
+						}
+
+						field.Set(reflect.ValueOf(time.Unix(t.Unix(), 0)))
+					}
+				}
+
 			}
 
 			if isPtr {

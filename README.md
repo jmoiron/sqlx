@@ -1,6 +1,6 @@
 # sqlx
 
-[![Build Status](https://travis-ci.org/jmoiron/sqlx.svg?branch=master)](https://travis-ci.org/jmoiron/sqlx) [![Coverage Status](https://coveralls.io/repos/github/jmoiron/sqlx/badge.svg?branch=master)](https://coveralls.io/github/jmoiron/sqlx?branch=master) [![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/jmoiron/sqlx) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/jmoiron/sqlx/master/LICENSE)
+[![Build Status](https://travis-ci.org/jmoiron/sqlx.svg?branch=master)](https://travis-ci.org/jmoiron/sqlx) [![Coverage Status](https://coveralls.io/repos/github/jmoiron/sqlx/badge.svg?branch=master)](https://coveralls.io/github/jmoiron/sqlx?branch=master) [![Godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/jjjachyty/sqlx) [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/jmoiron/sqlx/master/LICENSE)
 
 sqlx is a library which provides a set of extensions on go's standard
 `database/sql` library.  The sqlx versions of `sql.DB`, `sql.TX`, `sql.Stmt`,
@@ -14,13 +14,13 @@ Major additional concepts are:
 * Named parameter support including prepared statements
 * `Get` and `Select` to go quickly from query to struct/slice
 
-In addition to the [godoc API documentation](http://godoc.org/github.com/jmoiron/sqlx),
+In addition to the [godoc API documentation](http://godoc.org/github.com/jjjachyty/sqlx),
 there is also some [user documentation](http://jmoiron.github.io/sqlx/) that
 explains how to use `database/sql` along with sqlx.
 
 ## Recent Changes
 
-* The [introduction](https://github.com/jmoiron/sqlx/pull/387) of `sql.ColumnType` sets the required minimum Go version to 1.8.
+* The [introduction](https://github.com/jjjachyty/sqlx/pull/387) of `sql.ColumnType` sets the required minimum Go version to 1.8.
 
 * sqlx/types.JsonText has been renamed to JSONText to follow Go naming conventions.
 
@@ -34,15 +34,15 @@ active development currently.
 
 There is no Go1-like promise of absolute stability, but I take the issue seriously
 and will maintain the library in a compatible state unless vital bugs prevent me 
-from doing so.  Since [#59](https://github.com/jmoiron/sqlx/issues/59) and 
-[#60](https://github.com/jmoiron/sqlx/issues/60) necessitated breaking behavior, 
+from doing so.  Since [#59](https://github.com/jjjachyty/sqlx/issues/59) and 
+[#60](https://github.com/jjjachyty/sqlx/issues/60) necessitated breaking behavior, 
 a wider API cleanup was done at the time of fixing.  It's possible this will happen
 in future;  if it does, a git tag will be provided for users requiring the old
 behavior to continue to use it until such a time as they can migrate.
 
 ## install
 
-    go get github.com/jmoiron/sqlx
+    go get github.com/jjjachyty/sqlx
 
 ## issues
 
@@ -60,7 +60,7 @@ to give columns distinct names, `rows.Scan` to scan them manually, or
 ## usage
 
 Below is an example which shows some common use cases for sqlx.  Check 
-[sqlx_test.go](https://github.com/jmoiron/sqlx/blob/master/sqlx_test.go) for more
+[sqlx_test.go](https://github.com/jjjachyty/sqlx/blob/master/sqlx_test.go) for more
 usage.
 
 
@@ -73,7 +73,7 @@ import (
     "log"
     
     _ "github.com/lib/pq"
-    "github.com/jmoiron/sqlx"
+    "github.com/jjjachyty/sqlx"
 )
 
 var schema = `

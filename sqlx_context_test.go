@@ -23,9 +23,9 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/sambengtson/sqlx/reflectx"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/sambengtson/sqlx/reflectx"
 )
 
 func MultiExecContext(ctx context.Context, e ExecerContext, query string) {

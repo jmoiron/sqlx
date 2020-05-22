@@ -23,7 +23,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jmoiron/sqlx/reflectx"
+	"github.com/sambengtson/sqlx/reflectx"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -244,7 +244,7 @@ func RunWithSchema(schema Schema, t *testing.T, test func(db *DB, t *testing.T))
 
 func loadDefaultFixture(db *DB, t *testing.T) {
 	tx := db.MustBegin()
-	tx.MustExec(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "Jason", "Moiron", "jmoiron@jmoiron.net")
+	tx.MustExec(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "Jason", "Moiron", "sambengtson@sambengtson.net")
 	tx.MustExec(tx.Rebind("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)"), "John", "Doe", "johndoeDNE@gmail.net")
 	tx.MustExec(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
 	tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
@@ -924,8 +924,8 @@ func TestUsage(t *testing.T) {
 		if jason.LastName != "Moiron" {
 			t.Errorf("Expecting LastName of Moiron, got %s", jason.LastName)
 		}
-		if jason.Email != "jmoiron@jmoiron.net" {
-			t.Errorf("Expecting Email of jmoiron@jmoiron.net, got %s", jason.Email)
+		if jason.Email != "sambengtson@sambengtson.net" {
+			t.Errorf("Expecting Email of sambengtson@sambengtson.net, got %s", jason.Email)
 		}
 		if john.FirstName != "John" || john.LastName != "Doe" || john.Email != "johndoeDNE@gmail.net" {
 			t.Errorf("John Doe's person record not what expected:  Got %v\n", john)

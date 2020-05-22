@@ -148,7 +148,7 @@ func TestNamedQueries(t *testing.T) {
 		test.Error(err)
 
 		// test Queryx w/ uses Query
-		p := Person{FirstName: "Jason", LastName: "Moiron", Email: "jmoiron@jmoiron.net"}
+		p := Person{FirstName: "Jason", LastName: "Moiron", Email: "sambengtson@sambengtson.net"}
 
 		rows, err := ns.Queryx(p)
 		test.Error(err)

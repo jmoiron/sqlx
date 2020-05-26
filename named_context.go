@@ -117,6 +117,11 @@ func NamedQueryContext(ctx context.Context, e ExtContext, query string, arg inte
 	if err != nil {
 		return nil, err
 	}
+	q, args, err = In(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	q = Rebind(BindType(e.DriverName()), q)
 	return e.QueryxContext(ctx, q, args...)
 }
 

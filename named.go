@@ -242,7 +242,7 @@ func bindArray(bindType int, query string, arg interface{}, m *reflectx.Mapper) 
 	if arrayLen == 0 {
 		return "", []interface{}{}, fmt.Errorf("length of array is 0: %#v", arg)
 	}
-	var arglist []interface{}
+	var arglist = make([]interface{}, 0, len(names)*arrayLen)
 	for i := 0; i < arrayLen; i++ {
 		elemArglist, err := bindAnyArgs(names, arrayValue.Index(i).Interface(), m)
 		if err != nil {
@@ -379,11 +379,12 @@ func Named(query string, arg interface{}) (string, []interface{}, error) {
 }
 
 func bindNamedMapper(bindType int, query string, arg interface{}, m *reflectx.Mapper) (string, []interface{}, error) {
-	if maparg, ok := arg.(map[string]interface{}); ok {
-		return bindMap(bindType, query, maparg)
-	}
-	switch reflect.TypeOf(arg).Kind() {
-	case reflect.Array, reflect.Slice:
+	t := reflect.TypeOf(arg)
+	k := t.Kind()
+	switch {
+	case k == reflect.Map && t.Key().Kind() == reflect.String:
+		return bindMap(bindType, query, arg.(map[string]interface{}))
+	case k == reflect.Array || k == reflect.Slice:
 		return bindArray(bindType, query, arg, m)
 	default:
 		return bindStruct(bindType, query, arg, m)

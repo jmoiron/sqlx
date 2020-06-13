@@ -244,7 +244,7 @@ func bindArray(bindType int, query string, arg interface{}, m *reflectx.Mapper) 
 	}
 	var arglist []interface{}
 	for i := 0; i < arrayLen; i++ {
-		elemArglist, err := bindArgs(names, arrayValue.Index(i).Interface(), m)
+		elemArglist, err := bindAnyArgs(names, arrayValue.Index(i).Interface(), m)
 		if err != nil {
 			return "", []interface{}{}, err
 		}

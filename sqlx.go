@@ -380,6 +380,14 @@ func (db *DB) PrepareNamed(query string) (*NamedStmt, error) {
 	return prepareNamed(db, query)
 }
 
+// Conn is a wrapper around sql.Conn with extra functionality
+type Conn struct {
+	*sql.Conn
+	driverName string
+	unsafe     bool
+	Mapper     *reflectx.Mapper
+}
+
 // Tx is an sqlx wrapper around sql.Tx with extra functionality
 type Tx struct {
 	*sql.Tx

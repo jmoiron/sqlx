@@ -40,10 +40,10 @@ func mapper() *reflectx.Mapper {
 	defer mprMu.Unlock()
 
 	if mpr == nil {
-		mpr = reflectx.NewMapperFunc("db", NameMapper)
+		mpr = reflectx.NewMapperFunc("json", NameMapper)
 	} else if origMapper != reflect.ValueOf(NameMapper) {
 		// if NameMapper has changed, create a new mapper
-		mpr = reflectx.NewMapperFunc("db", NameMapper)
+		mpr = reflectx.NewMapperFunc("json", NameMapper)
 		origMapper = reflect.ValueOf(NameMapper)
 	}
 	return mpr
@@ -279,10 +279,25 @@ func MustOpen(driverName, dataSourceName string) *DB {
 	return db
 }
 
+func ExecOne(ex Execer, query string, args ...interface{}) error {
+	rows, err := ex.Exec(query, args...)
+	if err != nil {
+		return err
+	}
+	count, err := rows.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 // MapperFunc sets a new mapper for this db using the default sqlx struct tag
 // and the provided mapper function.
 func (db *DB) MapperFunc(mf func(string) string) {
-	db.Mapper = reflectx.NewMapperFunc("db", mf)
+	db.Mapper = reflectx.NewMapperFunc("json", mf)
 }
 
 // Rebind transforms a query from QUESTION to the DB driver's bindvar type.
@@ -307,6 +322,12 @@ func (db *DB) BindNamed(query string, arg interface{}) (string, []interface{}, e
 // Any named placeholder parameters are replaced with fields from arg.
 func (db *DB) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(db, query, arg)
+}
+
+// NamedQueryRow using this DB.
+func (db *DB) NamedQueryRow(query string, arg interface{}) *Row {
+	rows, err := NamedQuery(db, query, arg)
+	return &Row{rows: rows.Rows, err: err, unsafe: db.unsafe, Mapper: db.Mapper}
 }
 
 // NamedExec using this DB.
@@ -380,6 +401,11 @@ func (db *DB) PrepareNamed(query string) (*NamedStmt, error) {
 	return prepareNamed(db, query)
 }
 
+// ExecOne expects exactly one row to be affected.
+func (db *DB) ExecOne(query string, args ...interface{}) error {
+	return ExecOne(db, query, args...)
+}
+
 // Tx is an sqlx wrapper around sql.Tx with extra functionality
 type Tx struct {
 	*sql.Tx
@@ -415,6 +441,12 @@ func (tx *Tx) NamedQuery(query string, arg interface{}) (*Rows, error) {
 	return NamedQuery(tx, query, arg)
 }
 
+// NamedQueryRow within a transaction.
+func (tx *Tx) NamedQueryRow(query string, arg interface{}) *Row {
+	rows, err := NamedQuery(tx, query, arg)
+	return &Row{rows: rows.Rows, err: err, unsafe: tx.unsafe, Mapper: tx.Mapper}
+}
+
 // NamedExec a named query within a transaction.
 // Any named placeholder parameters are replaced with fields from arg.
 func (tx *Tx) NamedExec(query string, arg interface{}) (sql.Result, error) {
@@ -425,6 +457,11 @@ func (tx *Tx) NamedExec(query string, arg interface{}) (sql.Result, error) {
 // Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(tx, dest, query, args...)
+}
+
+// ExecOne expects exactly one row to be affected.
+func (tx *Tx) ExecOne(query string, args ...interface{}) error {
+	return ExecOne(tx, query, args...)
 }
 
 // Queryx within a transaction.

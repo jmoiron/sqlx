@@ -744,6 +744,32 @@ func TestNamedQuery(t *testing.T) {
 
 		check(t, rows)
 
+		row := db.NamedQueryRow(pdb(`
+			SELECT * FROM jsperson
+			WHERE
+				"FIRST"=:FIRST AND
+				last_name=:last_name AND
+				"EMAIL"=:EMAIL
+		`, db), jp)
+
+		jp2 := JSONPerson{}
+		err = row.StructScan(&jp2)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if jp2.Email != jp.Email {
+			t.Errorf("Email Mismatch %s", db.DriverName())
+		}
+
+		if jp2.FirstName != jp.FirstName {
+			t.Errorf("FirstName Mismatch %s", db.DriverName())
+		}
+
+		if jp2.LastName != jp.LastName {
+			t.Errorf("LastName Mismatch %s", db.DriverName())
+		}
+
 		db.Mapper = &old
 
 		// Test nested structs

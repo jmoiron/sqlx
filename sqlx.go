@@ -795,6 +795,9 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 	fmt.Println("scan")
 	// scan into the struct field pointers and append to our results
 	if err = r.Scan(scanArgs...); err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil
+		}
 		return err
 	}
 

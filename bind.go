@@ -169,7 +169,9 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 	}
 
 	newArgs := make([]interface{}, 0, flatArgsCount)
-	buf := make([]byte, 0, len(query)+len(", ?")*flatArgsCount)
+
+	var buf strings.Builder
+	buf.Grow(len(query) + len(", ?")*flatArgsCount)
 
 	var arg, offset int
 
@@ -195,10 +197,10 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		}
 
 		// write everything up to and including our ? character
-		buf = append(buf, query[:offset+i+1]...)
+		buf.WriteString(query[:offset+i+1])
 
 		for si := 1; si < argMeta.length; si++ {
-			buf = append(buf, ", ?"...)
+			buf.WriteString(", ?")
 		}
 
 		newArgs = appendReflectSlice(newArgs, argMeta.v, argMeta.length)
@@ -209,13 +211,13 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		offset = 0
 	}
 
-	buf = append(buf, query...)
+	buf.WriteString(query)
 
 	if arg < len(meta) {
 		return "", nil, errors.New("number of bindVars less than number arguments")
 	}
 
-	return string(buf), newArgs, nil
+	return buf.String(), newArgs, nil
 }
 
 func appendReflectSlice(args []interface{}, v reflect.Value, vlen int) []interface{} {

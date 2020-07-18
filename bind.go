@@ -135,7 +135,14 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 	var flatArgsCount int
 	var anySlices bool
 
-	meta := make([]argMeta, len(args))
+	var stackMeta [32]argMeta
+
+	var meta []argMeta
+	if len(args) <= len(stackMeta) {
+		meta = stackMeta[:len(args)]
+	} else {
+		meta = make([]argMeta, len(args))
+	}
 
 	for i, arg := range args {
 		if a, ok := arg.(driver.Valuer); ok {

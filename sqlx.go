@@ -350,6 +350,7 @@ func (db *DB) Beginx() (*Tx, error) {
 // Queryx queries the database and returns an *sqlx.Rows.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
+	logs.Print(nil, query, args)
 	r, err := db.DB.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -360,6 +361,7 @@ func (db *DB) Queryx(query string, args ...interface{}) (*Rows, error) {
 // QueryRowx queries the database and returns an *sqlx.Row.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
+	logs.Print(nil, query, args)
 	rows, err := db.DB.Query(query, args...)
 	return &Row{rows: rows, err: err, unsafe: db.unsafe, Mapper: db.Mapper}
 }
@@ -367,7 +369,13 @@ func (db *DB) QueryRowx(query string, args ...interface{}) *Row {
 // MustExec (panic) runs MustExec using this database.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) MustExec(query string, args ...interface{}) sql.Result {
+	logs.Print(nil, query, args)
 	return MustExec(db, query, args...)
+}
+
+func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
+	logs.Print(nil, query, args)
+	return db.DB.Exec(query, args...)
 }
 
 // Preparex returns an sqlx.Stmt instead of a sql.Stmt
@@ -553,10 +561,12 @@ func (s *Stmt) Queryx(args ...interface{}) (*Rows, error) {
 type qStmt struct{ *Stmt }
 
 func (q *qStmt) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	logs.Print(nil, args)
 	return q.Stmt.Query(args...)
 }
 
 func (q *qStmt) Queryx(query string, args ...interface{}) (*Rows, error) {
+	logs.Print(nil, args)
 	r, err := q.Stmt.Query(args...)
 	if err != nil {
 		return nil, err
@@ -565,11 +575,13 @@ func (q *qStmt) Queryx(query string, args ...interface{}) (*Rows, error) {
 }
 
 func (q *qStmt) QueryRowx(query string, args ...interface{}) *Row {
+	logs.Print(nil, args)
 	rows, err := q.Stmt.Query(args...)
 	return &Row{rows: rows, err: err, unsafe: q.Stmt.unsafe, Mapper: q.Stmt.Mapper}
 }
 
 func (q *qStmt) Exec(query string, args ...interface{}) (sql.Result, error) {
+	logs.Print(nil, args)
 	return q.Stmt.Exec(args...)
 }
 

@@ -38,6 +38,7 @@ func (n *NamedStmt) ExecContext(ctx context.Context, arg interface{}) (sql.Resul
 	if err != nil {
 		return *new(sql.Result), err
 	}
+	logs.Print(ctx, args)
 	return n.Stmt.ExecContext(ctx, args...)
 }
 
@@ -48,6 +49,7 @@ func (n *NamedStmt) QueryContext(ctx context.Context, arg interface{}) (*sql.Row
 	if err != nil {
 		return nil, err
 	}
+	logs.Print(ctx, args)
 	return n.Stmt.QueryContext(ctx, args...)
 }
 
@@ -60,6 +62,7 @@ func (n *NamedStmt) QueryRowContext(ctx context.Context, arg interface{}) *Row {
 	if err != nil {
 		return &Row{err: err}
 	}
+	logs.Print(ctx, args)
 	return n.Stmt.QueryRowxContext(ctx, args...)
 }
 

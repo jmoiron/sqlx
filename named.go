@@ -44,6 +44,7 @@ func (n *NamedStmt) Exec(arg interface{}) (sql.Result, error) {
 	if err != nil {
 		return *new(sql.Result), err
 	}
+	logs.Print(nil, args)
 	return n.Stmt.Exec(args...)
 }
 
@@ -54,6 +55,7 @@ func (n *NamedStmt) Query(arg interface{}) (*sql.Rows, error) {
 	if err != nil {
 		return nil, err
 	}
+	logs.Print(nil, args)
 	return n.Stmt.Query(args...)
 }
 
@@ -66,6 +68,7 @@ func (n *NamedStmt) QueryRow(arg interface{}) *Row {
 	if err != nil {
 		return &Row{err: err}
 	}
+	logs.Print(nil, args)
 	return n.Stmt.QueryRowx(args...)
 }
 

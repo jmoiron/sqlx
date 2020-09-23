@@ -417,7 +417,7 @@ type PersonPlace struct {
 <h3>Scan Destination Safety <a href="#safety" class="permalink" id="safety">&para;</a></h3>
 <p>By default, StructScan will return an error if a column does not map to a field in the destination.  This mimics the treatment for things like unused variables in Go, but does <em>not</em> match the way that standard library marshallers like <code>encoding/json</code> behave.  Because SQL is generally executed in a more controlled fashion than parsing JSON, and these errors are generally coding errors, a decision was made to return errors by default.</p>
 <p>Like unused variables, columns which you ignore are a waste of network and database resources, and detecting things like an incompatible mapping or a typo in a struct tag early can be difficult without the mapper letting you know something wasn't found.</p>
-<p>Despite this, there are some cases where ignoring columns with no destination might be desired.  For this, there is the <code>Unsafe</code> method on each <a href="#handles">Handle type</a> which returns a new copy of that handle whith this safety turned off:</p>
+<p>Despite this, there are some cases where ignoring columns with no destination might be desired.  For this, there is the <code>Unsafe</code> method on each <a href="#handles">Handle type</a> which returns a new copy of that handle with this safety turned off:</p>
 <pre class="prettyprint linenums">
 var p Person
 // err here is not nil because there are no field destinations for columns in `place`

@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/jjjachyty/sqlx/reflectx"
+	"go.uber.org/zap"
 )
 
 // Although the NameMapper is convenient, in practice it should not
@@ -251,6 +252,7 @@ type DB struct {
 	driverName string
 	unsafe     bool
 	Mapper     *reflectx.Mapper
+	Log        *zap.Logger
 }
 
 // NewDb returns a new sqlx DB wrapper for a pre-existing *sql.DB.  The
@@ -321,6 +323,7 @@ func (db *DB) NamedExec(query string, arg interface{}) (sql.Result, error) {
 // Select using this DB.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
+	db.Log.Debug("Sqlx[select]:", zap.String("sql", query), zap.Any("Args", args))
 	return Select(db, dest, query, args...)
 }
 
@@ -779,7 +782,6 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 		return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
 	}
 	// scanArgs := make([]interface{}, len(columns))
-	fmt.Println("columns==", columns)
 
 	values := make([]sql.RawBytes, len(columns))
 
@@ -792,9 +794,11 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
-	fmt.Println("scan")
 	// scan into the struct field pointers and append to our results
 	if err = r.Scan(scanArgs...); err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil
+		}
 		return err
 	}
 
@@ -1058,9 +1062,8 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 				case reflect.String:
 					field.SetString(string(val))
 				case reflect.Struct:
-					// log.Println("struct嵌套不支持", filed.Kind().String())
-
-					if field.Type().String() == "time.Time" {
+					switch field.Type().String() {
+					case "time.Time":
 
 						var t time.Time
 
@@ -1070,6 +1073,12 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 
 						field.Set(reflect.ValueOf(time.Unix(t.Unix(), 0)))
 					}
+				case reflect.Slice:
+
+					field.SetBytes(val)
+
+				default:
+					field.Set(reflect.ValueOf(val))
 				}
 
 			}

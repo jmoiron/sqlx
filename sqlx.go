@@ -1074,9 +1074,10 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 						field.Set(reflect.ValueOf(time.Unix(t.Unix(), 0)))
 					}
 				case reflect.Slice:
-
-					field.SetBytes(val)
-
+					switch field.Type().String() {
+					case "json.RawMessage":
+						field.SetBytes([]byte(string(val)))
+					}
 				default:
 					field.Set(reflect.ValueOf(val))
 				}

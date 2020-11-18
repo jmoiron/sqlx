@@ -9,7 +9,7 @@ import (
 )
 
 func TestNamedContextQueries(t *testing.T) {
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 		test := Test{t}
 		var ns *NamedStmt

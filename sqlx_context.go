@@ -316,6 +316,12 @@ func (tx *Tx) PrepareNamedContext(ctx context.Context, query string) (*NamedStmt
 	return prepareNamedContext(ctx, tx, query)
 }
 
+// NamedQueryContext within a transaction.
+// Any named placeholder parameters are replaced with fields from arg.
+func (tx *Tx) NamedQueryContext(ctx context.Context, query string, arg interface{}) (*Rows, error) {
+	return NamedQueryContext(ctx, tx, query, arg)
+}
+
 // MustExecContext runs MustExecContext within a transaction.
 // Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) MustExecContext(ctx context.Context, query string, args ...interface{}) sql.Result {

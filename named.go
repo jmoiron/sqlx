@@ -383,7 +383,13 @@ func bindNamedMapper(bindType int, query string, arg interface{}, m *reflectx.Ma
 	k := t.Kind()
 	switch {
 	case k == reflect.Map && t.Key().Kind() == reflect.String:
-		return bindMap(bindType, query, arg.(map[string]interface{}))
+		var m map[string]interface{}
+		if !t.ConvertibleTo(reflect.TypeOf(m)) {
+			return "", nil, fmt.Errorf("sqlx.bindNamedMapper: unsupported map type: %T", arg)
+		}
+
+		m = reflect.ValueOf(arg).Convert(reflect.TypeOf(m)).Interface().(map[string]interface{})
+		return bindMap(bindType, query, m)
 	case k == reflect.Array || k == reflect.Slice:
 		return bindArray(bindType, query, arg, m)
 	default:

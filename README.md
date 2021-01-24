@@ -36,16 +36,13 @@ when resolving the driver into a bind type (~40ns per call), but it allows users
 to specify what bindtype their driver uses even when sqlx has not been updated
 to know about it by default.
 
-
 ### Backwards Compatibility
 
-There is no Go1-like promise of absolute stability, but I take the issue seriously
-and will maintain the library in a compatible state unless vital bugs prevent me 
-from doing so.  Since [#59](https://github.com/jmoiron/sqlx/issues/59) and 
-[#60](https://github.com/jmoiron/sqlx/issues/60) necessitated breaking behavior, 
-a wider API cleanup was done at the time of fixing.  It's possible this will happen
-in future;  if it does, a git tag will be provided for users requiring the old
-behavior to continue to use it until such a time as they can migrate.
+Compatibility with the most recent two versions of Go is a requirement for any
+new changes.  Compatibility beyond that is not guaranteed.
+
+Versioning is done with Go modules.  Breaking changes (eg. removing deprecated API)
+will get major version number bumps.
 
 ## install
 

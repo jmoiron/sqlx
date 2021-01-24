@@ -104,7 +104,7 @@ func (j *JSONText) Scan(src interface{}) error {
 	default:
 		return errors.New("Incompatible type for JSONText")
 	}
-	*j = JSONText(append((*j)[0:0], source...))
+	*j = append((*j)[0:0], source...)
 	return nil
 }
 

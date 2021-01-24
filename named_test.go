@@ -119,6 +119,15 @@ func (t Test) Errorf(err error, format string, args ...interface{}) {
 	}
 }
 
+func TestEscapedColons(t *testing.T) {
+	var qs = `SELECT * FROM testtable WHERE timeposted BETWEEN (now() AT TIME ZONE 'utc') AND
+	(now() AT TIME ZONE 'utc') - interval '01:30:00') AND name = '\'this is a test\'' and id = :id`
+	_, _, err := compileNamedQuery([]byte(qs), 3) //3 being DOLLAR
+	if err != nil{
+		t.Error("Didn't handle colons correctly when inside a string")
+	}
+}
+
 func TestNamedQueries(t *testing.T) {
 	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)

@@ -437,7 +437,7 @@ By default, StructScan will return an error if a column does not map to a field 
 
 Like unused variables, columns which you ignore are a waste of network and database resources, and detecting things like an incompatible mapping or a typo in a struct tag early can be difficult without the mapper letting you know something wasn't found.
 
-Despite this, there are some cases where ignoring columns with no destination might be desired.  For this, there is the `Unsafe` method on each [Handle type](#handles) which returns a new copy of that handle whith this safety turned off:
+Despite this, there are some cases where ignoring columns with no destination might be desired.  For this, there is the `Unsafe` method on each [Handle type](#handles) which returns a new copy of that handle with this safety turned off:
 
 ```go
 var p Person

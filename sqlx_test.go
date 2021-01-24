@@ -898,6 +898,17 @@ func TestScanError(t *testing.T) {
 	})
 }
 
+func TestMultiInsert(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+		q := db.Rebind(`INSERT INTO employees (name, id) VALUES (?, ?), (?, ?);`)
+		db.MustExec(q,
+			"Name1", 400,
+			"name2", 500,
+		)
+	})
+}
+
 // FIXME: this function is kinda big but it slows things down to be constantly
 // loading and reloading the schema..
 

@@ -217,6 +217,18 @@ func TestNamedQueries(t *testing.T) {
 			VALUES (:first_name, :last_name, :email)`, slsMap)
 		test.Error(err)
 
+		type A map[string]interface{}
+
+		typedMap := []A{
+			{"first_name": "Ardie", "last_name": "Savea", "email": "asavea@ab.co.nz"},
+			{"first_name": "Sonny Bill", "last_name": "Williams", "email": "sbw@ab.co.nz"},
+			{"first_name": "Ngani", "last_name": "Laumape", "email": "nlaumape@ab.co.nz"},
+		}
+
+		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
+			VALUES (:first_name, :last_name, :email)`, typedMap)
+		test.Error(err)
+
 		for _, p := range sls {
 			dest := Person{}
 			err = db.Get(&dest, db.Rebind("SELECT * FROM person WHERE email=?"), p.Email)

@@ -195,7 +195,7 @@ func TestNamedQueries(t *testing.T) {
 			t.Errorf("got %s, expected %s", p.Email, people[0].Email)
 		}
 
-		// test batch inserts
+		// test struct batch inserts
 		sls := []Person{
 			{FirstName: "Ardie", LastName: "Savea", Email: "asavea@ab.co.nz"},
 			{FirstName: "Sonny Bill", LastName: "Williams", Email: "sbw@ab.co.nz"},
@@ -204,6 +204,17 @@ func TestNamedQueries(t *testing.T) {
 
 		insert := fmt.Sprintf("INSERT INTO person (first_name, last_name, email, added_at) VALUES (:first_name, :last_name, :email, %v)", now)
 		_, err = db.NamedExec(insert, sls)
+		test.Error(err)
+
+		// test map batch inserts
+		slsMap := []map[string]interface{}{
+			{"first_name": "Ardie", "last_name": "Savea", "email": "asavea@ab.co.nz"},
+			{"first_name": "Sonny Bill", "last_name": "Williams", "email": "sbw@ab.co.nz"},
+			{"first_name": "Ngani", "last_name": "Laumape", "email": "nlaumape@ab.co.nz"},
+		}
+
+		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
+			VALUES (:first_name, :last_name, :email)`, slsMap)
 		test.Error(err)
 
 		for _, p := range sls {

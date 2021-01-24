@@ -182,6 +182,28 @@ func main() {
     // as the name -> db mapping, so struct fields are lowercased and the `db` tag
     // is taken into consideration.
     rows, err = db.NamedQuery(`SELECT * FROM person WHERE first_name=:first_name`, jason)
+    
+    
+    // batch insert
+    
+    // batch insert with structs
+    personStructs := []Person{
+        {FirstName: "Ardie", LastName: "Savea", Email: "asavea@ab.co.nz"},
+        {FirstName: "Sonny Bill", LastName: "Williams", Email: "sbw@ab.co.nz"},
+        {FirstName: "Ngani", LastName: "Laumape", Email: "nlaumape@ab.co.nz"},
+    }
+
+    _, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
+        VALUES (:first_name, :last_name, :email)`, personStructs)
+
+    // batch insert with maps
+    personMaps := []map[string]interface{}{
+        {"first_name": "Ardie", "last_name": "Savea", "email": "asavea@ab.co.nz"},
+        {"first_name": "Sonny Bill", "last_name": "Williams", "email": "sbw@ab.co.nz"},
+        {"first_name": "Ngani", "last_name": "Laumape", "email": "nlaumape@ab.co.nz"},
+    }
+
+    _, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
+        VALUES (:first_name, :last_name, :email)`, personMaps)
 }
 ```
-

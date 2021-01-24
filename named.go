@@ -157,6 +157,10 @@ func bindAnyArgs(names []string, arg interface{}, m *reflectx.Mapper) ([]interfa
 // type, given a list of names to pull out of the struct.  Used by public
 // BindStruct interface.
 func bindArgs(names []string, arg interface{}, m *reflectx.Mapper) ([]interface{}, error) {
+	if maparg, ok := arg.(map[string]interface{}); ok {
+		return bindMapArgs(names, maparg)
+	}
+
 	arglist := make([]interface{}, 0, len(names))
 
 	// grab the indirected value of arg

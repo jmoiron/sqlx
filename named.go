@@ -146,8 +146,22 @@ func prepareNamed(p namedPreparer, query string) (*NamedStmt, error) {
 	}, nil
 }
 
+// convertMapStringInterface attempts to convert v to map[string]interface{}.
+// Unlike v.(map[string]interface{}), this function works on named types that
+// are convertible to map[string]interface{} as well.
+func convertMapStringInterface(v interface{}) (map[string]interface{}, bool) {
+	var m map[string]interface{}
+	mtype := reflect.TypeOf(m)
+	t := reflect.TypeOf(v)
+	if !t.ConvertibleTo(mtype) {
+		return nil, false
+	}
+	return reflect.ValueOf(v).Convert(mtype).Interface().(map[string]interface{}), true
+
+}
+
 func bindAnyArgs(names []string, arg interface{}, m *reflectx.Mapper) ([]interface{}, error) {
-	if maparg, ok := arg.(map[string]interface{}); ok {
+	if maparg, ok := convertMapStringInterface(arg); ok {
 		return bindMapArgs(names, maparg)
 	}
 	return bindArgs(names, arg, m)
@@ -202,7 +216,7 @@ func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper)
 		return "", []interface{}{}, err
 	}
 
-	arglist, err := bindArgs(names, arg, m)
+	arglist, err := bindAnyArgs(names, arg, m)
 	if err != nil {
 		return "", []interface{}{}, err
 	}
@@ -383,12 +397,10 @@ func bindNamedMapper(bindType int, query string, arg interface{}, m *reflectx.Ma
 	k := t.Kind()
 	switch {
 	case k == reflect.Map && t.Key().Kind() == reflect.String:
-		var m map[string]interface{}
-		if !t.ConvertibleTo(reflect.TypeOf(m)) {
+		m, ok := convertMapStringInterface(arg)
+		if !ok {
 			return "", nil, fmt.Errorf("sqlx.bindNamedMapper: unsupported map type: %T", arg)
 		}
-
-		m = reflect.ValueOf(arg).Convert(reflect.TypeOf(m)).Interface().(map[string]interface{})
 		return bindMap(bindType, query, m)
 	case k == reflect.Array || k == reflect.Slice:
 		return bindArray(bindType, query, arg, m)

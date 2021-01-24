@@ -185,3 +185,10 @@ func main() {
 }
 ```
 
+## development 
+
+You can use `docker-compose` to run the tests during development. It will run the test suite in a platform agnostic way:
+
+```sh
+make ci
+```

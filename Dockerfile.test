@@ -1,0 +1,18 @@
+# Start from a Debian image with the latest version of Go installed
+# and a workspace (GOPATH) configured at /go.
+FROM golang
+
+# Set environment variables
+ENV PATH /go/bin:$PATH
+
+# Cd into the library code directory
+WORKDIR /go/src/github.com/jmoiron/sqlx
+
+# Copy the local package files to the container's workspace.
+ADD . /go/src/github.com/jmoiron/sqlx
+
+# Install dependencies
+RUN go list -f '{{range .TestImports}}{{.}} {{end}}' ./... | xargs -n1 go get -d
+
+# Run integration tests as default command
+CMD go list ./... | xargs -n1 go test -timeout=30s

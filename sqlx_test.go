@@ -1738,6 +1738,33 @@ func BenchmarkBindStruct(b *testing.B) {
 	}
 }
 
+func TestBindNamedMapper(t *testing.T) {
+	type A map[string]interface{}
+	m := reflectx.NewMapperFunc("db", NameMapper)
+	query, args, err := bindNamedMapper(DOLLAR, `select :x`, A{
+		"x": "X!",
+	}, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := fmt.Sprintf("%s %s", query, args)
+	want := `select $1 [X!]`
+	if got != want {
+		t.Errorf("\ngot:  %q\nwant: %q", got, want)
+	}
+
+	_, _, err = bindNamedMapper(DOLLAR, `select :x`, map[string]string{
+		"x": "X!",
+	}, m)
+	if err == nil {
+		t.Fatal("err is nil")
+	}
+	if !strings.Contains(err.Error(), "unsupported map type") {
+		t.Errorf("wrong error: %s", err)
+	}
+}
+
 func BenchmarkBindMap(b *testing.B) {
 	b.StopTimer()
 	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`

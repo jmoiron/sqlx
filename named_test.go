@@ -2,6 +2,7 @@ package sqlx
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 )
 
@@ -119,7 +120,7 @@ func (t Test) Errorf(err error, format string, args ...interface{}) {
 }
 
 func TestNamedQueries(t *testing.T) {
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 		test := Test{t}
 		var ns *NamedStmt
@@ -191,8 +192,8 @@ func TestNamedQueries(t *testing.T) {
 			{FirstName: "Ngani", LastName: "Laumape", Email: "nlaumape@ab.co.nz"},
 		}
 
-		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
-			VALUES (:first_name, :last_name, :email)`, sls)
+		insert := fmt.Sprintf("INSERT INTO person (first_name, last_name, email, added_at) VALUES (:first_name, :last_name, :email, %v)", now)
+		_, err = db.NamedExec(insert, sls)
 		test.Error(err)
 
 		for _, p := range sls {

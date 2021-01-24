@@ -42,7 +42,7 @@ func MultiExecContext(ctx context.Context, e ExecerContext, query string) {
 }
 
 func RunWithSchemaContext(ctx context.Context, schema Schema, t *testing.T, test func(ctx context.Context, db *DB, t *testing.T)) {
-	runner := func(ctx context.Context, db *DB, t *testing.T, create, drop string) {
+	runner := func(ctx context.Context, db *DB, t *testing.T, create, drop, now string) {
 		defer func() {
 			MultiExecContext(ctx, db, drop)
 		}()
@@ -52,16 +52,16 @@ func RunWithSchemaContext(ctx context.Context, schema Schema, t *testing.T, test
 	}
 
 	if TestPostgres {
-		create, drop := schema.Postgres()
-		runner(ctx, pgdb, t, create, drop)
+		create, drop, now := schema.Postgres()
+		runner(ctx, pgdb, t, create, drop, now)
 	}
 	if TestSqlite {
-		create, drop := schema.Sqlite3()
-		runner(ctx, sldb, t, create, drop)
+		create, drop, now := schema.Sqlite3()
+		runner(ctx, sldb, t, create, drop, now)
 	}
 	if TestMysql {
-		create, drop := schema.MySQL()
-		runner(ctx, mysqldb, t, create, drop)
+		create, drop, now := schema.MySQL()
+		runner(ctx, mysqldb, t, create, drop, now)
 	}
 }
 

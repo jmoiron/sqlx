@@ -98,16 +98,16 @@ type Schema struct {
 	drop   string
 }
 
-func (s Schema) Postgres() (string, string) {
-	return s.create, s.drop
+func (s Schema) Postgres() (string, string, string) {
+	return s.create, s.drop, `now()`
 }
 
-func (s Schema) MySQL() (string, string) {
-	return strings.Replace(s.create, `"`, "`", -1), s.drop
+func (s Schema) MySQL() (string, string, string) {
+	return strings.Replace(s.create, `"`, "`", -1), s.drop, `now()`
 }
 
-func (s Schema) Sqlite3() (string, string) {
-	return strings.Replace(s.create, `now()`, `CURRENT_TIMESTAMP`, -1), s.drop
+func (s Schema) Sqlite3() (string, string, string) {
+	return strings.Replace(s.create, `now()`, `CURRENT_TIMESTAMP`, -1), s.drop, `CURRENT_TIMESTAMP`
 }
 
 var defaultSchema = Schema{
@@ -218,27 +218,27 @@ func MultiExec(e Execer, query string) {
 	}
 }
 
-func RunWithSchema(schema Schema, t *testing.T, test func(db *DB, t *testing.T)) {
-	runner := func(db *DB, t *testing.T, create, drop string) {
+func RunWithSchema(schema Schema, t *testing.T, test func(db *DB, t *testing.T, now string)) {
+	runner := func(db *DB, t *testing.T, create, drop, now string) {
 		defer func() {
 			MultiExec(db, drop)
 		}()
 
 		MultiExec(db, create)
-		test(db, t)
+		test(db, t, now)
 	}
 
 	if TestPostgres {
-		create, drop := schema.Postgres()
-		runner(pgdb, t, create, drop)
+		create, drop, now := schema.Postgres()
+		runner(pgdb, t, create, drop, now)
 	}
 	if TestSqlite {
-		create, drop := schema.Sqlite3()
-		runner(sldb, t, create, drop)
+		create, drop, now := schema.Sqlite3()
+		runner(sldb, t, create, drop, now)
 	}
 	if TestMysql {
-		create, drop := schema.MySQL()
-		runner(mysqldb, t, create, drop)
+		create, drop, now := schema.MySQL()
+		runner(mysqldb, t, create, drop, now)
 	}
 }
 
@@ -263,7 +263,7 @@ func loadDefaultFixture(db *DB, t *testing.T) {
 // Test a new backwards compatible feature, that missing scan destinations
 // will silently scan into sql.RawText rather than failing/panicing
 func TestMissingNames(t *testing.T) {
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 		type PersonPlus struct {
 			FirstName string `db:"first_name"`
@@ -383,7 +383,7 @@ func TestEmbeddedStructs(t *testing.T) {
 	type Loop2 struct{ Loop1 }
 	type Loop3 struct{ Loop2 }
 
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 		peopleAndPlaces := []PersonPlace{}
 		err := db.Select(
@@ -476,7 +476,7 @@ func TestJoinQuery(t *testing.T) {
 	}
 	type Boss Employee
 
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 
 		var employees []struct {
@@ -512,7 +512,7 @@ func TestJoinQueryNamedPointerStructs(t *testing.T) {
 	}
 	type Boss Employee
 
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 
 		var employees []struct {
@@ -544,7 +544,7 @@ func TestJoinQueryNamedPointerStructs(t *testing.T) {
 }
 
 func TestSelectSliceMapTime(t *testing.T) {
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 		rows, err := db.Queryx("SELECT * FROM person")
 		if err != nil {
@@ -573,7 +573,7 @@ func TestSelectSliceMapTime(t *testing.T) {
 }
 
 func TestNilReceiver(t *testing.T) {
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 		var p *Person
 		err := db.Get(p, "SELECT * FROM person LIMIT 1")
@@ -619,7 +619,7 @@ func TestNamedQuery(t *testing.T) {
 			`,
 	}
 
-	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(schema, t, func(db *DB, t *testing.T, now string) {
 		type Person struct {
 			FirstName sql.NullString `db:"first_name"`
 			LastName  sql.NullString `db:"last_name"`
@@ -829,7 +829,7 @@ func TestNilInserts(t *testing.T) {
 		drop: "drop table tt;",
 	}
 
-	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(schema, t, func(db *DB, t *testing.T, now string) {
 		type TT struct {
 			ID    int
 			Value *string
@@ -874,7 +874,7 @@ func TestScanError(t *testing.T) {
 		drop: `drop table kv;`,
 	}
 
-	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(schema, t, func(db *DB, t *testing.T, now string) {
 		type WrongTypes struct {
 			K int
 			V string
@@ -902,7 +902,7 @@ func TestScanError(t *testing.T) {
 // loading and reloading the schema..
 
 func TestUsage(t *testing.T) {
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 		slicemembers := []SliceMember{}
 		err := db.Select(&slicemembers, "SELECT * FROM place ORDER BY telcode ASC")
@@ -1421,7 +1421,7 @@ func TestEmbeddedMaps(t *testing.T) {
 		drop: `drop table message;`,
 	}
 
-	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(schema, t, func(db *DB, t *testing.T, now string) {
 		messages := []Message{
 			{"Hello, World", PropertyMap{"one": "1", "two": "2"}},
 			{"Thanks, Joy", PropertyMap{"pull": "request"}},
@@ -1465,7 +1465,7 @@ func TestIssue197(t *testing.T) {
 	type Var struct{ Raw json.RawMessage }
 	type Var2 struct{ Raw []byte }
 	type Var3 struct{ Raw mybyte }
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		var err error
 		var v, q Var
 		if err = db.Get(&v, `SELECT '{"a": "b"}' AS raw`); err != nil {
@@ -1565,7 +1565,7 @@ func TestIn(t *testing.T) {
 			t.Error("Expected an error, but got nil.")
 		}
 	}
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 		//tx.MustExec(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
 		//tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
@@ -1689,7 +1689,7 @@ func TestEmbeddedLiterals(t *testing.T) {
 		drop: `drop table x;`,
 	}
 
-	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(schema, t, func(db *DB, t *testing.T, now string) {
 		type t1 struct {
 			K *string
 		}

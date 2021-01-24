@@ -188,6 +188,8 @@ for rows.Next() {
     var telcode int
     err = rows.Scan(&country, &city, &telcode)
 }
+// check the error from rows
+err = rows.Err()
 </pre>
 
 <p>You should treat the Rows like a database cursor rather than a materialized list of results.  Although driver buffering behavior can vary, iterating via <code>Next()</code> is a good way to bound the memory usage of large result sets, as you're only scanning a single row at a time.  <code>Scan()</code> uses <a href="https://golang.org/pkg/reflect">reflect</a> to map sql column return types to Go types like <code>string</code>, <code>[]byte</code>, et al.  If you do not iterate over a whole rows result, be sure to call <code>rows.Close()</code> to return the connection back to the pool!</p>

@@ -1852,3 +1852,43 @@ func BenchmarkRebindBuffer(b *testing.B) {
 		rebindBuff(DOLLAR, q2)
 	}
 }
+
+func TestIn130Regression(t *testing.T) {
+	t.Run("[]interface{}{}", func(t *testing.T) {
+		q, args, err := In("SELECT * FROM people WHERE name IN (?)", []interface{}{[]string{"gopher"}}...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if q != "SELECT * FROM people WHERE name IN (?)" {
+			t.Errorf("got=%v", q)
+		}
+		t.Log(args)
+		for _, a := range args {
+			switch a.(type) {
+			case string:
+				t.Log("ok: string", a)
+			case *string:
+				t.Error("ng: string pointer", a, *a.(*string))
+			}
+		}
+	})
+
+	t.Run("[]string{}", func(t *testing.T) {
+		q, args, err := In("SELECT * FROM people WHERE name IN (?)", []string{"gopher"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if q != "SELECT * FROM people WHERE name IN (?)" {
+			t.Errorf("got=%v", q)
+		}
+		t.Log(args)
+		for _, a := range args {
+			switch a.(type) {
+			case string:
+				t.Log("ok: string", a)
+			case *string:
+				t.Error("ng: string pointer", a, *a.(*string))
+			}
+		}
+	})
+}

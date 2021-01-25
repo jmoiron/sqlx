@@ -249,11 +249,11 @@ func appendReflectSlice(args []interface{}, v reflect.Value, vlen int) []interfa
 		args = append(args, val...)
 	case []int:
 		for i := range val {
-			args = append(args, &val[i])
+			args = append(args, val[i])
 		}
 	case []string:
 		for i := range val {
-			args = append(args, &val[i])
+			args = append(args, val[i])
 		}
 	default:
 		for si := 0; si < vlen; si++ {

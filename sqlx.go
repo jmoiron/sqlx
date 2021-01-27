@@ -209,7 +209,8 @@ func (r *Row) Scan(dest ...interface{}) error {
 		if err := r.rows.Err(); err != nil {
 			return err
 		}
-		return sql.ErrNoRows
+		// return sql.ErrNoRows
+		return nil
 	}
 
 	err := r.rows.Scan(dest...)

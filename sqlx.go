@@ -15,7 +15,6 @@ import (
 	"sync"
 
 	"github.com/jjjachyty/sqlx/reflectx"
-	"go.uber.org/zap"
 )
 
 // Although the NameMapper is convenient, in practice it should not
@@ -253,7 +252,6 @@ type DB struct {
 	driverName string
 	unsafe     bool
 	Mapper     *reflectx.Mapper
-	Log        *zap.Logger
 }
 
 // NewDb returns a new sqlx DB wrapper for a pre-existing *sql.DB.  The
@@ -324,7 +322,6 @@ func (db *DB) NamedExec(query string, arg interface{}) (sql.Result, error) {
 // Select using this DB.
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
-	db.Log.Debug("Sqlx[select]:", zap.String("sql", query), zap.Any("Args", args))
 	return Select(db, dest, query, args...)
 }
 

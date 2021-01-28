@@ -202,7 +202,7 @@ func TestNamedQueries(t *testing.T) {
 			{FirstName: "Ngani", LastName: "Laumape", Email: "nlaumape@ab.co.nz"},
 		}
 
-		insert := fmt.Sprintf("INSERT INTO person (first_name, last_name, email, added_at) VALUES (:first_name, :last_name, :email, %v)", now)
+		insert := fmt.Sprintf("INSERT INTO person (first_name, last_name, email, added_at) VALUES (:first_name, :last_name, :email, %v)\n", now)
 		_, err = db.NamedExec(insert, sls)
 		test.Error(err)
 
@@ -214,7 +214,7 @@ func TestNamedQueries(t *testing.T) {
 		}
 
 		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
-			VALUES (:first_name, :last_name, :email)`, slsMap)
+			VALUES (:first_name, :last_name, :email) `, slsMap)
 		test.Error(err)
 
 		type A map[string]interface{}
@@ -226,7 +226,7 @@ func TestNamedQueries(t *testing.T) {
 		}
 
 		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
-			VALUES (:first_name, :last_name, :email)`, typedMap)
+			VALUES (:first_name, :last_name, :email) `, typedMap)
 		test.Error(err)
 
 		for _, p := range sls {

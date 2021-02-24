@@ -1,0 +1,103 @@
+version: 2.1
+
+workflows:
+  test:
+    jobs:
+      - test:
+          matrix:
+            parameters:
+              executor:
+                - go_11
+                - go_12
+                - go_13
+                - go_14
+                - go_15
+
+jobs:
+  test:
+    parameters:
+      executor:
+        type: executor
+    executor: <<parameters.executor>>
+    steps:
+      - run:
+          name: Adding GOPATH bin to PATH
+          command: echo 'export PATH="$PATH:$(go env GOPATH)/bin"' >> "$BASH_ENV"
+      - run:
+          name: Install goveralls
+          command: go get github.com/mattn/goveralls
+      - run:
+          name: Install gotestsum
+          command: |
+            curl -fsSL 'https://github.com/gotestyourself/gotestsum/releases/download/v1.6.2/gotestsum_1.6.2_linux_amd64.tar.gz' \
+              | $([[ $EUID -ne 0 ]] && echo sudo) tar -C '/usr/local/bin' -zxv gotestsum
+
+      - checkout
+      - run: mkdir -p test-results
+      - run:
+          name: Download dependencies
+          command: go mod download
+
+      - run:
+          name: Run tests
+          command: gotestsum --junitfile test-results/junit.xml -- -coverprofile=test-results/covprofile ./...
+          environment:
+            SQLX_MYSQL_DSN: 'user:password@/sqlxtest?parseTime=true'
+            SQLX_POSTGRES_DSN: 'postgres://user:password@localhost/sqlxtest?sslmode=disable'
+            SQLX_SQLITE_DSN: '/dev/shm/sqlxtest.db'
+
+      - store_artifacts:
+          path: test-results
+      - store_test_results:
+          path: test-results
+      - run:
+          name: Upload coverage
+          command: >
+            goveralls
+            -jobid '<<pipeline.number>>'
+            -flagname "${CIRCLE_JOB}"
+            -coverprofile 'test-results/covprofile'
+            -service 'circle-ci'
+
+x-references:
+  postgres-image: &postgres-image
+    image: circleci/postgres:latest-ram
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: sqlxtest
+
+  mysql-image: &mysql-image
+    image: circleci/mysql:latest-ram
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      MYSQL_DATABASE: sqlxtest
+
+executors:
+  go_11:
+    docker:
+      - image: cimg/go:1.11
+      - *postgres-image
+      - *mysql-image
+  go_12:
+    docker:
+      - image: cimg/go:1.12
+      - *postgres-image
+      - *mysql-image
+  go_13:
+    docker:
+      - image: cimg/go:1.13
+      - *postgres-image
+      - *mysql-image
+  go_14:
+    docker:
+      - image: cimg/go:1.14
+      - *postgres-image
+      - *mysql-image
+  go_15:
+    docker:
+      - image: cimg/go:1.15
+      - *postgres-image
+      - *mysql-image

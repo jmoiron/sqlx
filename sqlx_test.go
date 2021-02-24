@@ -229,16 +229,22 @@ func RunWithSchema(schema Schema, t *testing.T, test func(db *DB, t *testing.T, 
 	}
 
 	if TestPostgres {
-		create, drop, now := schema.Postgres()
-		runner(pgdb, t, create, drop, now)
+		t.Run("postgres", func(t *testing.T) {
+			create, drop, now := schema.Postgres()
+			runner(pgdb, t, create, drop, now)
+		})
 	}
 	if TestSqlite {
-		create, drop, now := schema.Sqlite3()
-		runner(sldb, t, create, drop, now)
+		t.Run("sqlite", func(t *testing.T) {
+			create, drop, now := schema.Sqlite3()
+			runner(sldb, t, create, drop, now)
+		})
 	}
 	if TestMysql {
-		create, drop, now := schema.MySQL()
-		runner(mysqldb, t, create, drop, now)
+		t.Run("mysql", func(t *testing.T) {
+			create, drop, now := schema.MySQL()
+			runner(mysqldb, t, create, drop, now)
+		})
 	}
 }
 

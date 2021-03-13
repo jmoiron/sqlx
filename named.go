@@ -232,6 +232,7 @@ func fixBound(bound string, loop int) string {
 		return bound
 	}
 	var buffer bytes.Buffer
+
 	buffer.WriteString(bound[0:loc[1]])
 	for i := 0; i < loop-1; i++ {
 		buffer.WriteString(",")

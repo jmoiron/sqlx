@@ -340,6 +340,7 @@ func TestNamedBulkInsert(t *testing.T) {
 			q:        "INSERT INTO val (k,v) VALUES ( :k, :v )",
 			expected: "INSERT INTO val (k,v) VALUES ( ?, ? ),( ?, ? )",
 		},
+		// sql functions (0 arguments)
 		{
 			values: []interface{}{vs[0], vs[1]},
 			q: func() string {
@@ -363,6 +364,12 @@ func TestNamedBulkInsert(t *testing.T) {
 				return fmt.Sprintf("INSERT INTO val (k, v, added_at) VALUES (:k, :v, %v)", now)
 			}(),
 			expected: "INSERT INTO val (k, v, added_at) VALUES (?, ?, CURRENT_TIMESTAMP),(?, ?, CURRENT_TIMESTAMP)",
+		},
+		// extra operation
+		{
+			values:   []interface{}{vs[0], vs[1]},
+			q:        "INSERT INTO val (k,v) VALUES (:k,:v) ON DUPLICATE KEY UPDATE v = VALUES(v)",
+			expected: "INSERT INTO val (k,v) VALUES (?,?),(?,?) ON DUPLICATE KEY UPDATE v = VALUES(v)",
 		},
 	}
 

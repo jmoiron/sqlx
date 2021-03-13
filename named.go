@@ -224,19 +224,18 @@ func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper)
 	return bound, arglist, nil
 }
 
-var valueBracketReg = regexp.MustCompile(`\([^()]+(?:\(\s*\))?(?:\s*,\s*[^()]+(?:\(\s*\))?)*\)\s*$`)
+var valueBracketReg = regexp.MustCompile(`(?i)(VALUES\s+)\([^()]+(?:\(\s*\))?(?:\s*,\s*[^()]+(?:\(\s*\))?)*\)`)
 
 func fixBound(bound string, loop int) string {
-	loc := valueBracketReg.FindStringIndex(bound)
-	if len(loc) != 2 {
+	loc := valueBracketReg.FindStringSubmatchIndex(bound)
+	if len(loc) != 4 {
 		return bound
 	}
 	var buffer bytes.Buffer
-
 	buffer.WriteString(bound[0:loc[1]])
 	for i := 0; i < loop-1; i++ {
 		buffer.WriteString(",")
-		buffer.WriteString(bound[loc[0]:loc[1]])
+		buffer.WriteString(bound[loc[3]:loc[1]])
 	}
 	buffer.WriteString(bound[loc[1]:])
 	return buffer.String()

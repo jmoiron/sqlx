@@ -340,6 +340,30 @@ func TestNamedBulkInsert(t *testing.T) {
 			q:        "INSERT INTO val (k,v) VALUES ( :k, :v )",
 			expected: "INSERT INTO val (k,v) VALUES ( ?, ? ),( ?, ? )",
 		},
+		{
+			values: []interface{}{vs[0], vs[1]},
+			q: func() string {
+				_, _, now := defaultSchema.Postgres()
+				return fmt.Sprintf("INSERT INTO val (k, v, added_at) VALUES (:k, :v, %v)", now)
+			}(),
+			expected: "INSERT INTO val (k, v, added_at) VALUES (?, ?, now()),(?, ?, now())",
+		},
+		{
+			values: []interface{}{vs[0], vs[1]},
+			q: func() string {
+				_, _, now := defaultSchema.MySQL()
+				return fmt.Sprintf("INSERT INTO val (k, v, added_at) VALUES (:k, :v, %v)", now)
+			}(),
+			expected: "INSERT INTO val (k, v, added_at) VALUES (?, ?, now()),(?, ?, now())",
+		},
+		{
+			values: []interface{}{vs[0], vs[1]},
+			q: func() string {
+				_, _, now := defaultSchema.Sqlite3()
+				return fmt.Sprintf("INSERT INTO val (k, v, added_at) VALUES (:k, :v, %v)", now)
+			}(),
+			expected: "INSERT INTO val (k, v, added_at) VALUES (?, ?, CURRENT_TIMESTAMP),(?, ?, CURRENT_TIMESTAMP)",
+		},
 	}
 
 	for _, test := range table {

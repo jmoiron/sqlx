@@ -328,6 +328,16 @@ func TestNamedBulkInsert(t *testing.T) {
 			q:        "INSERT INTO val (k,v) VALUES (:k,:v)",
 			expected: "INSERT INTO val (k,v) VALUES (?,?),(?,?)",
 		},
+		{
+			values:   []interface{}{vs[0]},
+			q:        "INSERT INTO val (k,v) VALUES ( :k, :v )",
+			expected: "INSERT INTO val (k,v) VALUES ( ?, ? )",
+		},
+		{
+			values:   []interface{}{vs[0], vs[1]},
+			q:        "INSERT INTO val (k,v) VALUES ( :k, :v )",
+			expected: "INSERT INTO val (k,v) VALUES ( ?, ? ),( ?, ? )",
+		},
 	}
 
 	for _, test := range table {

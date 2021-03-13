@@ -104,6 +104,7 @@ type Test struct {
 }
 
 func (t Test) Error(err error, msg ...interface{}) {
+	t.t.Helper()
 	if err != nil {
 		if len(msg) == 0 {
 			t.t.Error(err)
@@ -114,6 +115,7 @@ func (t Test) Error(err error, msg ...interface{}) {
 }
 
 func (t Test) Errorf(err error, format string, args ...interface{}) {
+	t.t.Helper()
 	if err != nil {
 		t.t.Errorf(format, args...)
 	}

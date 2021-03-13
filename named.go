@@ -225,6 +225,7 @@ func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper)
 }
 
 var valueBracketReg = regexp.MustCompile(`\([^)]+(?:\s*,\s*[^)]+)*\)\s*$`)
+
 func fixBound(bound string, loop int) string {
 	loc := valueBracketReg.FindStringIndex(bound)
 	if len(loc) != 2 {

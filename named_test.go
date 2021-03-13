@@ -296,3 +296,47 @@ func TestNamedQueries(t *testing.T) {
 
 	})
 }
+
+func TestNamedBulkInsert(t *testing.T) {
+	type Val struct {
+		K string `db:"k"`
+		V int    `db:"v"`
+	}
+
+	vs := []Val{{K: "x"}, {K: "y"}, {K: "z"}}
+	table := []struct {
+		values      []interface{}
+		q, expected string
+	}{
+		{
+			values:   []interface{}{vs[0]},
+			q:        "INSERT INTO val (k) VALUES (:k)",
+			expected: "INSERT INTO val (k) VALUES (?)",
+		},
+		{
+			values:   []interface{}{vs[0], vs[1]},
+			q:        "INSERT INTO val (k) VALUES (:k)",
+			expected: "INSERT INTO val (k) VALUES (?),(?)",
+		},
+		{
+			values:   []interface{}{vs[0]},
+			q:        "INSERT INTO val (k,v) VALUES (:k,:v)",
+			expected: "INSERT INTO val (k,v) VALUES (?,?)",
+		},
+		{
+			values:   []interface{}{vs[0], vs[1]},
+			q:        "INSERT INTO val (k,v) VALUES (:k,:v)",
+			expected: "INSERT INTO val (k,v) VALUES (?,?),(?,?)",
+		},
+	}
+
+	for _, test := range table {
+		actual, _, err := Named(test.q, test.values)
+		if err != nil {
+			t.Fatalf("unexpected error %+v, when len(values) == %d", err, len(test.values))
+		}
+		if test.expected != actual {
+			t.Errorf("expected query is (len(values) == %d)\n\t%q\nbut actual result is\n\t%q", len(test.values), test.expected, actual)
+		}
+	}
+}

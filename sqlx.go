@@ -936,6 +936,24 @@ func structOnlyError(t reflect.Type) error {
 	return fmt.Errorf("expected a struct, but struct %s has no exported fields", t.Name())
 }
 
+//getField
+func getField(v reflect.Value) (field []reflect.Value) {
+	v = v.Elem()
+	for i := 0; i < v.NumField(); i++ {
+		f := v.Field(i)
+		if f.Kind() == reflect.Ptr {
+			child := reflect.New(f.Type().Elem())
+			v.Field(i).Set(child)
+			for j := 0; j < child.Elem().NumField(); j++ {
+				field = append(field, v.FieldByIndex([]int{i, j}))
+			}
+		} else {
+			field = append(field, v.Field(i))
+		}
+	}
+	return field
+}
+
 // scanAll scans all rows into a destination, which must be a slice of any
 // type.  If the destination slice type is a Struct, then StructScan will be
 // used on each row.  If the destination is some other kind of base type, then
@@ -990,20 +1008,20 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 
 	if !scannable {
 		// var values []interface{}
-		var m *reflectx.Mapper
+		// var m *reflectx.Mapper
 
-		switch rows.(type) {
-		case *Rows:
-			m = rows.(*Rows).Mapper
-		default:
-			m = mapper()
-		}
+		// switch rows.(type) {
+		// case *Rows:
+		// 	m = rows.(*Rows).Mapper
+		// default:
+		// 	m = mapper()
+		// }
 
-		fields := m.TraversalsByName(base, columns)
-		// if we are not unsafe and are missing fields, return an error
-		if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
-			return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
-		}
+		// fields := m.TraversalsByName(base, columns)
+		// // if we are not unsafe and are missing fields, return an error
+		// if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
+		// 	return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
+		// }
 		values := make([]sql.RawBytes, len(columns))
 
 		scanArgs := make([]interface{}, len(values))
@@ -1012,7 +1030,8 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 		for rows.Next() {
 			// create a new struct type (which returns PtrTo) and indirect it
 			vp = reflect.New(base)
-			v = reflect.Indirect(vp)
+			feilds := getField(vp)
+
 			// err = fieldsByTraversal(v, fields, values, true)
 			// if err != nil {
 			// 	return err
@@ -1028,8 +1047,11 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 				return err
 			}
 
-			for i, val := range values {
-				field := vp.Elem().Field(i)
+			for j, val := range values {
+				if j > len(feilds) {
+					return fmt.Errorf("db field length %d > entify length %d field", j, len(feilds))
+				}
+				field := feilds[j]
 
 				if len(val) == 0 {
 					continue

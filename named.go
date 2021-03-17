@@ -224,11 +224,36 @@ func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper)
 	return bound, arglist, nil
 }
 
-var valueBracketReg = regexp.MustCompile(`\([^(]*.[^(]\)\s*$`)
+func findLocs(bound string) (int, int) {
+	firstParamStart := strings.Index(bound, "?")
+
+	// Find first '(' working backwards from the first parameter.
+	// This assumes parameters only appear inside parentheses for bound arrays.
+	var loc1 int
+	for i := firstParamStart; i > 0; i-- {
+		r := []rune(bound)[i]
+		if r == '(' {
+			loc1 = i
+			break
+		}
+	}
+
+	// Find last ')' in query. Just work backwards from end of query.
+	var loc2 int
+	for i := len(bound) - 1; i > firstParamStart; i-- {
+		r := []rune(bound)[i]
+		if r == ')' {
+			loc2 = i + 1
+			break
+		}
+	}
+
+	return loc1, loc2
+}
 
 func fixBound(bound string, loop int) string {
-	loc := valueBracketReg.FindStringIndex(bound)
-	if len(loc) != 2 {
+	loc1, loc2 := findLocs(bound)
+	if loc1 == 0 || loc2 == 0 {
 		return bound
 	}
 	var buffer bytes.Buffer

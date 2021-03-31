@@ -3,6 +3,7 @@ package sqlx
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"testing"
 )
 
@@ -352,4 +353,17 @@ func TestFixBounds(t *testing.T) {
 		})
 	}
 
+	t.Run("regex changed", func(t *testing.T) {
+		var valueBracketRegChanged = regexp.MustCompile(`(VALUES)\s+(\([^(]*.[^(]\))`)
+		saveRegexp := valueBracketReg
+		defer func() {
+			valueBracketReg = saveRegexp
+		}()
+		valueBracketReg = valueBracketRegChanged
+
+		res := fixBound("VALUES (:a, :b)", 2)
+		if res != "VALUES (:a, :b)" {
+			t.Errorf("changed regex should return string")
+		}
+	})
 }

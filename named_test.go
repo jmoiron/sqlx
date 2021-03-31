@@ -299,3 +299,57 @@ func TestNamedQueries(t *testing.T) {
 
 	})
 }
+
+func TestFixBounds(t *testing.T) {
+	table := []struct {
+		name, query, expect string
+		loop                int
+	}{
+		{
+			name:   `named syntax`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `mysql syntax`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?),(?, ?, ?, ?)`,
+			loop:   2,
+		},
+		{
+			name:   `named syntax w/ trailer`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) ;--`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last) ;--`,
+			loop:   2,
+		},
+		{
+			name:   `mysql syntax w/ trailer`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?) ;--`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?),(?, ?, ?, ?) ;--`,
+			loop:   2,
+		},
+		{
+			name:   `not found test`,
+			query:  `INSERT INTO foo (a,b,c,d) (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) (:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `found twice test`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			loop:   2,
+		},
+	}
+
+	for _, tc := range table {
+		t.Run(tc.name, func(t *testing.T) {
+			res := fixBound(tc.query, tc.loop)
+			if res != tc.expect {
+				t.Errorf("mismatched results")
+			}
+		})
+	}
+
+}

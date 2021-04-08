@@ -342,6 +342,24 @@ func TestFixBounds(t *testing.T) {
 			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
 			loop:   2,
 		},
+		{
+			name:   `lowercase`,
+			query:  `INSERT INTO foo (a,b,c,d) values (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) values (:name, :age, :first, :last),(:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `not blank space`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES(:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES(:name, :age, :first, :last),(:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `capital letter`,
+			query:  `INSERT INTO foo (a,b,c,d) Values(:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) Values(:name, :age, :first, :last),(:name, :age, :first, :last)`,
+			loop:   2,
+		},
 	}
 
 	for _, tc := range table {
@@ -354,7 +372,7 @@ func TestFixBounds(t *testing.T) {
 	}
 
 	t.Run("regex changed", func(t *testing.T) {
-		var valueBracketRegChanged = regexp.MustCompile(`(VALUES)\s+(\([^(]*.[^(]\))`)
+		var valueBracketRegChanged = regexp.MustCompile(`(?i:VALUES)\s*(\([^(]*.[^(]\))`)
 		saveRegexp := valueBracketReg
 		defer func() {
 			valueBracketReg = saveRegexp
@@ -362,7 +380,7 @@ func TestFixBounds(t *testing.T) {
 		valueBracketReg = valueBracketRegChanged
 
 		res := fixBound("VALUES (:a, :b)", 2)
-		if res != "VALUES (:a, :b)" {
+		if res != "VALUES (:a, :b),(:a, :b)" {
 			t.Errorf("changed regex should return string")
 		}
 	})

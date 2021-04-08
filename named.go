@@ -224,7 +224,7 @@ func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper)
 	return bound, arglist, nil
 }
 
-var valueBracketReg = regexp.MustCompile(`VALUES\s+(\([^(]*.[^(]\))`)
+var valueBracketReg = regexp.MustCompile(`(?i:VALUES)\s*(\([^(]*.[^(]\))`)
 
 func fixBound(bound string, loop int) string {
 	loc := valueBracketReg.FindAllStringSubmatchIndex(bound, -1)

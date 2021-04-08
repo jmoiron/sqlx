@@ -3,6 +3,7 @@ package sqlx
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"testing"
 )
 
@@ -202,7 +203,10 @@ func TestNamedQueries(t *testing.T) {
 			{FirstName: "Ngani", LastName: "Laumape", Email: "nlaumape@ab.co.nz"},
 		}
 
-		insert := fmt.Sprintf("INSERT INTO person (first_name, last_name, email, added_at) VALUES (:first_name, :last_name, :email, %v)\n", now)
+		insert := fmt.Sprintf(
+			"INSERT INTO person (first_name, last_name, email, added_at) VALUES (:first_name, :last_name, :email, %v)\n",
+			now,
+		)
 		_, err = db.NamedExec(insert, sls)
 		test.Error(err)
 
@@ -214,7 +218,7 @@ func TestNamedQueries(t *testing.T) {
 		}
 
 		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
-			VALUES (:first_name, :last_name, :email) `, slsMap)
+			VALUES (:first_name, :last_name, :email) ;--`, slsMap)
 		test.Error(err)
 
 		type A map[string]interface{}
@@ -226,7 +230,7 @@ func TestNamedQueries(t *testing.T) {
 		}
 
 		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
-			VALUES (:first_name, :last_name, :email) `, typedMap)
+			VALUES (:first_name, :last_name, :email) ;--`, typedMap)
 		test.Error(err)
 
 		for _, p := range sls {
@@ -294,5 +298,72 @@ func TestNamedQueries(t *testing.T) {
 			t.Errorf("expected %s, got %s", sl.Email, p2.Email)
 		}
 
+	})
+}
+
+func TestFixBounds(t *testing.T) {
+	table := []struct {
+		name, query, expect string
+		loop                int
+	}{
+		{
+			name:   `named syntax`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `mysql syntax`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?),(?, ?, ?, ?)`,
+			loop:   2,
+		},
+		{
+			name:   `named syntax w/ trailer`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) ;--`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last) ;--`,
+			loop:   2,
+		},
+		{
+			name:   `mysql syntax w/ trailer`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?) ;--`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?),(?, ?, ?, ?) ;--`,
+			loop:   2,
+		},
+		{
+			name:   `not found test`,
+			query:  `INSERT INTO foo (a,b,c,d) (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) (:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `found twice test`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			loop:   2,
+		},
+	}
+
+	for _, tc := range table {
+		t.Run(tc.name, func(t *testing.T) {
+			res := fixBound(tc.query, tc.loop)
+			if res != tc.expect {
+				t.Errorf("mismatched results")
+			}
+		})
+	}
+
+	t.Run("regex changed", func(t *testing.T) {
+		var valueBracketRegChanged = regexp.MustCompile(`(VALUES)\s+(\([^(]*.[^(]\))`)
+		saveRegexp := valueBracketReg
+		defer func() {
+			valueBracketReg = saveRegexp
+		}()
+		valueBracketReg = valueBracketRegChanged
+
+		res := fixBound("VALUES (:a, :b)", 2)
+		if res != "VALUES (:a, :b)" {
+			t.Errorf("changed regex should return string")
+		}
 	})
 }

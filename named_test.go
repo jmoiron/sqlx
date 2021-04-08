@@ -337,12 +337,6 @@ func TestFixBounds(t *testing.T) {
 			loop:   2,
 		},
 		{
-			name:   `found twice test`,
-			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
-			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
-			loop:   2,
-		},
-		{
 			name:   `nospace`,
 			query:  `INSERT INTO foo (a,b) VALUES(:a, :b)`,
 			expect: `INSERT INTO foo (a,b) VALUES(:a, :b),(:a, :b)`,
@@ -354,6 +348,20 @@ func TestFixBounds(t *testing.T) {
 			expect: `INSERT INTO foo (a,b) values(:a, :b),(:a, :b)`,
 			loop:   2,
 		},
+		{
+			name:   `mysql values syntax test`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE a=VALUES(a),b=VALUES(b),c=VALUES(c),d=VALUES(d)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?),(?, ?, ?, ?) ON DUPLICATE KEY UPDATE a=VALUES(a),b=VALUES(b),c=VALUES(c),d=VALUES(d)`,
+			loop:   2,
+		},
+		// This is invalid SQL, but expected behavior to support the above mysql behavior
+		// garbage in, garbage out.  sqlx does not detect already-broken SQL by design
+		{
+			name:   `found twice test`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			loop:   2,
+		},
 	}
 
 	for _, tc := range table {
@@ -361,6 +369,8 @@ func TestFixBounds(t *testing.T) {
 			res := fixBound(tc.query, tc.loop)
 			if res != tc.expect {
 				t.Errorf("mismatched results")
+				t.Logf("expected: %s", tc.expect)
+				t.Logf("actual: %s", res)
 			}
 		})
 	}

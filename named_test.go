@@ -342,6 +342,18 @@ func TestFixBounds(t *testing.T) {
 			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
 			loop:   2,
 		},
+		{
+			name:   `nospace`,
+			query:  `INSERT INTO foo (a,b) VALUES(:a, :b)`,
+			expect: `INSERT INTO foo (a,b) VALUES(:a, :b),(:a, :b)`,
+			loop:   2,
+		},
+		{
+			name:   `lowercase`,
+			query:  `INSERT INTO foo (a,b) values(:a, :b)`,
+			expect: `INSERT INTO foo (a,b) values(:a, :b),(:a, :b)`,
+			loop:   2,
+		},
 	}
 
 	for _, tc := range table {

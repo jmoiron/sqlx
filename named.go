@@ -100,11 +100,11 @@ func (n *NamedStmt) QueryRowx(arg interface{}) *Row {
 // Any named placeholder parameters are replaced with fields from arg.
 func (n *NamedStmt) Select(dest interface{}, arg interface{}) error {
 	rows, err := n.Queryx(arg)
+	// if something happens here, we want to make sure the rows are Closed
+	defer rows.Close()
 	if err != nil {
 		return err
 	}
-	// if something happens here, we want to make sure the rows are Closed
-	defer rows.Close()
 	return scanAll(rows, dest, false)
 }
 

@@ -3,7 +3,6 @@ package sqlx
 import (
 	"database/sql"
 	"fmt"
-	"regexp"
 	"testing"
 )
 
@@ -358,20 +357,32 @@ func TestFixBounds(t *testing.T) {
 		},
 		{
 			name:   `on duplicate key using VALUES`,
-			query:  `INSERT INTO foo (a,b) VALUES(:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
-			expect: `INSERT INTO foo (a,b) VALUES(:a, :b),(:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
+			query:  `INSERT INTO foo (a,b) VALUES (:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
+			expect: `INSERT INTO foo (a,b) VALUES (:a, :b),(:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
 			loop:   2,
 		},
 		{
 			name:   `single column`,
-			query:  `INSERT INTO foo (a) VALUES(:a)`,
-			expect: `INSERT INTO foo (a) VALUES(:a),(:a)`,
+			query:  `INSERT INTO foo (a) VALUES (:a)`,
+			expect: `INSERT INTO foo (a) VALUES (:a),(:a)`,
 			loop:   2,
 		},
 		{
 			name:   `call now`,
-			query:  `INSERT INTO foo (a, b) VALUES(:a, NOW())`,
-			expect: `INSERT INTO foo (a, b) VALUES(:a, NOW()),(:a, NOW())`,
+			query:  `INSERT INTO foo (a, b) VALUES (:a, NOW())`,
+			expect: `INSERT INTO foo (a, b) VALUES (:a, NOW()),(:a, NOW())`,
+			loop:   2,
+		},
+		{
+			name:   `two level depth function call`,
+			query:  `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW()))`,
+			expect: `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW())),(:a, YEAR(NOW()))`,
+			loop:   2,
+		},
+		{
+			name:   `missing closing bracket`,
+			query:  `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW())`,
+			expect: `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW())`,
 			loop:   2,
 		},
 	}
@@ -384,18 +395,4 @@ func TestFixBounds(t *testing.T) {
 			}
 		})
 	}
-
-	t.Run("regex changed", func(t *testing.T) {
-		var valueBracketRegChanged = regexp.MustCompile(`(VALUES)\s+(\([^(]*.[^(]\))`)
-		saveRegexp := valueBracketReg
-		defer func() {
-			valueBracketReg = saveRegexp
-		}()
-		valueBracketReg = valueBracketRegChanged
-
-		res := fixBound("VALUES (:a, :b)", 2)
-		if res != "VALUES (:a, :b)" {
-			t.Errorf("changed regex should return string")
-		}
-	})
 }

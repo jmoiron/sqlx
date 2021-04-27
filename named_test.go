@@ -105,6 +105,7 @@ type Test struct {
 }
 
 func (t Test) Error(err error, msg ...interface{}) {
+	t.t.Helper()
 	if err != nil {
 		if len(msg) == 0 {
 			t.t.Error(err)
@@ -115,6 +116,7 @@ func (t Test) Error(err error, msg ...interface{}) {
 }
 
 func (t Test) Errorf(err error, format string, args ...interface{}) {
+	t.t.Helper()
 	if err != nil {
 		t.t.Errorf(format, args...)
 	}
@@ -339,7 +341,7 @@ func TestFixBounds(t *testing.T) {
 		{
 			name:   `found twice test`,
 			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
-			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
 			loop:   2,
 		},
 		{
@@ -352,6 +354,24 @@ func TestFixBounds(t *testing.T) {
 			name:   `lowercase`,
 			query:  `INSERT INTO foo (a,b) values(:a, :b)`,
 			expect: `INSERT INTO foo (a,b) values(:a, :b),(:a, :b)`,
+			loop:   2,
+		},
+		{
+			name:   `on duplicate key using VALUES`,
+			query:  `INSERT INTO foo (a,b) VALUES(:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
+			expect: `INSERT INTO foo (a,b) VALUES(:a, :b),(:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
+			loop:   2,
+		},
+		{
+			name:   `single column`,
+			query:  `INSERT INTO foo (a) VALUES(:a)`,
+			expect: `INSERT INTO foo (a) VALUES(:a),(:a)`,
+			loop:   2,
+		},
+		{
+			name:   `call now`,
+			query:  `INSERT INTO foo (a, b) VALUES(:a, NOW())`,
+			expect: `INSERT INTO foo (a, b) VALUES(:a, NOW()),(:a, NOW())`,
 			loop:   2,
 		},
 	}

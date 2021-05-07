@@ -245,7 +245,7 @@ func findMatchingClosingBracketIndex(s string) int {
 func fixBound(bound string, loop int) string {
 	loc := valuesReg.FindStringIndex(bound)
 	// defensive guard when "VALUES (...)" not found
-	if len(loc) < 1 {
+	if len(loc) < 2 {
 		return bound
 	}
 

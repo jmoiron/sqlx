@@ -391,6 +391,37 @@ func TestFixBounds(t *testing.T) {
 			expect: `INSERT INTO table_values (a, b) VALUES (:a, :b),(:a, :b)`,
 			loop:   2,
 		},
+		{
+			name: `multiline indented query`,
+			query: `INSERT INTO foo (
+		a,
+		b,
+		c,
+		d
+	) VALUES (
+		:name,
+		:age,
+		:first,
+		:last
+	)`,
+			expect: `INSERT INTO foo (
+		a,
+		b,
+		c,
+		d
+	) VALUES (
+		:name,
+		:age,
+		:first,
+		:last
+	),(
+		:name,
+		:age,
+		:first,
+		:last
+	)`,
+			loop: 2,
+		},
 	}
 
 	for _, tc := range table {

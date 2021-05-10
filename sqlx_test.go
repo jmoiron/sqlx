@@ -23,6 +23,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/lib/pq"
 	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
@@ -1491,6 +1492,68 @@ func TestIssue197(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Fail()
+	})
+}
+
+func TestInStringSlices(t *testing.T) {
+	// some quite normal situations
+	type tr struct {
+		q    string
+		args []interface{}
+		c    int
+	}
+	tests := []tr{
+		// pq.StringArrays get passed into sqlx.In in the failed premerge tests: 
+		// https://sourcegraph.iap.tmachine.io/git.gaia.tmachine.io/diffusion/CORE/-/blob/vault/payment_hub/payments/credit_transfer_api/payments/db/list_payments.go?subtree=true#L356:1
+
+		{"SELECT * FROM foo WHERE x = ? AND y in (?)",
+			[]interface{}{1, pq.StringArray([]string{"MyAccountID"})},
+		2},
+		{"SELECT * FROM foo WHERE x = ? AND y in (?)",
+			[]interface{}{0, pq.StringArray([]string{"MyAccountID", "MySchemeID"})},
+		3},
+	}
+	for _, test := range tests {
+		q, a, err := In(test.q, test.args...)
+		if err != nil {
+			t.Error(err)
+		}
+		for _, arg := range a {
+			log.Printf("arg = %v, type = %v", arg, reflect.TypeOf(arg))
+		}
+		if len(a) != test.c {
+			t.Errorf("Expected %d args, but got %d (%+v)", test.c, len(a), a)
+		}
+		if strings.Count(q, "?") != test.c {
+			t.Errorf("Expected %d bindVars, got %d", test.c, strings.Count(q, "?"))
+		}
+	}
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		//tx.MustExec(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
+		//tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
+		//tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
+		telcodes := []int{852, 65}
+		q := "SELECT * FROM place WHERE telcode IN(?) ORDER BY telcode"
+		query, args, err := In(q, telcodes)
+		if err != nil {
+			t.Error(err)
+		}
+		query = db.Rebind(query)
+		places := []Place{}
+		err = db.Select(&places, query, args...)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(places) != 2 {
+			t.Fatalf("Expecting 2 results, got %d", len(places))
+		}
+		if places[0].TelCode != 65 {
+			t.Errorf("Expecting singapore first, but got %#v", places[0])
+		}
+		if places[1].TelCode != 852 {
+			t.Errorf("Expecting hong kong second, but got %#v", places[1])
+		}
 	})
 }
 

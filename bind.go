@@ -2,7 +2,7 @@ package sqlx
 
 import (
 	"bytes"
-	"database/sql/driver"
+	//"database/sql/driver"
 	"errors"
 	"reflect"
 	"strconv"
@@ -116,13 +116,13 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 	meta := make([]argMeta, len(args))
 
 	for i, arg := range args {
-		if a, ok := arg.(driver.Valuer); ok {
-			var err error
-			arg, err = a.Value()
-			if err != nil {
-				return "", nil, err
-			}
-		}
+		//if a, ok := arg.(driver.Valuer); ok {
+		//	var err error
+		//	arg, err = a.Value()
+		//	if err != nil {
+		//		return "", nil, err
+		//	}
+		//}
 		v := reflect.ValueOf(arg)
 		t := reflectx.Deref(v.Type())
 

@@ -224,29 +224,47 @@ func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper)
 	return bound, arglist, nil
 }
 
-var valueBracketReg = regexp.MustCompile(`(?i)VALUES\s*(\([^(]*.[^(]\))`)
+var valuesReg = regexp.MustCompile(`\)\s*(?i)VALUES\s*\(`)
+
+func findMatchingClosingBracketIndex(s string) int {
+	count := 0
+	for i, ch := range s {
+		if ch == '(' {
+			count++
+		}
+		if ch == ')' {
+			count--
+			if count == 0 {
+				return i
+			}
+		}
+	}
+	return 0
+}
 
 func fixBound(bound string, loop int) string {
+	loc := valuesReg.FindStringIndex(bound)
+	// defensive guard when "VALUES (...)" not found
+	if len(loc) < 2 {
+		return bound
+	}
 
-	loc := valueBracketReg.FindAllStringSubmatchIndex(bound, -1)
-	// Either no VALUES () found or more than one found??
-	if len(loc) != 1 {
+	openingBracketIndex := loc[1] - 1
+	index := findMatchingClosingBracketIndex(bound[openingBracketIndex:])
+	// defensive guard. must have closing bracket
+	if index == 0 {
 		return bound
 	}
-	// defensive guard. loc should be len 4 representing the starting and
-	// ending index for the whole regex match and the starting + ending
-	// index for the single inside group
-	if len(loc[0]) != 4 {
-		return bound
-	}
+	closingBracketIndex := openingBracketIndex + index + 1
+
 	var buffer bytes.Buffer
 
-	buffer.WriteString(bound[0:loc[0][1]])
+	buffer.WriteString(bound[0:closingBracketIndex])
 	for i := 0; i < loop-1; i++ {
 		buffer.WriteString(",")
-		buffer.WriteString(bound[loc[0][2]:loc[0][3]])
+		buffer.WriteString(bound[openingBracketIndex:closingBracketIndex])
 	}
-	buffer.WriteString(bound[loc[0][1]:])
+	buffer.WriteString(bound[closingBracketIndex:])
 	return buffer.String()
 }
 

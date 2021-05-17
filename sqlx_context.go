@@ -358,6 +358,12 @@ func (tx *Tx) NamedExecContext(ctx context.Context, query string, arg interface{
 	return NamedExecContext(ctx, tx, query, arg)
 }
 
+// NamedQueryContext using this Tx.
+// Any named placeholder parameters are replaced with fields from arg.
+func (tx *Tx) NamedQueryContext(ctx context.Context, query string, arg interface{}) (*Rows, error) {
+	return NamedQueryContext(ctx, tx, query, arg)
+}
+
 // SelectContext using the prepared statement.
 // Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) SelectContext(ctx context.Context, dest interface{}, args ...interface{}) error {

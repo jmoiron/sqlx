@@ -141,12 +141,51 @@ func TestBasicEmbeddedWithTags(t *testing.T) {
 	// }
 
 	v := m.FieldByName(zv, "a")
-	if ival(v) != z.Bar.Foo.A { // the dominant field
-		t.Errorf("Expecting %d, got %d", z.Bar.Foo.A, ival(v))
+	if ival(v) != z.A { // the dominant field
+		t.Errorf("Expecting %d, got %d", z.A, ival(v))
 	}
 	v = m.FieldByName(zv, "b")
 	if ival(v) != z.B {
 		t.Errorf("Expecting %d, got %d", z.B, ival(v))
+	}
+}
+
+func TestBasicEmbeddedWithSameName(t *testing.T) {
+	type Foo struct {
+		A   int `db:"a"`
+		Foo int `db:"Foo"` // Same name as the embedded struct
+	}
+
+	type FooExt struct {
+		Foo
+		B int `db:"b"`
+	}
+
+	m := NewMapper("db")
+
+	z := FooExt{}
+	z.A = 1
+	z.B = 2
+	z.Foo.Foo = 3
+
+	zv := reflect.ValueOf(z)
+	fields := m.TypeMap(reflect.TypeOf(z))
+
+	if len(fields.Index) != 4 {
+		t.Errorf("Expecting 3 fields, found %d", len(fields.Index))
+	}
+
+	v := m.FieldByName(zv, "a")
+	if ival(v) != z.A { // the dominant field
+		t.Errorf("Expecting %d, got %d", z.A, ival(v))
+	}
+	v = m.FieldByName(zv, "b")
+	if ival(v) != z.B {
+		t.Errorf("Expecting %d, got %d", z.B, ival(v))
+	}
+	v = m.FieldByName(zv, "Foo")
+	if ival(v) != z.Foo.Foo {
+		t.Errorf("Expecting %d, got %d", z.Foo.Foo, ival(v))
 	}
 }
 

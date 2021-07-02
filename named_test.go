@@ -2,6 +2,7 @@ package sqlx
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 )
 
@@ -103,6 +104,7 @@ type Test struct {
 }
 
 func (t Test) Error(err error, msg ...interface{}) {
+	t.t.Helper()
 	if err != nil {
 		if len(msg) == 0 {
 			t.t.Error(err)
@@ -113,13 +115,24 @@ func (t Test) Error(err error, msg ...interface{}) {
 }
 
 func (t Test) Errorf(err error, format string, args ...interface{}) {
+	t.t.Helper()
 	if err != nil {
 		t.t.Errorf(format, args...)
 	}
 }
 
+func TestEscapedColons(t *testing.T) {
+	t.Skip("not sure it is possible to support this in general case without an SQL parser")
+	var qs = `SELECT * FROM testtable WHERE timeposted BETWEEN (now() AT TIME ZONE 'utc') AND
+	(now() AT TIME ZONE 'utc') - interval '01:30:00') AND name = '\'this is a test\'' and id = :id`
+	_, _, err := compileNamedQuery([]byte(qs), DOLLAR)
+	if err != nil {
+		t.Error("Didn't handle colons correctly when inside a string")
+	}
+}
+
 func TestNamedQueries(t *testing.T) {
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
 		test := Test{t}
 		var ns *NamedStmt
@@ -184,15 +197,41 @@ func TestNamedQueries(t *testing.T) {
 			t.Errorf("got %s, expected %s", p.Email, people[0].Email)
 		}
 
-		// test batch inserts
+		// test struct batch inserts
 		sls := []Person{
 			{FirstName: "Ardie", LastName: "Savea", Email: "asavea@ab.co.nz"},
 			{FirstName: "Sonny Bill", LastName: "Williams", Email: "sbw@ab.co.nz"},
 			{FirstName: "Ngani", LastName: "Laumape", Email: "nlaumape@ab.co.nz"},
 		}
 
+		insert := fmt.Sprintf(
+			"INSERT INTO person (first_name, last_name, email, added_at) VALUES (:first_name, :last_name, :email, %v)\n",
+			now,
+		)
+		_, err = db.NamedExec(insert, sls)
+		test.Error(err)
+
+		// test map batch inserts
+		slsMap := []map[string]interface{}{
+			{"first_name": "Ardie", "last_name": "Savea", "email": "asavea@ab.co.nz"},
+			{"first_name": "Sonny Bill", "last_name": "Williams", "email": "sbw@ab.co.nz"},
+			{"first_name": "Ngani", "last_name": "Laumape", "email": "nlaumape@ab.co.nz"},
+		}
+
 		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
-			VALUES (:first_name, :last_name, :email)`, sls)
+			VALUES (:first_name, :last_name, :email) ;--`, slsMap)
+		test.Error(err)
+
+		type A map[string]interface{}
+
+		typedMap := []A{
+			{"first_name": "Ardie", "last_name": "Savea", "email": "asavea@ab.co.nz"},
+			{"first_name": "Sonny Bill", "last_name": "Williams", "email": "sbw@ab.co.nz"},
+			{"first_name": "Ngani", "last_name": "Laumape", "email": "nlaumape@ab.co.nz"},
+		}
+
+		_, err = db.NamedExec(`INSERT INTO person (first_name, last_name, email)
+			VALUES (:first_name, :last_name, :email) ;--`, typedMap)
 		test.Error(err)
 
 		for _, p := range sls {
@@ -261,4 +300,136 @@ func TestNamedQueries(t *testing.T) {
 		}
 
 	})
+}
+
+func TestFixBounds(t *testing.T) {
+	table := []struct {
+		name, query, expect string
+		loop                int
+	}{
+		{
+			name:   `named syntax`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `mysql syntax`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?),(?, ?, ?, ?)`,
+			loop:   2,
+		},
+		{
+			name:   `named syntax w/ trailer`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) ;--`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last) ;--`,
+			loop:   2,
+		},
+		{
+			name:   `mysql syntax w/ trailer`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?) ;--`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?),(?, ?, ?, ?) ;--`,
+			loop:   2,
+		},
+		{
+			name:   `not found test`,
+			query:  `INSERT INTO foo (a,b,c,d) (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) (:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `found twice test`,
+			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `nospace`,
+			query:  `INSERT INTO foo (a,b) VALUES(:a, :b)`,
+			expect: `INSERT INTO foo (a,b) VALUES(:a, :b),(:a, :b)`,
+			loop:   2,
+		},
+		{
+			name:   `lowercase`,
+			query:  `INSERT INTO foo (a,b) values(:a, :b)`,
+			expect: `INSERT INTO foo (a,b) values(:a, :b),(:a, :b)`,
+			loop:   2,
+		},
+		{
+			name:   `on duplicate key using VALUES`,
+			query:  `INSERT INTO foo (a,b) VALUES (:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
+			expect: `INSERT INTO foo (a,b) VALUES (:a, :b),(:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
+			loop:   2,
+		},
+		{
+			name:   `single column`,
+			query:  `INSERT INTO foo (a) VALUES (:a)`,
+			expect: `INSERT INTO foo (a) VALUES (:a),(:a)`,
+			loop:   2,
+		},
+		{
+			name:   `call now`,
+			query:  `INSERT INTO foo (a, b) VALUES (:a, NOW())`,
+			expect: `INSERT INTO foo (a, b) VALUES (:a, NOW()),(:a, NOW())`,
+			loop:   2,
+		},
+		{
+			name:   `two level depth function call`,
+			query:  `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW()))`,
+			expect: `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW())),(:a, YEAR(NOW()))`,
+			loop:   2,
+		},
+		{
+			name:   `missing closing bracket`,
+			query:  `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW())`,
+			expect: `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW())`,
+			loop:   2,
+		},
+		{
+			name:   `table with "values" at the end`,
+			query:  `INSERT INTO table_values (a, b) VALUES (:a, :b)`,
+			expect: `INSERT INTO table_values (a, b) VALUES (:a, :b),(:a, :b)`,
+			loop:   2,
+		},
+		{
+			name: `multiline indented query`,
+			query: `INSERT INTO foo (
+		a,
+		b,
+		c,
+		d
+	) VALUES (
+		:name,
+		:age,
+		:first,
+		:last
+	)`,
+			expect: `INSERT INTO foo (
+		a,
+		b,
+		c,
+		d
+	) VALUES (
+		:name,
+		:age,
+		:first,
+		:last
+	),(
+		:name,
+		:age,
+		:first,
+		:last
+	)`,
+			loop: 2,
+		},
+	}
+
+	for _, tc := range table {
+		t.Run(tc.name, func(t *testing.T) {
+			res := fixBound(tc.query, tc.loop)
+			if res != tc.expect {
+				t.Errorf("mismatched results")
+			}
+		})
+	}
 }

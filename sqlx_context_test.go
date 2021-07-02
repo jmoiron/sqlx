@@ -42,7 +42,7 @@ func MultiExecContext(ctx context.Context, e ExecerContext, query string) {
 }
 
 func RunWithSchemaContext(ctx context.Context, schema Schema, t *testing.T, test func(ctx context.Context, db *DB, t *testing.T)) {
-	runner := func(ctx context.Context, db *DB, t *testing.T, create, drop string) {
+	runner := func(ctx context.Context, db *DB, t *testing.T, create, drop, now string) {
 		defer func() {
 			MultiExecContext(ctx, db, drop)
 		}()
@@ -52,16 +52,16 @@ func RunWithSchemaContext(ctx context.Context, schema Schema, t *testing.T, test
 	}
 
 	if TestPostgres {
-		create, drop := schema.Postgres()
-		runner(ctx, pgdb, t, create, drop)
+		create, drop, now := schema.Postgres()
+		runner(ctx, pgdb, t, create, drop, now)
 	}
 	if TestSqlite {
-		create, drop := schema.Sqlite3()
-		runner(ctx, sldb, t, create, drop)
+		create, drop, now := schema.Sqlite3()
+		runner(ctx, sldb, t, create, drop, now)
 	}
 	if TestMysql {
-		create, drop := schema.MySQL()
-		runner(ctx, mysqldb, t, create, drop)
+		create, drop, now := schema.MySQL()
+		runner(ctx, mysqldb, t, create, drop, now)
 	}
 }
 
@@ -1339,6 +1339,88 @@ func TestEmbeddedLiteralsContext(t *testing.T) {
 		}
 		if *target2.K != "one" {
 			t.Errorf("Expected target2.K to be `one`, got `%v`", target2.K)
+		}
+	})
+}
+
+func TestConn(t *testing.T) {
+	var schema = Schema{
+		create: `
+			CREATE TABLE tt_conn (
+				id integer,
+				value text NULL DEFAULT NULL
+			);`,
+		drop: "drop table tt_conn;",
+	}
+
+	RunWithSchemaContext(context.Background(), schema, t, func(ctx context.Context, db *DB, t *testing.T) {
+		conn, err := db.Connx(ctx)
+		defer conn.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = conn.ExecContext(ctx, conn.Rebind(`INSERT INTO tt_conn (id, value) VALUES (?, ?), (?, ?)`), 1, "a", 2, "b")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		type s struct {
+			ID    int    `db:"id"`
+			Value string `db:"value"`
+		}
+
+		v := []s{}
+
+		err = conn.SelectContext(ctx, &v, "SELECT * FROM tt_conn ORDER BY id ASC")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if v[0].ID != 1 {
+			t.Errorf("Expecting ID of 1, got %d", v[0].ID)
+		}
+
+		v1 := s{}
+		err = conn.GetContext(ctx, &v1, conn.Rebind("SELECT * FROM tt_conn WHERE id=?"), 1)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v1.ID != 1 {
+			t.Errorf("Expecting to get back 1, but got %v\n", v1.ID)
+		}
+
+		stmt, err := conn.PreparexContext(ctx, conn.Rebind("SELECT * FROM tt_conn WHERE id=?"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		v1 = s{}
+		tx, err := conn.BeginTxx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tstmt := tx.Stmtx(stmt)
+		row := tstmt.QueryRowx(1)
+		err = row.StructScan(&v1)
+		if err != nil {
+			t.Error(err)
+		}
+		tx.Commit()
+		if v1.ID != 1 {
+			t.Errorf("Expecting to get back 1, but got %v\n", v1.ID)
+		}
+
+		rows, err := conn.QueryxContext(ctx, "SELECT * FROM tt_conn")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for rows.Next() {
+			err = rows.StructScan(&v1)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	})
 }

@@ -344,7 +344,7 @@ func (db *DB) Beginx() (*Tx, error) {
 	return &Tx{Tx: tx, driverName: db.driverName, unsafe: db.unsafe, Mapper: db.Mapper}, err
 }
 
-// Beginx begins a transaction and returns an *sqlx.Tx instead of an *sql.Tx.
+// BeginTxx begins a transaction with options and returns an *sqlx.Tx instead of an *sql.Tx.
 func (db *DB) BeginTxx(opts *sql.TxOptions) (*Tx, error) {
 	tx, err := db.DB.BeginTx(context.Background(), opts)
 	if err != nil {

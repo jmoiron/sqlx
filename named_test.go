@@ -422,13 +422,37 @@ func TestFixBounds(t *testing.T) {
 	)`,
 			loop: 2,
 		},
+		{
+			name:   `query with "join" generated table`,
+			query:	`
+				SELECT 
+					t_1.code_values, t_2.name, t_2.age, t_2.first, t_2.last  
+				FROM public.table_1 t_1 
+				INNER JOIN 
+					(VALUES (:v_code, :v_name, :v_age, :v_first, :v_last)) 
+					t_2 (code, name, age, first, last)
+				ON
+					t_1.code_values = t_2.code
+			`,
+			expect: `
+				SELECT
+					t_1.code_values, t_2.name, t_2.age, t_2.first, t_2.last  
+				FROM public.table_1 t_1 
+				INNER JOIN 
+					(VALUES (:v_code, :v_name, :v_age, :v_first, :v_last),(:v_code, :v_name, :v_age, :v_first, :v_last)) 
+					t_2 (code, name, age, first, last)
+				ON
+					t_1.code_values = t_2.code
+			`,
+			loop:   2,
+		},
 	}
 
 	for _, tc := range table {
 		t.Run(tc.name, func(t *testing.T) {
 			res := fixBound(tc.query, tc.loop)
 			if res != tc.expect {
-				t.Errorf("mismatched results")
+				t.Errorf("mismatched results\nresult query:%s\nexpected query:%s", res, tc.expect)
 			}
 		})
 	}

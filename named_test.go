@@ -422,6 +422,66 @@ func TestFixBounds(t *testing.T) {
 	)`,
 			loop: 2,
 		},
+		{
+			name: `multiline WITH query`,
+			query: `WITH input_rows(name, age, first, last) AS (
+    VALUES (:name, :age, :first, :last)
+)
+   , ins AS (
+    INSERT INTO co_categories (name, age, first, last)
+        SELECT * FROM input_rows
+        ON CONFLICT (name, age, first, last) DO NOTHING
+        RETURNING id, name, age, first, last
+)
+SELECT id, name, age, first, last FROM ins
+UNION ALL
+SELECT id, name, age, first, last
+FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
+			expect: `WITH input_rows(name, age, first, last) AS (
+    VALUES (:name, :age, :first, :last),(:name, :age, :first, :last)
+)
+   , ins AS (
+    INSERT INTO co_categories (name, age, first, last)
+        SELECT * FROM input_rows
+        ON CONFLICT (name, age, first, last) DO NOTHING
+        RETURNING id, name, age, first, last
+)
+SELECT id, name, age, first, last FROM ins
+UNION ALL
+SELECT id, name, age, first, last
+FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
+			loop: 2,
+		},
+		{
+			name: `multiline WITH query using casting`,
+			query: `WITH input_rows(name, age, first, last) AS (
+    VALUES (:name ::::string, :age ::::int, :first ::::string, :last ::::string)
+)
+   , ins AS (
+    INSERT INTO co_categories (name, age, first, last)
+        SELECT * FROM input_rows
+        ON CONFLICT (name, age, first, last) DO NOTHING
+        RETURNING id, name, age, first, last
+)
+SELECT id, name, age, first, last FROM ins
+UNION ALL
+SELECT id, name, age, first, last
+FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
+			expect: `WITH input_rows(name, age, first, last) AS (
+    VALUES (:name ::::string, :age ::::int, :first ::::string, :last ::::string),(:name ::::string, :age ::::int, :first ::::string, :last ::::string)
+)
+   , ins AS (
+    INSERT INTO co_categories (name, age, first, last)
+        SELECT * FROM input_rows
+        ON CONFLICT (name, age, first, last) DO NOTHING
+        RETURNING id, name, age, first, last
+)
+SELECT id, name, age, first, last FROM ins
+UNION ALL
+SELECT id, name, age, first, last
+FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
+			loop: 2,
+		},
 	}
 
 	for _, tc := range table {

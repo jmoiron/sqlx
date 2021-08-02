@@ -428,7 +428,7 @@ func TestFixBounds(t *testing.T) {
     VALUES (:name, :age, :first, :last)
 )
    , ins AS (
-    INSERT INTO co_categories (name, age, first, last)
+    INSERT INTO foo (name, age, first, last)
         SELECT * FROM input_rows
         ON CONFLICT (name, age, first, last) DO NOTHING
         RETURNING id, name, age, first, last
@@ -436,12 +436,12 @@ func TestFixBounds(t *testing.T) {
 SELECT id, name, age, first, last FROM ins
 UNION ALL
 SELECT id, name, age, first, last
-FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
+FROM input_rows r JOIN foo c USING (name, age, first, last)`,
 			expect: `WITH input_rows(name, age, first, last) AS (
     VALUES (:name, :age, :first, :last),(:name, :age, :first, :last)
 )
    , ins AS (
-    INSERT INTO co_categories (name, age, first, last)
+    INSERT INTO foo (name, age, first, last)
         SELECT * FROM input_rows
         ON CONFLICT (name, age, first, last) DO NOTHING
         RETURNING id, name, age, first, last
@@ -449,7 +449,7 @@ FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
 SELECT id, name, age, first, last FROM ins
 UNION ALL
 SELECT id, name, age, first, last
-FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
+FROM input_rows r JOIN foo c USING (name, age, first, last)`,
 			loop: 2,
 		},
 		{
@@ -458,7 +458,7 @@ FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
     VALUES (:name ::::string, :age ::::int, :first ::::string, :last ::::string)
 )
    , ins AS (
-    INSERT INTO co_categories (name, age, first, last)
+    INSERT INTO foo (name, age, first, last)
         SELECT * FROM input_rows
         ON CONFLICT (name, age, first, last) DO NOTHING
         RETURNING id, name, age, first, last
@@ -466,12 +466,12 @@ FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
 SELECT id, name, age, first, last FROM ins
 UNION ALL
 SELECT id, name, age, first, last
-FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
+FROM input_rows r JOIN foo c USING (name, age, first, last)`,
 			expect: `WITH input_rows(name, age, first, last) AS (
     VALUES (:name ::::string, :age ::::int, :first ::::string, :last ::::string),(:name ::::string, :age ::::int, :first ::::string, :last ::::string)
 )
    , ins AS (
-    INSERT INTO co_categories (name, age, first, last)
+    INSERT INTO foo (name, age, first, last)
         SELECT * FROM input_rows
         ON CONFLICT (name, age, first, last) DO NOTHING
         RETURNING id, name, age, first, last
@@ -479,7 +479,23 @@ FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
 SELECT id, name, age, first, last FROM ins
 UNION ALL
 SELECT id, name, age, first, last
-FROM input_rows r JOIN co_categories c USING (name, age, first, last)`,
+FROM input_rows r JOIN foo c USING (name, age, first, last)`,
+			loop: 2,
+		},
+		{
+			name: `multiline FROM query using casting`,
+			query: `INSERT INTO houses (name, age, address, owner_id)
+SELECT i.name, i.age, i.address, p.id
+FROM (VALUES (:name, :age, :address, :owner_email)) AS i
+	 (name, age, address, email)
+	 JOIN people p
+		  ON p.email = owner_email;`,
+			expect: `INSERT INTO houses (name, age, address, owner_id)
+SELECT i.name, i.age, i.address, p.id
+FROM (VALUES (:name, :age, :address, :owner_email),(:name, :age, :address, :owner_email)) AS i
+	 (name, age, address, email)
+	 JOIN people p
+		  ON p.email = owner_email;`,
 			loop: 2,
 		},
 	}

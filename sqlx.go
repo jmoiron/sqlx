@@ -392,6 +392,10 @@ type Tx struct {
 	Mapper     *reflectx.Mapper
 }
 
+func NewTx(tx *sql.Tx, driverName string) *Tx {
+	return &Tx{Tx: tx, driverName: driverName, Mapper: mapper()}
+}
+
 // DriverName returns the driverName used by the DB which began this transaction.
 func (tx *Tx) DriverName() string {
 	return tx.driverName

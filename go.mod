@@ -1,4 +1,4 @@
-module github.com/jmoiron/sqlx
+module github.com/smartcontractkit/sqlx
 
 go 1.10
 

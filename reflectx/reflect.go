@@ -104,7 +104,7 @@ func NewMapperFunc(tagName string, f func(string) string) *Mapper {
 // NewMapperTagColFunc returns a new mapper which contains a mapper for field names
 // AND a mapper for tag values AND a mapper for column names.  This is useful for tags
 // like json which can have values like "name,omitempty", and processing sql column
-// names to lower case for example.
+// names.
 func NewMapperTagColFunc(tagName string, mapFunc, tagMapFunc, colMapFunc func(string) string) *Mapper {
 	return &Mapper{
 		cache:      make(map[reflect.Type]*StructMap),

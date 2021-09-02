@@ -64,6 +64,7 @@ type Mapper struct {
 	cache      map[reflect.Type]*StructMap
 	tagName    string
 	tagMapFunc func(string) string
+	colMapFunc func(string) string
 	mapFunc    func(string) string
 	mutex      sync.Mutex
 }
@@ -97,6 +98,20 @@ func NewMapperFunc(tagName string, f func(string) string) *Mapper {
 		cache:   make(map[reflect.Type]*StructMap),
 		tagName: tagName,
 		mapFunc: f,
+	}
+}
+
+// NewMapperTagColFunc returns a new mapper which contains a mapper for field names
+// AND a mapper for tag values AND a mapper for column names.  This is useful for tags
+// like json which can have values like "name,omitempty", and processing sql column
+// names to lower case for example.
+func NewMapperTagColFunc(tagName string, mapFunc, tagMapFunc, colMapFunc func(string) string) *Mapper {
+	return &Mapper{
+		cache:      make(map[reflect.Type]*StructMap),
+		tagName:    tagName,
+		colMapFunc: colMapFunc,
+		mapFunc:    mapFunc,
+		tagMapFunc: tagMapFunc,
 	}
 }
 
@@ -135,6 +150,9 @@ func (m *Mapper) FieldByName(v reflect.Value, name string) reflect.Value {
 	mustBe(v, reflect.Struct)
 
 	tm := m.TypeMap(v.Type())
+	if m.colMapFunc != nil {
+		name = m.colMapFunc(name)
+	}
 	fi, ok := tm.Names[name]
 	if !ok {
 		return v
@@ -152,6 +170,9 @@ func (m *Mapper) FieldsByName(v reflect.Value, names []string) []reflect.Value {
 	tm := m.TypeMap(v.Type())
 	vals := make([]reflect.Value, 0, len(names))
 	for _, name := range names {
+		if m.colMapFunc != nil {
+			name = m.colMapFunc(name)
+		}
 		fi, ok := tm.Names[name]
 		if !ok {
 			vals = append(vals, *new(reflect.Value))
@@ -187,6 +208,9 @@ func (m *Mapper) TraversalsByNameFunc(t reflect.Type, names []string, fn func(in
 	mustBe(t, reflect.Struct)
 	tm := m.TypeMap(t)
 	for i, name := range names {
+		if m.colMapFunc != nil {
+			name = m.colMapFunc(name)
+		}
 		fi, ok := tm.Names[name]
 		if !ok {
 			if err := fn(i, nil); err != nil {

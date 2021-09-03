@@ -287,7 +287,7 @@ func TestInlineStruct(t *testing.T) {
 }
 
 func TestColMapFunc(t *testing.T) {
-	m := NewMapperTagColFunc("db", strings.ToLower, nil, strings.ToLower)
+	m := NewMapperTagColFunc("", strings.ToLower, nil, strings.ToLower)
 
 	type Employee struct {
 		FirstName string
@@ -295,8 +295,8 @@ func TestColMapFunc(t *testing.T) {
 	}
 	type Boss Employee
 	type person struct {
-		Employee `db:"employee"`
-		Boss     `db:"boss"`
+		Employee Employee
+		Boss     Boss
 	}
 	// employees columns: (employee.firstName employee.id boss.firstName boss.id)
 

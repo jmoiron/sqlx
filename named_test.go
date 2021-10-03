@@ -8,11 +8,12 @@ import (
 
 func TestCompileQuery(t *testing.T) {
 	table := []struct {
+		d             string
 		Q, R, D, T, N string
 		V             []string
 	}{
-		// basic test for named parameters, invalid char ',' terminating
 		{
+			d: "basic test for named parameters, invalid char ',' terminating",
 			Q: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last)`,
 			R: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
 			D: `INSERT INTO foo (a,b,c,d) VALUES ($1, $2, $3, $4)`,
@@ -20,8 +21,8 @@ func TestCompileQuery(t *testing.T) {
 			N: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last)`,
 			V: []string{"name", "age", "first", "last"},
 		},
-		// This query tests a named parameter ending the string as well as numbers
 		{
+			d: "This query tests a named parameter ending the string as well as numbers",
 			Q: `SELECT * FROM a WHERE first_name=:name1 AND last_name=:name2`,
 			R: `SELECT * FROM a WHERE first_name=? AND last_name=?`,
 			D: `SELECT * FROM a WHERE first_name=$1 AND last_name=$2`,
@@ -30,7 +31,7 @@ func TestCompileQuery(t *testing.T) {
 			V: []string{"name1", "name2"},
 		},
 		{
-			Q: `SELECT "::foo" FROM a WHERE first_name=:name1 AND last_name=:name2`,
+			Q: `SELECT ":foo" FROM a WHERE first_name=:name1 AND last_name=:name2`,
 			R: `SELECT ":foo" FROM a WHERE first_name=? AND last_name=?`,
 			D: `SELECT ":foo" FROM a WHERE first_name=$1 AND last_name=$2`,
 			T: `SELECT ":foo" FROM a WHERE first_name=@p1 AND last_name=@p2`,
@@ -38,7 +39,7 @@ func TestCompileQuery(t *testing.T) {
 			V: []string{"name1", "name2"},
 		},
 		{
-			Q: `SELECT 'a::b::c' || first_name, '::::ABC::_::' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
+			Q: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
 			R: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=? AND last_name=?`,
 			D: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=$1 AND last_name=$2`,
 			T: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=@p1 AND last_name=@p2`,
@@ -53,49 +54,66 @@ func TestCompileQuery(t *testing.T) {
 			T: `SELECT @name := "name", @p1, @p2, @p3`,
 			V: []string{"age", "first", "last"},
 		},
-		/* This unicode awareness test sadly fails, because of our byte-wise worldview.
-		 * We could certainly iterate by Rune instead, though it's a great deal slower,
-		 * it's probably the RightWay(tm)
 		{
 			Q: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
 			R: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
 			D: `INSERT INTO foo (a,b,c,d) VALUES ($1, $2, $3, $4)`,
-			N: []string{"name", "age", "first", "last"},
+			N: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
+			T: `INSERT INTO foo (a,b,c,d) VALUES (@p1, @p2, @p3, @p4)`,
+			V: []string{"あ", "b", "キコ", "名前"},
 		},
-		*/
+		{
+			Q: `SELECT id, added_at::date FROM person WHERE first_name=:first_name AND last_name=:last_name`,
+			R: `SELECT id, added_at::date FROM person WHERE first_name=? AND last_name=?`,
+			D: `SELECT id, added_at::date FROM person WHERE first_name=$1 AND last_name=$2`,
+			T: `SELECT id, added_at::date FROM person WHERE first_name=@p1 AND last_name=@p2`,
+			N: `SELECT id, added_at::date FROM person WHERE first_name=:first_name AND last_name=:last_name`,
+			V: []string{"first_name", "last_name"},
+		},
 	}
 
 	for _, test := range table {
-		qr, names, err := compileNamedQuery([]byte(test.Q), QUESTION)
-		if err != nil {
-			t.Error(err)
+		test := test
+		n := test.d
+		if n == "" {
+			n = test.Q
 		}
-		if qr != test.R {
-			t.Errorf("expected %s, got %s", test.R, qr)
-		}
-		if len(names) != len(test.V) {
-			t.Errorf("expected %#v, got %#v", test.V, names)
-		} else {
-			for i, name := range names {
-				if name != test.V[i] {
-					t.Errorf("expected %dth name to be %s, got %s", i+1, test.V[i], name)
+		t.Run(n, func(t *testing.T) {
+			if test.d != "" {
+				t.Log(test.d)
+			}
+			t.Log(test.Q)
+			qr, names, err := compileNamedQuery([]byte(test.Q), QUESTION)
+			if err != nil {
+				t.Error(err)
+			}
+			if qr != test.R {
+				t.Errorf("R: expected %s, got(R) %s", test.R, qr)
+			}
+			if len(names) != len(test.V) {
+				t.Errorf("V: expected %#v, got(V) %#v", test.V, names)
+			} else {
+				for i, name := range names {
+					if name != test.V[i] {
+						t.Errorf("expected %dth name to be %s, got(V) %s", i+1, test.V[i], name)
+					}
 				}
 			}
-		}
-		qd, _, _ := compileNamedQuery([]byte(test.Q), DOLLAR)
-		if qd != test.D {
-			t.Errorf("\nexpected: `%s`\ngot:      `%s`", test.D, qd)
-		}
+			qd, _, _ := compileNamedQuery([]byte(test.Q), DOLLAR)
+			if qd != test.D {
+				t.Errorf("\nexpected: `%s`\ngot(D):      `%s`", test.D, qd)
+			}
 
-		qt, _, _ := compileNamedQuery([]byte(test.Q), AT)
-		if qt != test.T {
-			t.Errorf("\nexpected: `%s`\ngot:      `%s`", test.T, qt)
-		}
+			qt, _, _ := compileNamedQuery([]byte(test.Q), AT)
+			if qt != test.T {
+				t.Errorf("\nexpected: `%s`\ngot(T):      `%s`", test.T, qt)
+			}
 
-		qq, _, _ := compileNamedQuery([]byte(test.Q), NAMED)
-		if qq != test.N {
-			t.Errorf("\nexpected: `%s`\ngot:      `%s`\n(len: %d vs %d)", test.N, qq, len(test.N), len(qq))
-		}
+			qq, _, _ := compileNamedQuery([]byte(test.Q), NAMED)
+			if qq != test.N {
+				t.Errorf("\nexpected: `%s`\ngot(N):      `%s`\n(len: %d vs %d)", test.N, qq, len(test.N), len(qq))
+			}
+		})
 	}
 }
 
@@ -123,7 +141,7 @@ func (t Test) Errorf(err error, format string, args ...interface{}) {
 
 func TestEscapedColons(t *testing.T) {
 	t.Skip("not sure it is possible to support this in general case without an SQL parser")
-	var qs = `SELECT * FROM testtable WHERE timeposted BETWEEN (now() AT TIME ZONE 'utc') AND
+	qs := `SELECT * FROM testtable WHERE timeposted BETWEEN (now() AT TIME ZONE 'utc') AND
 	(now() AT TIME ZONE 'utc') - interval '01:30:00') AND name = '\'this is a test\'' and id = :id`
 	_, _, err := compileNamedQuery([]byte(qs), DOLLAR)
 	if err != nil {
@@ -298,7 +316,6 @@ func TestNamedQueries(t *testing.T) {
 		if p2.Email != sl.Email {
 			t.Errorf("expected %s, got %s", sl.Email, p2.Email)
 		}
-
 	})
 }
 

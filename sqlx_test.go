@@ -29,19 +29,25 @@ import (
 )
 
 /* compile time checks that Db, Tx, Stmt (qStmt) implement expected interfaces */
-var _, _ Ext = &DB{}, &Tx{}
-var _, _ ColScanner = &Row{}, &Rows{}
-var _ Queryer = &qStmt{}
-var _ Execer = &qStmt{}
+var (
+	_, _ Ext        = &DB{}, &Tx{}
+	_, _ ColScanner = &Row{}, &Rows{}
+	_    Queryer    = &qStmt{}
+	_    Execer     = &qStmt{}
+)
 
-var TestPostgres = true
-var TestSqlite = true
-var TestMysql = true
+var (
+	TestPostgres = true
+	TestSqlite   = true
+	TestMysql    = true
+)
 
-var sldb *DB
-var pgdb *DB
-var mysqldb *DB
-var active = []*DB{}
+var (
+	sldb    *DB
+	pgdb    *DB
+	mysqldb *DB
+	active  = []*DB{}
+)
 
 func init() {
 	ConnectAll()
@@ -269,7 +275,7 @@ func TestMissingNames(t *testing.T) {
 			FirstName string `db:"first_name"`
 			LastName  string `db:"last_name"`
 			Email     string
-			//AddedAt time.Time `db:"added_at"`
+			// AddedAt time.Time `db:"added_at"`
 		}
 
 		// test Select first
@@ -374,7 +380,6 @@ func TestMissingNames(t *testing.T) {
 		if len(pps) != 1 {
 			t.Errorf("Expected 1 person back, got %d", len(pps))
 		}
-
 	})
 }
 
@@ -568,7 +573,6 @@ func TestSelectSliceMapTime(t *testing.T) {
 				t.Error(err)
 			}
 		}
-
 	})
 }
 
@@ -589,7 +593,7 @@ func TestNilReceiver(t *testing.T) {
 }
 
 func TestNamedQuery(t *testing.T) {
-	var schema = Schema{
+	schema := Schema{
 		create: `
 			CREATE TABLE place (
 				id integer PRIMARY KEY,
@@ -718,7 +722,6 @@ func TestNamedQuery(t *testing.T) {
 				last_name=:last_name AND
 				"EMAIL"=:EMAIL
 		`, db))
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -820,7 +823,7 @@ func TestNamedQuery(t *testing.T) {
 }
 
 func TestNilInserts(t *testing.T) {
-	var schema = Schema{
+	schema := Schema{
 		create: `
 			CREATE TABLE tt (
 				id integer,
@@ -865,7 +868,7 @@ func TestNilInserts(t *testing.T) {
 }
 
 func TestScanError(t *testing.T) {
-	var schema = Schema{
+	schema := Schema{
 		create: `
 			CREATE TABLE kv (
 				k text,
@@ -1016,7 +1019,7 @@ func TestUsage(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		//fmt.Printf("%#v\n%#v\n%#v\n", placesptr[0], placesptr[1], placesptr[2])
+		// fmt.Printf("%#v\n%#v\n%#v\n", placesptr[0], placesptr[1], placesptr[2])
 
 		// if you have null fields and use SELECT *, you must use sql.Null* in your struct
 		// this test also verifies that you can use either a []Struct{} or a []*Struct{}
@@ -1348,7 +1351,7 @@ func TestRebind(t *testing.T) {
 	ex1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES ` +
 		`(:arg1, :arg2, :arg3, :arg4, :arg5, :arg6, :arg7, :arg8, :arg9, :arg10)`
 	if s1 != ex1 {
-		t.Error("q1 failed on Named params")
+		t.Errorf("q1 failed on Named params: %s", s1)
 	}
 
 	ex2 := `INSERT INTO foo (a, b, c) VALUES (:arg1, :arg2, "foo"), ("Hi", :arg3, :arg4)`
@@ -1423,7 +1426,7 @@ func (p PropertyMap) Scan(src interface{}) error {
 }
 
 func TestEmbeddedMaps(t *testing.T) {
-	var schema = Schema{
+	schema := Schema{
 		create: `
 			CREATE TABLE message (
 				string text,
@@ -1513,18 +1516,26 @@ func TestIn(t *testing.T) {
 		c    int
 	}
 	tests := []tr{
-		{"SELECT * FROM foo WHERE x = ? AND v in (?) AND y = ?",
+		{
+			"SELECT * FROM foo WHERE x = ? AND v in (?) AND y = ?",
 			[]interface{}{"foo", []int{0, 5, 7, 2, 9}, "bar"},
-			7},
-		{"SELECT * FROM foo WHERE x in (?)",
+			7,
+		},
+		{
+			"SELECT * FROM foo WHERE x in (?)",
 			[]interface{}{[]int{1, 2, 3, 4, 5, 6, 7, 8}},
-			8},
-		{"SELECT * FROM foo WHERE x = ? AND y in (?)",
+			8,
+		},
+		{
+			"SELECT * FROM foo WHERE x = ? AND y in (?)",
 			[]interface{}{[]byte("foo"), []int{0, 5, 3}},
-			4},
-		{"SELECT * FROM foo WHERE x = ? AND y IN (?)",
+			4,
+		},
+		{
+			"SELECT * FROM foo WHERE x = ? AND y IN (?)",
 			[]interface{}{sql.NullString{Valid: false}, []string{"a", "b"}},
-			3},
+			3,
+		},
 	}
 	for _, test := range tests {
 		q, a, err := In(test.q, test.args...)
@@ -1558,17 +1569,23 @@ func TestIn(t *testing.T) {
 
 	tests = []tr{
 		// too many bindvars;  slice present so should return error during parse
-		{"SELECT * FROM foo WHERE x = ? and y = ?",
+		{
+			"SELECT * FROM foo WHERE x = ? and y = ?",
 			[]interface{}{"foo", []int{1, 2, 3}, "bar"},
-			0},
+			0,
+		},
 		// empty slice, should return error before parse
-		{"SELECT * FROM foo WHERE x = ?",
+		{
+			"SELECT * FROM foo WHERE x = ?",
 			[]interface{}{[]int{}},
-			0},
+			0,
+		},
 		// too *few* bindvars, should return an error
-		{"SELECT * FROM foo WHERE x = ? AND y in (?)",
+		{
+			"SELECT * FROM foo WHERE x = ? AND y in (?)",
 			[]interface{}{[]int{1, 2, 3}},
-			0},
+			0,
+		},
 	}
 	for _, test := range tests {
 		_, _, err := In(test.q, test.args...)
@@ -1578,9 +1595,9 @@ func TestIn(t *testing.T) {
 	}
 	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
-		//tx.MustExec(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
-		//tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
-		//tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
+		// tx.MustExec(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
+		// tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
+		// tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
 		telcodes := []int{852, 65}
 		q := "SELECT * FROM place WHERE telcode IN(?) ORDER BY telcode"
 		query, args, err := In(q, telcodes)
@@ -1692,7 +1709,7 @@ func TestBindStruct(t *testing.T) {
 }
 
 func TestEmbeddedLiterals(t *testing.T) {
-	var schema = Schema{
+	schema := Schema{
 		create: `
 			CREATE TABLE x (
 				k text
@@ -1841,6 +1858,18 @@ func BenchmarkRebind(b *testing.B) {
 	}
 }
 
+func BenchmarkOldRebind(b *testing.B) {
+	b.StopTimer()
+	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		oldRebind(DOLLAR, q1)
+		oldRebind(DOLLAR, q2)
+	}
+}
+
 func BenchmarkRebindBuffer(b *testing.B) {
 	b.StopTimer()
 	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -1850,6 +1879,30 @@ func BenchmarkRebindBuffer(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		rebindBuff(DOLLAR, q1)
 		rebindBuff(DOLLAR, q2)
+	}
+}
+
+func BenchmarkCompileNamedQuery(b *testing.B) {
+	b.StopTimer()
+	q := `SELECT id, added_at::date FROM person WHERE first_name=:first_name AND last_name=:last_name`
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		compileNamedQuery([]byte(q), QUESTION)
+		compileNamedQuery([]byte(q), DOLLAR)
+		compileNamedQuery([]byte(q), AT)
+		compileNamedQuery([]byte(q), NAMED)
+	}
+}
+
+func BenchmarkOldCompileNamedQuery(b *testing.B) {
+	b.StopTimer()
+	q := `SELECT id, added_at::::date FROM person WHERE first_name=:first_name AND last_name=:last_name`
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		oldCmpileNamedQuery([]byte(q), QUESTION)
+		oldCmpileNamedQuery([]byte(q), DOLLAR)
+		oldCmpileNamedQuery([]byte(q), AT)
+		oldCmpileNamedQuery([]byte(q), NAMED)
 	}
 }
 

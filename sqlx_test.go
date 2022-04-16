@@ -1892,3 +1892,35 @@ func TestIn130Regression(t *testing.T) {
 		}
 	})
 }
+
+func TestSelectReset(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		filledDest := []string{"a", "b", "c"}
+		err := db.Select(&filledDest, "SELECT first_name FROM person ORDER BY first_name ASC;")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(filledDest) != 2 {
+			t.Errorf("Expected 2 first names, got %d.", len(filledDest))
+		}
+		expected := []string{"Jason", "John"}
+		for i, got := range filledDest {
+			if got != expected[i] {
+				t.Errorf("Expected %d result to be %s, but got %s.", i, expected[i], got)
+			}
+		}
+
+		var emptyDest []string
+		err = db.Select(&emptyDest, "SELECT first_name FROM person WHERE first_name = 'Jack';")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Verify that selecting 0 rows into a nil target didn't create a
+		// non-nil slice.
+		if emptyDest != nil {
+			t.Error("Expected emptyDest to be nil")
+		}
+	})
+}

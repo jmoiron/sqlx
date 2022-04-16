@@ -82,9 +82,10 @@ func (j JSONText) Value() (driver.Value, error) {
 	var m json.RawMessage
 	var err = j.Unmarshal(&m)
 	if err != nil {
-		return []byte{}, err
+		return "", err
 	}
-	return []byte(j), nil
+	// Return as a string, so that it can be encoded via text format
+	return string(j), nil
 }
 
 // Scan stores the src in *j.  No validation is done.

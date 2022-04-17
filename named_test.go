@@ -211,6 +211,10 @@ func TestNamedQueries(t *testing.T) {
 		_, err = db.NamedExec(insert, sls)
 		test.Error(err)
 
+		// and test ptr batch inserts
+		_, err = db.NamedExec(insert, &sls)
+		test.Error(err)
+
 		// test map batch inserts
 		slsMap := []map[string]interface{}{
 			{"first_name": "Ardie", "last_name": "Savea", "email": "asavea@ab.co.nz"},

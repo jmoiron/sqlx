@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/jmoiron/sqlx/reflectx"
+	"github.com/muir/sqltoken"
 )
 
 // Bindvar types supported by Rebind, BindMap and BindStruct.
@@ -22,13 +23,32 @@ const (
 )
 
 var defaultBinds = map[int][]string{
-	DOLLAR:   []string{"postgres", "pgx", "pq-timeouts", "cloudsqlpostgres", "ql", "nrpostgres", "cockroach"},
-	QUESTION: []string{"mysql", "sqlite3", "nrmysql", "nrsqlite3"},
-	NAMED:    []string{"oci8", "ora", "goracle", "godror"},
-	AT:       []string{"sqlserver"},
+	DOLLAR:   {"postgres", "pgx", "pq-timeouts", "cloudsqlpostgres", "ql", "nrpostgres", "cockroach"},
+	QUESTION: {"mysql", "sqlite3", "nrmysql", "nrsqlite3"},
+	NAMED:    {"oci8", "ora", "goracle", "godror"},
+	AT:       {"sqlserver"},
 }
 
 var binds sync.Map
+
+var rebindConfigs = func() []sqltoken.Config {
+	configs := make([]sqltoken.Config, AT+1)
+	pg := sqltoken.PostgreSQLConfig()
+	pg.NoticeQuestionMark = true
+	pg.NoticeDollarNumber = false
+	configs[DOLLAR] = pg
+
+	ora := sqltoken.OracleConfig()
+	ora.NoticeColonWord = false
+	ora.NoticeQuestionMark = true
+	configs[NAMED] = ora
+
+	ssvr := sqltoken.SQLServerConfig()
+	ssvr.NoticeAtWord = false
+	ssvr.NoticeQuestionMark = true
+	configs[AT] = ssvr
+	return configs
+}()
 
 func init() {
 	for bind, drivers := range defaultBinds {
@@ -36,7 +56,6 @@ func init() {
 			BindDriver(driver, bind)
 		}
 	}
-
 }
 
 // BindType returns the bindtype for a given database given a drivername.
@@ -53,11 +72,39 @@ func BindDriver(driverName string, bindType int) {
 	binds.Store(driverName, bindType)
 }
 
-// FIXME: this should be able to be tolerant of escaped ?'s in queries without
-// losing much speed, and should be to avoid confusion.
-
 // Rebind a query from the default bindtype (QUESTION) to the target bindtype.
 func Rebind(bindType int, query string) string {
+	switch bindType {
+	case QUESTION, UNKNOWN:
+		return query
+	}
+	config := rebindConfigs[bindType]
+	tokens := sqltoken.Tokenize(query, config)
+	rqb := make([]byte, 0, len(query)+10)
+
+	var j int
+	for _, token := range tokens {
+		if token.Type != sqltoken.QuestionMark {
+			rqb = append(rqb, ([]byte)(token.Text)...)
+			continue
+		}
+		switch bindType {
+		case DOLLAR:
+			rqb = append(rqb, '$')
+		case NAMED:
+			rqb = append(rqb, ':', 'a', 'r', 'g')
+		case AT:
+			rqb = append(rqb, '@', 'p')
+		}
+		j++
+		rqb = strconv.AppendInt(rqb, int64(j), 10)
+	}
+	return string(rqb)
+}
+
+// Previous rebind implementation, kept here for benchmarking purposes
+// at least for now.
+func oldRebind(bindType int, query string) string {
 	switch bindType {
 	case QUESTION, UNKNOWN:
 		return query
@@ -130,7 +177,6 @@ func asSliceForIn(i interface{}) (v reflect.Value, ok bool) {
 	// []byte is a driver.Value type so it should not be expanded
 	if t == reflect.TypeOf([]byte{}) {
 		return reflect.Value{}, false
-
 	}
 
 	return v, true

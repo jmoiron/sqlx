@@ -3,7 +3,6 @@ package sqlx
 import (
 	"database/sql"
 	"fmt"
-	"regexp"
 	"testing"
 )
 
@@ -105,6 +104,7 @@ type Test struct {
 }
 
 func (t Test) Error(err error, msg ...interface{}) {
+	t.t.Helper()
 	if err != nil {
 		if len(msg) == 0 {
 			t.t.Error(err)
@@ -115,6 +115,7 @@ func (t Test) Error(err error, msg ...interface{}) {
 }
 
 func (t Test) Errorf(err error, format string, args ...interface{}) {
+	t.t.Helper()
 	if err != nil {
 		t.t.Errorf(format, args...)
 	}
@@ -339,26 +340,87 @@ func TestFixBounds(t *testing.T) {
 		{
 			name:   `found twice test`,
 			query:  `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
-			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			expect: `INSERT INTO foo (a,b,c,d) VALUES (:name, :age, :first, :last),(:name, :age, :first, :last) VALUES (:name, :age, :first, :last)`,
+			loop:   2,
+		},
+		{
+			name:   `nospace`,
+			query:  `INSERT INTO foo (a,b) VALUES(:a, :b)`,
+			expect: `INSERT INTO foo (a,b) VALUES(:a, :b),(:a, :b)`,
 			loop:   2,
 		},
 		{
 			name:   `lowercase`,
-			query:  `INSERT INTO foo (a,b,c,d) values (:name, :age, :first, :last)`,
-			expect: `INSERT INTO foo (a,b,c,d) values (:name, :age, :first, :last),(:name, :age, :first, :last)`,
+			query:  `INSERT INTO foo (a,b) values(:a, :b)`,
+			expect: `INSERT INTO foo (a,b) values(:a, :b),(:a, :b)`,
 			loop:   2,
 		},
 		{
-			name:   `not blank space`,
-			query:  `INSERT INTO foo (a,b,c,d) VALUES(:name, :age, :first, :last)`,
-			expect: `INSERT INTO foo (a,b,c,d) VALUES(:name, :age, :first, :last),(:name, :age, :first, :last)`,
+			name:   `on duplicate key using VALUES`,
+			query:  `INSERT INTO foo (a,b) VALUES (:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
+			expect: `INSERT INTO foo (a,b) VALUES (:a, :b),(:a, :b) ON DUPLICATE KEY UPDATE a=VALUES(a)`,
 			loop:   2,
 		},
 		{
-			name:   `capital letter`,
-			query:  `INSERT INTO foo (a,b,c,d) Values(:name, :age, :first, :last)`,
-			expect: `INSERT INTO foo (a,b,c,d) Values(:name, :age, :first, :last),(:name, :age, :first, :last)`,
+			name:   `single column`,
+			query:  `INSERT INTO foo (a) VALUES (:a)`,
+			expect: `INSERT INTO foo (a) VALUES (:a),(:a)`,
 			loop:   2,
+		},
+		{
+			name:   `call now`,
+			query:  `INSERT INTO foo (a, b) VALUES (:a, NOW())`,
+			expect: `INSERT INTO foo (a, b) VALUES (:a, NOW()),(:a, NOW())`,
+			loop:   2,
+		},
+		{
+			name:   `two level depth function call`,
+			query:  `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW()))`,
+			expect: `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW())),(:a, YEAR(NOW()))`,
+			loop:   2,
+		},
+		{
+			name:   `missing closing bracket`,
+			query:  `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW())`,
+			expect: `INSERT INTO foo (a, b) VALUES (:a, YEAR(NOW())`,
+			loop:   2,
+		},
+		{
+			name:   `table with "values" at the end`,
+			query:  `INSERT INTO table_values (a, b) VALUES (:a, :b)`,
+			expect: `INSERT INTO table_values (a, b) VALUES (:a, :b),(:a, :b)`,
+			loop:   2,
+		},
+		{
+			name: `multiline indented query`,
+			query: `INSERT INTO foo (
+		a,
+		b,
+		c,
+		d
+	) VALUES (
+		:name,
+		:age,
+		:first,
+		:last
+	)`,
+			expect: `INSERT INTO foo (
+		a,
+		b,
+		c,
+		d
+	) VALUES (
+		:name,
+		:age,
+		:first,
+		:last
+	),(
+		:name,
+		:age,
+		:first,
+		:last
+	)`,
+			loop: 2,
 		},
 	}
 
@@ -370,18 +432,4 @@ func TestFixBounds(t *testing.T) {
 			}
 		})
 	}
-
-	t.Run("regex changed", func(t *testing.T) {
-		var valueBracketRegChanged = regexp.MustCompile(`(?i:VALUES)\s*(\([^(]*.[^(]\))`)
-		saveRegexp := valueBracketReg
-		defer func() {
-			valueBracketReg = saveRegexp
-		}()
-		valueBracketReg = valueBracketRegChanged
-
-		res := fixBound("VALUES (:a, :b)", 2)
-		if res != "VALUES (:a, :b),(:a, :b)" {
-			t.Errorf("changed regex should return string")
-		}
-	})
 }

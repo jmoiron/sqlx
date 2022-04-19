@@ -53,11 +53,78 @@ func BindDriver(driverName string, bindType int) {
 	binds.Store(driverName, bindType)
 }
 
-// FIXME: this should be able to be tolerant of escaped ?'s in queries without
-// losing much speed, and should be to avoid confusion.
-
 // Rebind a query from the default bindtype (QUESTION) to the target bindtype.
+// Rebind will not replace properly escaped question marks as part of a valid
+// string constant i.e. surrounded by single or double quotes. If a double or
+// single quote is inside a string constant and is properly escaped it is not
+// interpreted as the end of the string. You can safely escape a quotation
+// mark by preceding it with a c style backslash or with another quotation mark.
 func Rebind(bindType int, query string) string {
+	switch bindType {
+	case QUESTION, UNKNOWN:
+		return query
+	}
+
+	// Make space enough for 10 named params before we have to allocate
+	rqb := make([]byte, len(query)+50)
+
+	inDouble := false
+	inSingle := false
+	var lastChar uint8 = 0
+
+	var k = 0
+	var j = 1
+
+	for i := 0; i < len(query); i++ {
+		c := query[i]
+
+		if c == '?' && !inSingle && !inDouble {
+			switch bindType {
+			case DOLLAR:
+				rqb[k] = '$'
+				k++
+			case NAMED:
+				rqb[k] = ':'
+				rqb[k+1] = 'a'
+				rqb[k+2] = 'r'
+				rqb[k+3] = 'g'
+				k = k + 4
+			case AT:
+				rqb[k] = '@'
+				rqb[k+1] = 'p'
+				k = k + 2
+			}
+
+			// Append the arg number
+			num := strconv.Itoa(j)
+			for _, n := range num {
+				rqb[k] = byte(n)
+				k++
+			}
+			j++
+			continue
+		}
+		rqb[k] = c
+
+		if c == '"' && !inSingle && lastChar != '\\' {
+			inDouble = !inDouble
+		}
+
+		if c == '\'' && !inDouble && lastChar != '\\' {
+			inSingle = !inSingle
+		}
+
+		k++
+		lastChar = c
+	}
+
+	// The length of rqb is likely longer than the slice we wrote to, so we only
+	// return the written portion.
+	return string(rqb[:k])
+}
+
+// The original Rebind function kept for benchmarking purposes.
+func rebindIndex(bindType int, query string) string {
 	switch bindType {
 	case QUESTION, UNKNOWN:
 		return query

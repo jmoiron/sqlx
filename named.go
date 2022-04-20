@@ -456,3 +456,32 @@ func NamedExec(e Ext, query string, arg interface{}) (sql.Result, error) {
 	}
 	return e.Exec(q, args...)
 }
+
+// NamedSelect binds a named query and then runs Query on the result using the
+// provided Ext (sqlx.Tx, sql.DB) and StructScans each row
+// into dest, which must be a slice.  If the slice elements are scannable, then
+// the result set must have only one column.  Otherwise, StructScan is used.
+// The *sql.Rows are closed automatically.
+func NamedSelect(e Ext, dest interface{}, query string, arg interface{}) error {
+	rows, err := NamedQuery(e, query, arg)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	return scanAll(rows, dest, false)
+}
+
+// NamedGet binds a named query and then runs Query on the result using the
+// provided Ext (sqlx.Tx, sql.DB) and StructScan the row into dest.
+// The *sql.Rows are closed automatically.
+func NamedGet(e Ext, dest interface{}, query string, arg interface{}) error {
+	rows, err := NamedQuery(e, query, arg)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		return rows.StructScan(dest)
+	}
+	return nil
+}

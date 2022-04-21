@@ -433,3 +433,21 @@ func TestFixBounds(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkFixBound10(b *testing.B) {
+	query := `INSERT INTO foo (a,b) VALUES(:a, :b)`
+	loop := 10
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		fixBound(query, loop)
+	}
+}
+
+func BenchmarkFixBound100(b *testing.B) {
+	query := `INSERT INTO foo (a,b) VALUES(:a, :b)`
+	loop := 100
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		fixBound(query, loop)
+	}
+}

@@ -257,7 +257,8 @@ func fixBound(bound string, loop int) string {
 	}
 	closingBracketIndex := openingBracketIndex + index + 1
 
-	var buffer bytes.Buffer
+	length := closingBracketIndex + (loop-1)*(closingBracketIndex-openingBracketIndex+1) + len(bound) - closingBracketIndex
+	buffer := bytes.NewBuffer(make([]byte, 0, length))
 
 	buffer.WriteString(bound[0:closingBracketIndex])
 	for i := 0; i < loop-1; i++ {

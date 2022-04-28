@@ -510,6 +510,26 @@ func TestTagNameMapping(t *testing.T) {
 	}
 }
 
+func TestPartialTagMatch(t *testing.T) {
+	type MultiDBThing struct {
+		ID    int    `db:"ThingID"`
+		Name  string `db:"Name" mydb:"ThingName"`
+		Color string `mydb:"ThingColor" db:"TheColor"`
+		Value int    `mydb:"ThingValue"`
+	}
+
+	m := NewMapperTagFunc("db", strings.TrimSpace, nil)
+	thing := MultiDBThing{}
+	mapping := m.TypeMap(reflect.TypeOf(thing))
+
+	// All 'db' tags should map and 'mydb' tags should be ignored
+	for _, key := range []string{"ThingID", "Name", "TheColor", "Value"} {
+		if fi := mapping.GetByPath(key); fi == nil {
+			t.Errorf("Expecting to find key %s in mapping but did not.", key)
+		}
+	}
+}
+
 func TestMapping(t *testing.T) {
 	type Person struct {
 		ID           int

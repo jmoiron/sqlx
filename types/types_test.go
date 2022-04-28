@@ -1,6 +1,10 @@
 package types
 
-import "testing"
+import (
+	"encoding/json"
+	"reflect"
+	"testing"
+)
 
 func TestGzipText(t *testing.T) {
 	g := GzippedText("Hello, world")
@@ -91,6 +95,24 @@ func TestNullJSONText(t *testing.T) {
 	}
 	if j.Valid != false {
 		t.Errorf("Expected valid to be false, but got true")
+	}
+}
+
+func TestNullJSONTextJsonMarshal(t *testing.T) {
+	jsonText := NullJSONText{JSONText: []byte(`{"some":"thing"}`), Valid: true}
+	data, err := json.Marshal(&jsonText)
+	if err != nil {
+		t.Errorf("Failed to json.Marshal NullJSONText: %s", err)
+	}
+
+	newJsonText := NullJSONText{}
+	err = json.Unmarshal(data, &newJsonText)
+	if err != nil {
+		t.Errorf("Failed to json.Unmarshal NullJSONText: %s", err)
+	}
+
+	if !reflect.DeepEqual(jsonText, newJsonText) {
+		t.Error("NullJSONText is not the same after unmarshal")
 	}
 }
 

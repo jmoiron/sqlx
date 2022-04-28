@@ -129,6 +129,15 @@ type NullJSONText struct {
 	Valid bool // Valid is true if JSONText is not NULL
 }
 
+// UnmarshalJSON sets *n to a copy of data
+func (n *NullJSONText) UnmarshalJSON(data []byte) error {
+	if err := n.JSONText.UnmarshalJSON(data); err != nil {
+		return err
+	}
+	n.Valid = true
+	return nil
+}
+
 // Scan implements the Scanner interface.
 func (n *NullJSONText) Scan(value interface{}) error {
 	if value == nil {

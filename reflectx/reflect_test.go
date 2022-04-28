@@ -850,7 +850,7 @@ func TestMustBe(t *testing.T) {
 				t.Error("expected panic with *reflect.ValueError")
 				return
 			}
-			if valueErr.Method != "github.com/jmoiron/sqlx/reflectx.TestMustBe" {
+			if valueErr.Method != "github.com/jjjachyty/sqlx/reflectx.TestMustBe" {
 			}
 			if valueErr.Kind != reflect.String {
 				t.Errorf("unexpected Kind: %s", valueErr.Kind)

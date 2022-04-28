@@ -139,12 +139,12 @@ func TestNamedQueries(t *testing.T) {
 		var err error
 
 		// Check that invalid preparations fail
-		ns, err = db.PrepareNamed("SELECT * FROM person WHERE first_name=:first:name")
+		_, err = db.PrepareNamed("SELECT * FROM person WHERE first_name=:first:name")
 		if err == nil {
 			t.Error("Expected an error with invalid prepared statement.")
 		}
 
-		ns, err = db.PrepareNamed("invalid sql")
+		_, err = db.PrepareNamed("invalid sql")
 		if err == nil {
 			t.Error("Expected an error with invalid prepared statement.")
 		}

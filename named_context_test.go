@@ -18,12 +18,12 @@ func TestNamedContextQueries(t *testing.T) {
 		ctx := context.Background()
 
 		// Check that invalid preparations fail
-		ns, err = db.PrepareNamedContext(ctx, "SELECT * FROM person WHERE first_name=:first:name")
+		_, err = db.PrepareNamedContext(ctx, "SELECT * FROM person WHERE first_name=:first:name")
 		if err == nil {
 			t.Error("Expected an error with invalid prepared statement.")
 		}
 
-		ns, err = db.PrepareNamedContext(ctx, "invalid sql")
+		_, err = db.PrepareNamedContext(ctx, "invalid sql")
 		if err == nil {
 			t.Error("Expected an error with invalid prepared statement.")
 		}

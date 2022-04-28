@@ -119,6 +119,7 @@ func main() {
     
     tx := db.MustBegin()
     tx.MustExec("INSERT INTO person (first_name, last_name, email) VALUES ($1, $2, $3)", "Jason", "Moiron", "jmoiron@jmoiron.net")
+    // mysql: tx.MustExec("INSERT INTO person (first_name, last_name, email) VALUES (?, ?, ?)", "Jason", "Moiron", "jmoiron@jmoiron.net")
     tx.MustExec("INSERT INTO person (first_name, last_name, email) VALUES ($1, $2, $3)", "John", "Doe", "johndoeDNE@gmail.net")
     tx.MustExec("INSERT INTO place (country, city, telcode) VALUES ($1, $2, $3)", "United States", "New York", "1")
     tx.MustExec("INSERT INTO place (country, telcode) VALUES ($1, $2)", "Hong Kong", "852")
@@ -139,6 +140,7 @@ func main() {
     // You can also get a single result, a la QueryRow
     jason = Person{}
     err = db.Get(&jason, "SELECT * FROM person WHERE first_name=$1", "Jason")
+    // mysql: db.Get(&jason, "SELECT * FROM person WHERE first_name=?", "Jason")
     fmt.Printf("%#v\n", jason)
     // Person{FirstName:"Jason", LastName:"Moiron", Email:"jmoiron@jmoiron.net"}
 

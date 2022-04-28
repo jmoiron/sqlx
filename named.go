@@ -14,6 +14,7 @@ package sqlx
 import (
 	"bytes"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"reflect"
@@ -185,7 +186,15 @@ func bindArgs(names []string, arg interface{}, m *reflectx.Mapper) ([]interface{
 		}
 
 		val := reflectx.FieldByIndexesReadOnly(v, t)
-		arglist = append(arglist, val.Interface())
+		if v, ok := val.Interface().(driver.Valuer); ok {
+			value, err := v.Value()
+			if err != nil {
+				return err
+			}
+			arglist = append(arglist, value)
+		} else {
+			arglist = append(arglist, val.Interface())
+		}
 
 		return nil
 	})

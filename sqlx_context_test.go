@@ -482,6 +482,22 @@ func TestNamedQueryContext(t *testing.T) {
 			}
 		}
 
+		p3 := &Person{}
+		row := db.NamedQueryRowContext(ctx, "SELECT * FROM person WHERE first_name=:first_name", p)
+		err = row.StructScan(p3)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if p.FirstName != p3.FirstName {
+			t.Error(err)
+		}
+		if p.LastName != p3.LastName {
+			t.Error(err)
+		}
+		if p.Email != p3.Email {
+			t.Error(err)
+		}
+
 		// these are tests for #73;  they verify that named queries work if you've
 		// changed the db mapper.  This code checks both NamedQuery "ad-hoc" style
 		// queries and NamedStmt queries, which use different code paths internally.

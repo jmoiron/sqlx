@@ -1,6 +1,7 @@
 package sqlx
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -236,6 +237,35 @@ func (r *Row) ColumnTypes() ([]*sql.ColumnType, error) {
 func (r *Row) Err() error {
 	return r.err
 }
+
+// Queryable includes all methods shared by sqlx.DB and sqlx.Tx, allowing
+// either type to be used interchangeably.
+type Queryable interface {
+	Ext
+	ExecerContext
+	PreparerContext
+	QueryerContext
+	Preparer
+
+	GetContext(context.Context, interface{}, string, ...interface{}) error
+	SelectContext(context.Context, interface{}, string, ...interface{}) error
+	Get(interface{}, string, ...interface{}) error
+	MustExecContext(context.Context, string, ...interface{}) sql.Result
+	PreparexContext(context.Context, string) (*Stmt, error)
+	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
+	Select(interface{}, string, ...interface{}) error
+	QueryRow(string, ...interface{}) *sql.Row
+	PrepareNamedContext(context.Context, string) (*NamedStmt, error)
+	PrepareNamed(string) (*NamedStmt, error)
+	Preparex(string) (*Stmt, error)
+	NamedExec(string, interface{}) (sql.Result, error)
+	NamedExecContext(context.Context, string, interface{}) (sql.Result, error)
+	MustExec(string, ...interface{}) sql.Result
+	NamedQuery(string, interface{}) (*Rows, error)
+}
+
+var _ Queryable = (*DB)(nil)
+var _ Queryable = (*Tx)(nil)
 
 // DB is a wrapper around sql.DB which keeps track of the driverName upon Open,
 // used mostly to automatically bind named queries using the right bindvars.

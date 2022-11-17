@@ -328,7 +328,7 @@ func parseOptions(tag string) map[string]string {
 		for _, opt := range parts[1:] {
 			opt = strings.TrimSpace(opt)
 			if sep := strings.Index(opt, "="); sep > -1 {
-				options[opt[:sep]] = opt[sep+1:]
+				options[strings.TrimSpace(opt[:sep])] = strings.TrimSpace(opt[sep+1:])
 				continue
 			}
 			options[opt] = ""

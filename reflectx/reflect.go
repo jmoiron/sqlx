@@ -326,10 +326,9 @@ func parseOptions(tag string) map[string]string {
 	options := make(map[string]string, len(parts))
 	if len(parts) > 1 {
 		for _, opt := range parts[1:] {
-			// short circuit potentially expensive split op
-			if strings.Contains(opt, "=") {
-				kv := strings.Split(opt, "=")
-				options[kv[0]] = kv[1]
+			opt = strings.TrimSpace(opt)
+			if sep := strings.Index(opt, "="); sep > -1 {
+				options[strings.TrimSpace(opt[:sep])] = strings.TrimSpace(opt[sep+1:])
 				continue
 			}
 			options[opt] = ""

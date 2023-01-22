@@ -234,6 +234,7 @@ func (r *Row) ColumnTypes() ([]*sql.ColumnType, error) {
 
 // Err returns the error encountered while scanning.
 func (r *Row) Err() error {
+	defer r.rows.Close()
 	return r.err
 }
 

@@ -422,13 +422,19 @@ func TestFixBounds(t *testing.T) {
 	)`,
 			loop: 2,
 		},
+		{
+			name:   `select with "values" and no insert`,
+			query:  `SELECT a, b FROM (VALUES (:a, :b)) x (a, b)`,
+			expect: `SELECT a, b FROM (VALUES (:a, :b),(:a, :b)) x (a, b)`,
+			loop:   2,
+		},
 	}
 
 	for _, tc := range table {
 		t.Run(tc.name, func(t *testing.T) {
 			res := fixBound(tc.query, tc.loop)
 			if res != tc.expect {
-				t.Errorf("mismatched results")
+				t.Errorf("mismatched results, got \"%s\" but expected \"%s\"", res, tc.expect)
 			}
 		})
 	}

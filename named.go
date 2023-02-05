@@ -224,7 +224,9 @@ func bindStruct(bindType int, query string, arg interface{}, m *reflectx.Mapper)
 	return bound, arglist, nil
 }
 
-var valuesReg = regexp.MustCompile(`\)\s*(?i)VALUES\s*\(`)
+var valuesReg = regexp.MustCompile(`[\)\(]\s*(?i)VALUES\s*\(`)
+
+// var valuesReg = regexp.MustCompile(`\)\s*(?i)VALUES\s*\(`)
 
 func findMatchingClosingBracketIndex(s string) int {
 	count := 0

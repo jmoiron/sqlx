@@ -19,6 +19,7 @@ const (
 	DOLLAR
 	NAMED
 	AT
+	COLON
 )
 
 var defaultBinds = map[int][]string{
@@ -78,6 +79,8 @@ func Rebind(bindType int, query string) string {
 			rqb = append(rqb, ':', 'a', 'r', 'g')
 		case AT:
 			rqb = append(rqb, '@', 'p')
+		case COLON:
+			rqb = append(rqb, ':')
 		}
 
 		j++

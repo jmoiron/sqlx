@@ -1,13 +1,13 @@
 // The following environment variables, if set, will be used:
 //
-//	* SQLX_SQLITE_DSN
-//	* SQLX_POSTGRES_DSN
-//	* SQLX_MYSQL_DSN
+//   - SQLX_SQLITE_DSN
+//   - SQLX_POSTGRES_DSN
+//   - SQLX_MYSQL_DSN
+//   - SQLX_LIBSQL_DSN
 //
 // Set any of these variables to 'skip' to skip them.  Note that for MySQL,
 // the string '?parseTime=True' will be appended to the DSN if it's not there
 // already.
-//
 package sqlx
 
 import (
@@ -25,6 +25,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/lib/pq"
+	_ "github.com/libsql/libsql-client-go/libsql"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -37,10 +38,12 @@ var _ Execer = &qStmt{}
 var TestPostgres = true
 var TestSqlite = true
 var TestMysql = true
+var TestLibsql = true
 
 var sldb *DB
 var pgdb *DB
 var mysqldb *DB
+var libsqldb *DB
 var active = []*DB{}
 
 func init() {
@@ -53,10 +56,12 @@ func ConnectAll() {
 	pgdsn := os.Getenv("SQLX_POSTGRES_DSN")
 	mydsn := os.Getenv("SQLX_MYSQL_DSN")
 	sqdsn := os.Getenv("SQLX_SQLITE_DSN")
+	libsqldsn := os.Getenv("SQLX_LIBSQL_DSN")
 
 	TestPostgres = pgdsn != "skip"
 	TestMysql = mydsn != "skip"
 	TestSqlite = sqdsn != "skip"
+	TestLibsql = libsqldsn != "skip"
 
 	if !strings.Contains(mydsn, "parseTime=true") {
 		mydsn += "?parseTime=true"
@@ -90,6 +95,16 @@ func ConnectAll() {
 		}
 	} else {
 		fmt.Println("Disabling SQLite tests.")
+	}
+
+	if TestLibsql {
+		libsqldb, err = Connect("libsql", libsqldsn)
+		if err != nil {
+			fmt.Printf("Disabling LibSQL:\n    %v", err)
+			TestLibsql = false
+		}
+	} else {
+		fmt.Println("Disabling LibSQL tests.")
 	}
 }
 
@@ -235,6 +250,10 @@ func RunWithSchema(schema Schema, t *testing.T, test func(db *DB, t *testing.T, 
 	if TestSqlite {
 		create, drop, now := schema.Sqlite3()
 		runner(sldb, t, create, drop, now)
+	}
+	if TestLibsql {
+		create, drop, now := schema.Sqlite3()
+		runner(libsqldb, t, create, drop, now)
 	}
 	if TestMysql {
 		create, drop, now := schema.MySQL()

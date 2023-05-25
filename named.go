@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"strconv"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/jmoiron/sqlx/reflectx"
 )
@@ -333,9 +334,11 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 	rebound := make([]byte, 0, len(qs))
 
 	inName := false
+	inRune := false
 	last := len(qs) - 1
 	currentVar := 1
 	name := make([]byte, 0, 10)
+	var oneRune []byte
 
 	for i, b := range qs {
 		// a ':' while we're in a name is an error
@@ -355,6 +358,25 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 			rebound = append(rebound, ':', '=')
 			inName = false
 			continue
+			// if we're in a rune
+		} else if inRune {
+			oneRune = append(oneRune, b)
+			// if next character is a first byte of utf8
+			if i == last || utf8.RuneStart(qs[i+1]) {
+				inRune = false
+				r, size := utf8.DecodeRune(oneRune)
+				if size == len(oneRune) && unicode.IsOneOf(allowedBindRunes, r) {
+					name = append(name, oneRune...)
+				} else {
+					err = fmt.Errorf("a broken multi-byte character (%v) while reading named param at %d", oneRune, i)
+					return query, names, err
+				}
+			}
+			// if we're in a name, and this is a multi-byte character, continue
+		} else if inName && i != last && !utf8.RuneStart(qs[i+1]) {
+			inRune = true
+			oneRune = []byte{}
+			oneRune = append(oneRune, b)
 			// if we're in a name, and this is an allowed character, continue
 		} else if inName && (unicode.IsOneOf(allowedBindRunes, rune(b)) || b == '_' || b == '.') && i != last {
 			// append the byte to the name if we are in a name and not on the last byte

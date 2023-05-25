@@ -56,13 +56,15 @@ func TestCompileQuery(t *testing.T) {
 		/* This unicode awareness test sadly fails, because of our byte-wise worldview.
 		 * We could certainly iterate by Rune instead, though it's a great deal slower,
 		 * it's probably the RightWay(tm)
+		 */
 		{
 			Q: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
 			R: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
 			D: `INSERT INTO foo (a,b,c,d) VALUES ($1, $2, $3, $4)`,
-			N: []string{"name", "age", "first", "last"},
+			N: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
+			T: `INSERT INTO foo (a,b,c,d) VALUES (@p1, @p2, @p3, @p4)`,
+			V: []string{"あ", "b", "キコ", "名前"},
 		},
-		*/
 	}
 
 	for _, test := range table {

@@ -1864,11 +1864,11 @@ func TestIn130Regression(t *testing.T) {
 		}
 		t.Log(args)
 		for _, a := range args {
-			switch a.(type) {
+			switch a := a.(type) {
 			case string:
 				t.Log("ok: string", a)
 			case *string:
-				t.Error("ng: string pointer", a, *a.(*string))
+				t.Error("ng: string pointer", a, *a)
 			}
 		}
 	})
@@ -1883,11 +1883,11 @@ func TestIn130Regression(t *testing.T) {
 		}
 		t.Log(args)
 		for _, a := range args {
-			switch a.(type) {
+			switch a := a.(type) {
 			case string:
 				t.Log("ok: string", a)
 			case *string:
-				t.Error("ng: string pointer", a, *a.(*string))
+				t.Error("ng: string pointer", a, *a)
 			}
 		}
 	})

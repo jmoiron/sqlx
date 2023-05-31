@@ -7,7 +7,7 @@ import (
 
 func oldBindType(driverName string) int {
 	switch driverName {
-	case "postgres", "pgx", "pq-timeouts", "cloudsqlpostgres", "ql":
+	case "postgres", "pgx", "pgx/v4", "pgx/v5", "pq-timeouts", "cloudsqlpostgres", "ql":
 		return DOLLAR
 	case "mysql":
 		return QUESTION

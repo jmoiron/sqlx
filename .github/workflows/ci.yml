@@ -1,0 +1,110 @@
+name: SQLX CI
+
+on: 
+  push:
+    
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+      
+        ##
+        # XXX: change this to the official action once multiple --out-format args are supported.
+        # See: https://github.com/golangci/golangci-lint-action/issues/612
+        ##
+      - name: golangci-lint
+        uses: smartcontractkit/golangci-lint-action@54ab6c5f11d66a92d14c3f7cc41ea13f676644bd # feature/multiple-output-formats-backup
+        with:
+          version: v1.52.1
+          allow-extra-out-format-args: true
+          args: --timeout=2m0s --out-format checkstyle:golangci-lint-report.xml
+
+      - name: Print lint report artifact
+        if: always()
+        run: test -f golangci-lint-report.xml && cat golangci-lint-report.xml || true
+
+      - name: Upload lint report artifact
+        if: always()
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
+        with:
+          name: golangci-lint-report
+          path: golangci-lint-report.xml
+
+  ci_test:
+    name: CI Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v2
+      
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          cache: true
+          
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go
+      
+      - name: Run Test Suite
+        run: go test ./... -coverpkg=./... -coverprofile=coverage.txt $1 | tee $OUTPUT_FILE
+      
+      - name: Run Race Test Suite
+        run: go test -race ./... -coverpkg=./... -coverprofile=race_coverage.txt $1 | tee $OUTPUT_FILE
+
+      - name: Upload Go test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: go-test-results
+          path: |
+            ./output.txt
+            ./coverage.txt
+            ./race_coverage.txt
+
+  sonar-scan:
+    name: SonarQube
+    needs: [lint, ci_test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # fetches all history for all tags and branches to provide more metadata for sonar reports
+
+      - name: Download all workflow run artifacts
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+      
+      - name: Set SonarQube Report Paths
+        id: sonarqube_report_paths
+        shell: bash
+        run: |
+          echo "sonarqube_tests_report_paths=$(find -type f -name 'output.txt' -printf "%p,")" >> $GITHUB_OUTPUT
+          echo "sonarqube_coverage_report_paths=$(find -type f -name '*coverage.txt' -printf "%p,")" >> $GITHUB_OUTPUT
+          echo "sonarqube_golangci_report_paths=$(find -type f -name 'golangci-lint-report.xml' -printf "%p,")" >> $GITHUB_OUTPUT
+      
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@a6ba0aafc293e03de5437af7edbc97f7d3ebc91a # v1.2.0
+        with:
+          args: >
+            -Dsonar.go.tests.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_tests_report_paths }}
+            -Dsonar.go.coverage.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_coverage_report_paths }}
+            -Dsonar.go.golangci-lint.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_golangci_report_paths }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

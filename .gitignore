@@ -23,3 +23,8 @@ _testmain.go
 *.exe
 tags
 environ
+
+# Test & linter reports
+*report.xml
+*report.json
+*.out

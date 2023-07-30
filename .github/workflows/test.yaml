@@ -1,0 +1,63 @@
+name: Code-Testing
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: sqlxtest
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mysql:
+        image: mysql
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_USER: mysql
+          MYSQL_DATABASE: sqlxtest
+          MYSQL_PASSWORD: mysql
+          MYSQL_ROOT_PASSWORD: mysql
+        options: >-
+          --health-cmd="mysqladmin ping" 
+          --health-interval=10s 
+          --health-timeout=5s 
+          --health-retries=3
+
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v2
+
+      - name: "Install Golang"
+        uses: actions/setup-go@v4
+        with:
+          go-version: "^1.20"
+
+      - name: "Install all dependencies"
+        run: |
+          go mod download
+
+      - name: "Install Gotestsum"
+        run: |
+          go install gotest.tools/gotestsum@latest
+
+      - name: "Run Tests"
+        env:
+          SQLX_POSTGRES_DSN: "postgres://postgres:postgres@127.0.0.1:5432/sqlxtest?sslmode=disable"
+          SQLX_MYSQL_DSN: ""
+          SQLX_SQLITE_DSN: "./sqlxtest.sqlite"
+        run: |
+          gotestsum --format testname ./...

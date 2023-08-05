@@ -26,7 +26,7 @@ sync.Map implementation:
 
 goos: linux
 goarch: amd64
-pkg: github.com/jmoiron/sqlx
+pkg: github.com/benknigge/sqly
 BenchmarkBindSpeed/old-4         	100000000	        11.0 ns/op
 BenchmarkBindSpeed/new-4         	24575726	        50.8 ns/op
 
@@ -35,7 +35,7 @@ async.Value map implementation:
 
 goos: linux
 goarch: amd64
-pkg: github.com/jmoiron/sqlx
+pkg: github.com/benknigge/sqly
 BenchmarkBindSpeed/old-4         	100000000	        11.0 ns/op
 BenchmarkBindSpeed/new-4         	42535839	        27.5 ns/op
 */

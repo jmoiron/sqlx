@@ -7,8 +7,11 @@
 package reflectx
 
 import (
+	"database/sql"
+	"fmt"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -199,6 +202,191 @@ func (m *Mapper) TraversalsByNameFunc(t reflect.Type, names []string, fn func(in
 		}
 	}
 	return nil
+}
+
+// ObjectContext provides a single layer to abstract away
+// nested struct scanning functionality
+type ObjectContext struct {
+	value reflect.Value
+}
+
+func NewObjectContext() *ObjectContext {
+	return &ObjectContext{}
+}
+
+// NewRow updates the object reference.
+// This ensures all columns point to the same object
+func (o *ObjectContext) NewRow(value reflect.Value) {
+	o.value = value
+}
+
+// FieldForIndexes returns the value for address. If the address is a nested struct,
+// a nestedFieldScanner is returned instead of the standard value reference
+func (o *ObjectContext) FieldForIndexes(indexes []int) reflect.Value {
+	if len(indexes) == 1 {
+		val := FieldByIndexes(o.value, indexes)
+		return val
+	}
+
+	obj := &nestedFieldScanner{
+		parent:  o,
+		indexes: indexes,
+	}
+
+	v := reflect.ValueOf(obj).Elem()
+	return v
+}
+
+// nestedFieldScanner will only forward the Scan to the nested value if
+// the database value is not nil.
+type nestedFieldScanner struct {
+	parent  *ObjectContext
+	indexes []int
+}
+
+// Scan implements sql.Scanner.
+// This method largely mirrors the sql.convertAssign() method with some minor changes
+func (o *nestedFieldScanner) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+
+	dv := FieldByIndexes(o.parent.value, o.indexes)
+	// Dereference pointer fields to avoid double pointers **T
+	if dv.Kind() == reflect.Pointer {
+		dv.Set(reflect.New(dv.Type().Elem()))
+		dv = dv.Elem()
+	}
+	iface := dv.Addr().Interface()
+
+	if scan, ok := iface.(sql.Scanner); ok {
+		return scan.Scan(src)
+	}
+
+	sv := reflect.ValueOf(src)
+
+	// below is taken from https://cs.opensource.google/go/go/+/refs/tags/go1.19.5:src/database/sql/convert.go
+	// with a few minor edits
+
+	if sv.IsValid() && sv.Type().AssignableTo(dv.Type()) {
+		switch b := src.(type) {
+		case []byte:
+			dv.Set(reflect.ValueOf(bytesClone(b)))
+		default:
+			dv.Set(sv)
+		}
+
+		return nil
+	}
+
+	if dv.Kind() == sv.Kind() && sv.Type().ConvertibleTo(dv.Type()) {
+		dv.Set(sv.Convert(dv.Type()))
+		return nil
+	}
+
+	// The following conversions use a string value as an intermediate representation
+	// to convert between various numeric types.
+	//
+	// This also allows scanning into user defined types such as "type Int int64".
+	// For symmetry, also check for string destination types.
+	switch dv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if src == nil {
+			return fmt.Errorf("converting NULL to %s is unsupported", dv.Kind())
+		}
+		s := asString(src)
+		i64, err := strconv.ParseInt(s, 10, dv.Type().Bits())
+		if err != nil {
+			err = strconvErr(err)
+			return fmt.Errorf("converting driver.Value type %T (%q) to a %s: %v", src, s, dv.Kind(), err)
+		}
+		dv.SetInt(i64)
+		return nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if src == nil {
+			return fmt.Errorf("converting NULL to %s is unsupported", dv.Kind())
+		}
+		s := asString(src)
+		u64, err := strconv.ParseUint(s, 10, dv.Type().Bits())
+		if err != nil {
+			err = strconvErr(err)
+			return fmt.Errorf("converting driver.Value type %T (%q) to a %s: %v", src, s, dv.Kind(), err)
+		}
+		dv.SetUint(u64)
+		return nil
+	case reflect.Float32, reflect.Float64:
+		if src == nil {
+			return fmt.Errorf("converting NULL to %s is unsupported", dv.Kind())
+		}
+		s := asString(src)
+		f64, err := strconv.ParseFloat(s, dv.Type().Bits())
+		if err != nil {
+			err = strconvErr(err)
+			return fmt.Errorf("converting driver.Value type %T (%q) to a %s: %v", src, s, dv.Kind(), err)
+		}
+		dv.SetFloat(f64)
+		return nil
+	case reflect.String:
+		if src == nil {
+			return fmt.Errorf("converting NULL to %s is unsupported", dv.Kind())
+		}
+		switch v := src.(type) {
+		case string:
+			dv.SetString(v)
+			return nil
+		case []byte:
+			dv.SetString(string(v))
+			return nil
+		}
+	}
+
+	return fmt.Errorf("don't know how to parse type %T -> %T", src, iface)
+}
+
+// returns internal conversion error if available
+// taken from https://cs.opensource.google/go/go/+/refs/tags/go1.19.5:src/database/sql/convert.go
+func strconvErr(err error) error {
+	if ne, ok := err.(*strconv.NumError); ok {
+		return ne.Err
+	}
+	return err
+}
+
+// converts value to it's string value
+// taken from https://cs.opensource.google/go/go/+/refs/tags/go1.19.5:src/database/sql/convert.go
+func asString(src interface{}) string {
+	switch v := src.(type) {
+	case string:
+		return v
+	case []byte:
+		return string(v)
+	}
+	rv := reflect.ValueOf(src)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.FormatInt(rv.Int(), 10)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.FormatUint(rv.Uint(), 10)
+	case reflect.Float64:
+		return strconv.FormatFloat(rv.Float(), 'g', -1, 64)
+	case reflect.Float32:
+		return strconv.FormatFloat(rv.Float(), 'g', -1, 32)
+	case reflect.Bool:
+		return strconv.FormatBool(rv.Bool())
+	}
+	return fmt.Sprintf("%v", src)
+}
+
+// bytesClone returns a copy of b[:len(b)].
+// The result may have additional unused capacity.
+// Clone(nil) returns nil.
+//
+// bytesClone is a mirror of bytes.Clone while our go.mod is on an older version
+func bytesClone(b []byte) []byte {
+	if b == nil {
+		return nil
+	}
+	return append([]byte{}, b...)
 }
 
 // FieldByIndexes returns a value for the field given by the struct traversal

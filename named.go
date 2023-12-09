@@ -418,6 +418,13 @@ func Named(query string, arg interface{}) (string, []interface{}, error) {
 	return bindNamedMapper(QUESTION, query, arg, mapper())
 }
 
+// Named takes a query using named parameters and an argument and
+// returns a new query with a list of args that can be executed by
+// a database.  The return value uses the `$` bindvar.
+func NamedDollar(query string, arg interface{}) (string, []interface{}, error) {
+	return bindNamedMapper(DOLLAR, query, arg, mapper())
+}
+
 func bindNamedMapper(bindType int, query string, arg interface{}, m *reflectx.Mapper) (string, []interface{}, error) {
 	t := reflect.TypeOf(arg)
 	k := t.Kind()

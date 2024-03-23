@@ -3,6 +3,7 @@ package sqlx
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -299,6 +300,15 @@ func TestNamedQueries(t *testing.T) {
 			t.Errorf("expected %s, got %s", sl.Email, p2.Email)
 		}
 
+		_, _, err = db.BindNamed("SELECT * FROM person WHERE id=:id /*TODO: handle accidental colon in named query*/", struct{ID int `db:"id"`}{1})
+		if err == nil || !strings.Contains(err.Error(), "sqlx.bindArgs: empty named parameter") {
+			t.Error("Expected an empty named parameter error with struct arg.")
+		}
+
+		_, _, err = db.BindNamed("SELECT * FROM person WHERE id=:id /*TODO: handle accidental colon in named query*/", map[string]interface{}{"id": 1})
+		if err == nil || !strings.Contains(err.Error(), "sqlx.bindMapArgs: empty named parameter") {
+			t.Error("Expected an empty named parameter error with map arg.")
+		}
 	})
 }
 

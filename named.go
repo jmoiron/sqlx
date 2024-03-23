@@ -181,6 +181,9 @@ func bindArgs(names []string, arg interface{}, m *reflectx.Mapper) ([]interface{
 
 	err := m.TraversalsByNameFunc(v.Type(), names, func(i int, t []int) error {
 		if len(t) == 0 {
+			if names[i] == "" {
+				return fmt.Errorf("sqlx.bindArgs: empty named parameter at index %d in %#v", i, names)
+			}
 			return fmt.Errorf("could not find name %s in %#v", names[i], arg)
 		}
 
@@ -197,7 +200,10 @@ func bindArgs(names []string, arg interface{}, m *reflectx.Mapper) ([]interface{
 func bindMapArgs(names []string, arg map[string]interface{}) ([]interface{}, error) {
 	arglist := make([]interface{}, 0, len(names))
 
-	for _, name := range names {
+	for i, name := range names {
+		if name == "" {
+			return arglist, fmt.Errorf("sqlx.bindMapArgs: empty named parameter at index %d in %#v", i, names)
+		}
 		val, ok := arg[name]
 		if !ok {
 			return arglist, fmt.Errorf("could not find name %s in %#v", name, arg)

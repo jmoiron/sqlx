@@ -1,13 +1,12 @@
 // The following environment variables, if set, will be used:
 //
-//	* SQLX_SQLITE_DSN
-//	* SQLX_POSTGRES_DSN
-//	* SQLX_MYSQL_DSN
+//   - SQLX_SQLITE_DSN
+//   - SQLX_POSTGRES_DSN
+//   - SQLX_MYSQL_DSN
 //
 // Set any of these variables to 'skip' to skip them.  Note that for MySQL,
 // the string '?parseTime=True' will be appended to the DSN if it's not there
 // already.
-//
 package sqlx
 
 import (
@@ -23,9 +22,10 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
 /* compile time checks that Db, Tx, Stmt (qStmt) implement expected interfaces */
@@ -41,7 +41,6 @@ var TestMysql = true
 var sldb *DB
 var pgdb *DB
 var mysqldb *DB
-var active = []*DB{}
 
 func init() {
 	ConnectAll()
@@ -269,7 +268,7 @@ func TestMissingNames(t *testing.T) {
 			FirstName string `db:"first_name"`
 			LastName  string `db:"last_name"`
 			Email     string
-			//AddedAt time.Time `db:"added_at"`
+			// AddedAt time.Time `db:"added_at"`
 		}
 
 		// test Select first
@@ -659,7 +658,7 @@ func TestNamedQuery(t *testing.T) {
 		// these are tests for #73;  they verify that named queries work if you've
 		// changed the db mapper.  This code checks both NamedQuery "ad-hoc" style
 		// queries and NamedStmt queries, which use different code paths internally.
-		old := *db.Mapper
+		old := (*db).Mapper
 
 		type JSONPerson struct {
 			FirstName sql.NullString `json:"FIRST"`
@@ -744,7 +743,7 @@ func TestNamedQuery(t *testing.T) {
 
 		check(t, rows)
 
-		db.Mapper = &old
+		db.Mapper = old
 
 		// Test nested structs
 		type Place struct {
@@ -1016,7 +1015,7 @@ func TestUsage(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		//fmt.Printf("%#v\n%#v\n%#v\n", placesptr[0], placesptr[1], placesptr[2])
+		// fmt.Printf("%#v\n%#v\n%#v\n", placesptr[0], placesptr[1], placesptr[2])
 
 		// if you have null fields and use SELECT *, you must use sql.Null* in your struct
 		// this test also verifies that you can use either a []Struct{} or a []*Struct{}
@@ -1578,9 +1577,9 @@ func TestIn(t *testing.T) {
 	}
 	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
 		loadDefaultFixture(db, t)
-		//tx.MustExec(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
-		//tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
-		//tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
+		// tx.MustExec(tx.Rebind("INSERT INTO place (country, city, telcode) VALUES (?, ?, ?)"), "United States", "New York", "1")
+		// tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Hong Kong", "852")
+		// tx.MustExec(tx.Rebind("INSERT INTO place (country, telcode) VALUES (?, ?)"), "Singapore", "65")
 		telcodes := []int{852, 65}
 		q := "SELECT * FROM place WHERE telcode IN(?) ORDER BY telcode"
 		query, args, err := In(q, telcodes)
@@ -1864,11 +1863,11 @@ func TestIn130Regression(t *testing.T) {
 		}
 		t.Log(args)
 		for _, a := range args {
-			switch a.(type) {
+			switch a := a.(type) {
 			case string:
 				t.Log("ok: string", a)
 			case *string:
-				t.Error("ng: string pointer", a, *a.(*string))
+				t.Error("ng: string pointer", a, *a)
 			}
 		}
 	})
@@ -1883,11 +1882,11 @@ func TestIn130Regression(t *testing.T) {
 		}
 		t.Log(args)
 		for _, a := range args {
-			switch a.(type) {
+			switch a := a.(type) {
 			case string:
 				t.Log("ok: string", a)
 			case *string:
-				t.Error("ng: string pointer", a, *a.(*string))
+				t.Error("ng: string pointer", a, *a)
 			}
 		}
 	})

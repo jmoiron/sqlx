@@ -1,0 +1,140 @@
+version: 2.1
+
+"-": &go-versions
+  [ "1.18.10", "1.19.13", "1.20.14", "1.21.9", "1.22.2" ]
+
+executors:
+  go_executor:
+    parameters:
+      version:
+        type: string
+    docker:
+      - image: cimg/go:<< parameters.version >>
+
+jobs:
+  test:
+    parameters:
+      go_version:
+        type: string
+    executor:
+      name: go_executor
+      version: << parameters.go_version >>
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
+      - run:
+          name: Install Dependencies
+          command: go mod download
+      - save_cache:
+          key: go-mod-v4-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+      - run:
+          name: Run tests
+          command: |
+            mkdir -p /tmp/test-reports
+            gotestsum --junitfile /tmp/test-reports/unit-tests.xml
+      - store_test_results:
+          path: /tmp/test-reports
+  test-race:
+    parameters:
+      go_version:
+        type: string
+    executor:
+      name: go_executor
+      version: << parameters.go_version >>
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
+      - run:
+          name: Install Dependencies
+          command: go mod download
+      - save_cache:
+          key: go-mod-v4-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+      - run:
+          name: Run tests with race detector
+          command: make test-race
+  lint:
+    parameters:
+      go_version:
+        type: string
+    executor:
+      name: go_executor
+      version: << parameters.go_version >>
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
+      - run:
+          name: Install Dependencies
+          command: go mod download
+      - run:
+          name: Install tooling
+          command: |
+            make tooling
+      - save_cache:
+          key: go-mod-v4-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+      - run:
+          name: Linting
+          command: make lint
+      - run:
+          name: Running vulncheck
+          command: make vuln-check
+  fmt:
+    parameters:
+      go_version:
+        type: string
+    executor:
+      name: go_executor
+      version: << parameters.go_version >>
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
+      - run:
+          name: Install Dependencies
+          command: go mod download
+      - run:
+          name: Install tooling
+          command: |
+            make tooling
+      - save_cache:
+          key: go-mod-v4-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+      - run:
+          name: Running formatting
+          command: |
+            make fmt
+            make has-changes
+
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+      - test:
+          matrix:
+            parameters:
+              go_version: *go-versions
+      - test-race:
+          matrix:
+            parameters:
+              go_version: *go-versions
+      - lint:
+          matrix:
+            parameters:
+              go_version: *go-versions
+      - fmt:
+          matrix:
+            parameters:
+              go_version: *go-versions

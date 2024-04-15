@@ -354,7 +354,7 @@ func TestFieldsEmbedded(t *testing.T) {
 
 	fi = fields.GetByPath("person.name")
 	if fi == nil {
-		t.Errorf("Expecting person.name to exist")
+		t.Fatal("Expecting person.name to exist")
 	}
 	if fi.Path != "person.name" {
 		t.Errorf("Expecting %s, got %s", "person.name", fi.Path)
@@ -365,7 +365,7 @@ func TestFieldsEmbedded(t *testing.T) {
 
 	fi = fields.GetByTraversal([]int{1, 0})
 	if fi == nil {
-		t.Errorf("Expecting traveral to exist")
+		t.Fatal("Expecting traversal to exist")
 	}
 	if fi.Path != "name" {
 		t.Errorf("Expecting %s, got %s", "name", fi.Path)
@@ -373,7 +373,7 @@ func TestFieldsEmbedded(t *testing.T) {
 
 	fi = fields.GetByTraversal([]int{2})
 	if fi == nil {
-		t.Errorf("Expecting traversal to exist")
+		t.Fatal("Expecting traversal to exist")
 	}
 	if _, ok := fi.Options["required"]; !ok {
 		t.Errorf("Expecting required option to be set")
@@ -642,7 +642,6 @@ func TestMapperMethodsByName(t *testing.T) {
 		A0 *B `db:"A0"`
 		B  `db:"A1"`
 		A2 int
-		a3 int
 	}
 
 	val := &A{
@@ -847,22 +846,22 @@ func TestMustBe(t *testing.T) {
 			valueErr, ok := r.(*reflect.ValueError)
 			if !ok {
 				t.Errorf("unexpected Method: %s", valueErr.Method)
-				t.Error("expected panic with *reflect.ValueError")
-				return
+				t.Fatal("expected panic with *reflect.ValueError")
 			}
 			if valueErr.Method != "github.com/jmoiron/sqlx/reflectx.TestMustBe" {
+				t.Fatalf("unexpected Method: %s", valueErr.Method)
 			}
 			if valueErr.Kind != reflect.String {
-				t.Errorf("unexpected Kind: %s", valueErr.Kind)
+				t.Fatalf("unexpected Kind: %s", valueErr.Kind)
 			}
 		} else {
-			t.Error("expected panic")
+			t.Fatal("expected panic")
 		}
 	}()
 
 	typ = reflect.TypeOf("string")
 	mustBe(typ, reflect.Struct)
-	t.Error("got here, didn't expect to")
+	t.Fatal("got here, didn't expect to")
 }
 
 type E1 struct {

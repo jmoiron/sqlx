@@ -807,6 +807,25 @@ func TestUsageContext(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		rows, err := tx.NamedQueryContext(ctx, "SELECT * FROM person WHERE first_name=:first", map[string]interface{}{"first": "Bin"})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ben := &Person{}
+		for rows.Next() {
+			err = rows.StructScan(ben)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ben.FirstName != "Bin" {
+				t.Fatal("Expected first name of `Bin`, got " + ben.FirstName)
+			}
+			if ben.LastName != "Smuth" {
+				t.Fatal("Expected first name of `Smuth`, got " + ben.LastName)
+			}
+		}
+
 		tstmt2 := tx.Stmtx(stmt2)
 		row2 := tstmt2.QueryRowx("Jason")
 		err = row2.StructScan(&jason)
@@ -880,7 +899,7 @@ func TestUsageContext(t *testing.T) {
 			t.Errorf("Expected the right telcodes, got %#v", places)
 		}
 
-		rows, err := db.QueryxContext(ctx, "SELECT * FROM place")
+		rows, err = db.QueryxContext(ctx, "SELECT * FROM place")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -940,7 +959,7 @@ func TestUsageContext(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ben := &Person{}
+		ben = &Person{}
 		for rows.Next() {
 			err = rows.StructScan(ben)
 			if err != nil {

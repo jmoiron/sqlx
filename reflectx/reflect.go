@@ -203,8 +203,24 @@ func (m *Mapper) TraversalsByNameFunc(t reflect.Type, names []string, fn func(in
 // FieldByIndexes returns a value for the field given by the struct traversal
 // for the given value.
 func FieldByIndexes(v reflect.Value, indexes []int) reflect.Value {
+	return fieldByIndexes(v, indexes, false)
+}
+
+// FieldByIndexesReadOnly returns a value for a particular struct traversal,
+// but is not concerned with allocating nil pointers because the value is
+// going to be used for reading and not setting.
+func FieldByIndexesReadOnly(v reflect.Value, indexes []int) reflect.Value {
+	return fieldByIndexes(v, indexes, true)
+}
+
+func fieldByIndexes(v reflect.Value, indexes []int, ro bool) reflect.Value {
 	for _, i := range indexes {
 		v = reflect.Indirect(v).Field(i)
+
+		if ro {
+			continue
+		}
+
 		// if this is a pointer and it's nil, allocate a new value and set it
 		if v.Kind() == reflect.Ptr && v.IsNil() {
 			alloc := reflect.New(Deref(v.Type()))
@@ -214,16 +230,7 @@ func FieldByIndexes(v reflect.Value, indexes []int) reflect.Value {
 			v.Set(reflect.MakeMap(v.Type()))
 		}
 	}
-	return v
-}
 
-// FieldByIndexesReadOnly returns a value for a particular struct traversal,
-// but is not concerned with allocating nil pointers because the value is
-// going to be used for reading and not setting.
-func FieldByIndexesReadOnly(v reflect.Value, indexes []int) reflect.Value {
-	for _, i := range indexes {
-		v = reflect.Indirect(v).Field(i)
-	}
 	return v
 }
 

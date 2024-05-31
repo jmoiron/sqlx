@@ -1,6 +1,7 @@
 package sqlx
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -340,6 +341,15 @@ func (db *DB) MustBegin() *Tx {
 // Beginx begins a transaction and returns an *sqlx.Tx instead of an *sql.Tx.
 func (db *DB) Beginx() (*Tx, error) {
 	tx, err := db.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	return &Tx{Tx: tx, driverName: db.driverName, unsafe: db.unsafe, Mapper: db.Mapper}, err
+}
+
+// BeginTxx begins a transaction with options and returns an *sqlx.Tx instead of an *sql.Tx.
+func (db *DB) BeginTxx(opts *sql.TxOptions) (*Tx, error) {
+	tx, err := db.DB.BeginTx(context.Background(), opts)
 	if err != nil {
 		return nil, err
 	}

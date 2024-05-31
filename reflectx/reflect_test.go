@@ -286,6 +286,38 @@ func TestInlineStruct(t *testing.T) {
 	}
 }
 
+func TestColMapFunc(t *testing.T) {
+	m := NewMapperTagColFunc("", strings.ToLower, nil, strings.ToLower)
+
+	type Employee struct {
+		FirstName string
+		ID        int
+	}
+	type Boss Employee
+	type person struct {
+		Employee Employee
+		Boss     Boss
+	}
+	// employees columns: (employee.firstName employee.id boss.firstName boss.id)
+
+	em := person{Employee: Employee{FirstName: "Joe", ID: 2}, Boss: Boss{FirstName: "Dick", ID: 1}}
+	ev := reflect.ValueOf(em)
+
+	fields := m.TypeMap(reflect.TypeOf(em))
+	if len(fields.Index) != 6 {
+		t.Errorf("Expecting 6 fields")
+	}
+
+	v := m.FieldByName(ev, "employee.firstName")
+	if v.Interface().(string) != em.Employee.FirstName {
+		t.Errorf("Expecting %s, got %s", em.Employee.FirstName, v.Interface().(string))
+	}
+	v = m.FieldByName(ev, "boss.id")
+	if ival(v) != em.Boss.ID {
+		t.Errorf("Expecting %v, got %v", em.Boss.ID, ival(v))
+	}
+}
+
 func TestRecursiveStruct(t *testing.T) {
 	type Person struct {
 		Parent *Person

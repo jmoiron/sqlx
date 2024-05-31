@@ -277,6 +277,18 @@ func (c *Conn) Rebind(query string) string {
 	return Rebind(BindType(c.driverName), query)
 }
 
+// NamedQueryContext using this Conn.
+// Any named placeholder parameters are replaced with fields from arg.
+func (c *Conn) NamedQueryContext(ctx context.Context, query string, arg interface{}) (*Rows, error) {
+	return NamedQueryContext(ctx, c, query, arg)
+}
+
+// NamedExecContext using this Conn.
+// Any named placeholder parameters are replaced with fields from arg.
+func (c *Conn) NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error) {
+	return NamedExecContext(ctx, c, query, arg)
+}
+
 // StmtxContext returns a version of the prepared statement which runs within a
 // transaction. Provided stmt can be either *sql.Stmt or *sqlx.Stmt.
 func (tx *Tx) StmtxContext(ctx context.Context, stmt interface{}) *Stmt {

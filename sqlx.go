@@ -1,6 +1,7 @@
 package sqlx
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -152,6 +153,10 @@ func mapperFor(i interface{}) *reflectx.Mapper {
 	case Tx:
 		return i.Mapper
 	case *Tx:
+		return i.Mapper
+	case Conn:
+		return i.Mapper
+	case *Conn:
 		return i.Mapper
 	default:
 		return mapper()
@@ -385,6 +390,67 @@ type Conn struct {
 	driverName string
 	unsafe     bool
 	Mapper     *reflectx.Mapper
+}
+
+func (c *Conn) Prepare(query string) (*sql.Stmt, error) {
+	return c.PrepareContext(context.Background(), query)
+}
+
+func (c *Conn) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return c.QueryContext(context.Background(), query, args...)
+}
+
+// Queryx queries the database and returns an *sqlx.Rows.
+// Any placeholder parameters are replaced with supplied args.
+func (c *Conn) Queryx(query string, args ...interface{}) (*Rows, error) {
+	r, err := c.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return &Rows{Rows: r, unsafe: c.unsafe, Mapper: c.Mapper}, err
+}
+
+func (c *Conn) QueryRowx(query string, args ...interface{}) *Row {
+	rows, err := c.Query(query, args...)
+	return &Row{rows: rows, err: err, unsafe: c.unsafe, Mapper: c.Mapper}
+}
+
+func (c *Conn) Exec(query string, args ...interface{}) (sql.Result, error) {
+	return c.ExecContext(context.Background(), query, args...)
+}
+
+// PrepareNamed returns an sqlx.NamedStmt
+func (c *Conn) PrepareNamed(query string) (*NamedStmt, error) {
+	return prepareNamed(c, query)
+}
+
+// DriverName returns the driverName used by the DB which began this transaction.
+func (c *Conn) DriverName() string {
+	return c.driverName
+}
+
+// BindNamed binds a query within a connections bindvar type.
+func (c *Conn) BindNamed(query string, arg interface{}) (string, []interface{}, error) {
+	return bindNamedMapper(BindType(c.driverName), query, arg, c.Mapper)
+}
+
+// NamedExec using this Conn.
+// Any named placeholder parameters are replaced with fields from arg.
+func (c *Conn) NamedExec(query string, arg interface{}) (sql.Result, error) {
+	return NamedExec(c, query, arg)
+}
+
+// NamedQuery using this Conn.
+// Any named placeholder parameters are replaced with fields from arg.
+func (c *Conn) NamedQuery(query string, arg interface{}) (*Rows, error) {
+	return NamedQuery(c, query, arg)
+}
+
+// Get using this Conn.
+// Any placeholder parameters are replaced with supplied args.
+// An error is returned if the result set is empty.
+func (c *Conn) Get(dest interface{}, query string, args ...interface{}) error {
+	return Get(c, dest, query, args...)
 }
 
 // Tx is an sqlx wrapper around sql.Tx with extra functionality

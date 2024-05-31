@@ -466,6 +466,70 @@ func TestEmbeddedStructs(t *testing.T) {
 	})
 }
 
+func TestForeignKeyNullableWithNamedStmt(t *testing.T) {
+	type Employee struct {
+		Name string `db:"name"`
+		ID   int64  `db:"id"`
+		// BossID is an id into the employee table
+		BossID sql.NullInt64 `db:"boss_id"`
+	}
+	type Boss Employee
+
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+
+		var (
+			boss     = new(Boss)
+			employee = new(Employee)
+		)
+
+		// Fetch the test boss from the database
+		err := db.Get(
+			boss,
+			`SELECT * FROM employees WHERE id = ?`, 4444)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Fetch the test employee under the boss 4444
+		err = db.Get(
+			employee,
+			`SELECT * FROM employees WHERE id = ? AND boss_id = ?`, 2, 4444)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if employee.BossID.Int64 != boss.ID {
+			t.Errorf("Employee's boss ID does not match expected value")
+		}
+
+		// Update the employee's boss_id foreign key to NULL via named statement
+		nstmt, err := db.PrepareNamed(`UPDATE employees SET boss_id=:boss_id WHERE id=:id`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		employee.BossID = sql.NullInt64{}
+		_, err = nstmt.Exec(employee)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Now fetch the updated employee from the database
+		employee = new(Employee)
+		err = db.Get(
+			employee,
+			`SELECT * FROM employees WHERE id = ?`, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// And make sure the foreign key was set to NULL
+		if employee.BossID.Valid {
+			t.Errorf("Employee's boss ID should be NULL")
+		}
+	})
+}
+
 func TestJoinQuery(t *testing.T) {
 	type Employee struct {
 		Name string

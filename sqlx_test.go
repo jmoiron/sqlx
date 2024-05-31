@@ -1315,47 +1315,6 @@ func TestDoNotPanicOnConnect(t *testing.T) {
 	}
 }
 
-func TestRebind(t *testing.T) {
-	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
-
-	s1 := Rebind(DOLLAR, q1)
-	s2 := Rebind(DOLLAR, q2)
-
-	if s1 != `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)` {
-		t.Errorf("q1 failed")
-	}
-
-	if s2 != `INSERT INTO foo (a, b, c) VALUES ($1, $2, "foo"), ("Hi", $3, $4)` {
-		t.Errorf("q2 failed")
-	}
-
-	s1 = Rebind(AT, q1)
-	s2 = Rebind(AT, q2)
-
-	if s1 != `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10)` {
-		t.Errorf("q1 failed")
-	}
-
-	if s2 != `INSERT INTO foo (a, b, c) VALUES (@p1, @p2, "foo"), ("Hi", @p3, @p4)` {
-		t.Errorf("q2 failed")
-	}
-
-	s1 = Rebind(NAMED, q1)
-	s2 = Rebind(NAMED, q2)
-
-	ex1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES ` +
-		`(:arg1, :arg2, :arg3, :arg4, :arg5, :arg6, :arg7, :arg8, :arg9, :arg10)`
-	if s1 != ex1 {
-		t.Error("q1 failed on Named params")
-	}
-
-	ex2 := `INSERT INTO foo (a, b, c) VALUES (:arg1, :arg2, "foo"), ("Hi", :arg3, :arg4)`
-	if s2 != ex2 {
-		t.Error("q2 failed on Named params")
-	}
-}
-
 func TestBindMap(t *testing.T) {
 	// Test that it works..
 	q1 := `INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)`
@@ -1825,30 +1784,6 @@ func BenchmarkIn1kString(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		_, _, _ = In(q, []interface{}{"foo", vals[:], "bar"}...)
-	}
-}
-
-func BenchmarkRebind(b *testing.B) {
-	b.StopTimer()
-	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
-	b.StartTimer()
-
-	for i := 0; i < b.N; i++ {
-		Rebind(DOLLAR, q1)
-		Rebind(DOLLAR, q2)
-	}
-}
-
-func BenchmarkRebindBuffer(b *testing.B) {
-	b.StopTimer()
-	q1 := `INSERT INTO foo (a, b, c, d, e, f, g, h, i) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	q2 := `INSERT INTO foo (a, b, c) VALUES (?, ?, "foo"), ("Hi", ?, ?)`
-	b.StartTimer()
-
-	for i := 0; i < b.N; i++ {
-		rebindBuff(DOLLAR, q1)
-		rebindBuff(DOLLAR, q2)
 	}
 }
 

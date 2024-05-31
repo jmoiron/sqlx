@@ -298,7 +298,7 @@ func parseName(field reflect.StructField, tagName string, mapFunc, tagMapFunc ma
 	//    If the tag does not have the conventional format,
 	//    the value returned by Get is unspecified.
 	// which doesn't sound great.
-	if !strings.Contains(string(field.Tag), tagName+":") {
+	if !(strings.Contains(string(field.Tag), " "+tagName+":") || strings.HasPrefix(string(field.Tag), tagName+":")) {
 		return "", fieldName
 	}
 

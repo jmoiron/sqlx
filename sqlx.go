@@ -594,6 +594,12 @@ func (r *Rows) MapScan(dest map[string]interface{}) error {
 	return MapScan(r, dest)
 }
 
+// ResetMappingCache Resets the mapping cache. This is needed when working with multiple result sets
+// with different underlying structure.
+func (r *Rows) ResetMappingCache() {
+	r.started = false
+}
+
 // StructScan is like sql.Rows.Scan, but scans a single Row into a single Struct.
 // Use this and iterate over Rows manually when the memory load of Select() might be
 // prohibitive.  *Rows.StructScan caches the reflect work of matching up column

@@ -1017,7 +1017,7 @@ func baseType(t reflect.Type, expected reflect.Kind) (reflect.Type, error) {
 	return t, nil
 }
 
-// fieldsByName fills a values interface with fields from the passed value based
+// fieldsByTraversal fills a values interface with fields from the passed value based
 // on the traversals in int.  If ptrs is true, return addresses instead of values.
 // We write this instead of using FieldsByName to save allocations and map lookups
 // when iterating over many rows.  Empty traversals will get an interface pointer.

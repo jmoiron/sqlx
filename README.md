@@ -130,9 +130,9 @@ func main() {
     // Query the database, storing results in a []Person (wrapped in []interface{})
     people := []Person{}
     db.Select(&people, "SELECT * FROM person ORDER BY first_name ASC")
-    jason, john := people[0], people[1]
+    jason, john := people[1], people[2]
 
-    fmt.Printf("%#v\n%#v", jason, john)
+    fmt.Printf("%#v\n%#v\n", jason, john)
     // Person{FirstName:"Jason", LastName:"Moiron", Email:"jmoiron@jmoiron.net"}
     // Person{FirstName:"John", LastName:"Doe", Email:"johndoeDNE@gmail.net"}
 

@@ -72,6 +72,11 @@ func (j *JSONText) UnmarshalJSON(data []byte) error {
 	if j == nil {
 		return errors.New("JSONText: UnmarshalJSON on nil pointer")
 	}
+
+	if string(data) == "null" {
+		return nil
+	}
+
 	*j = append((*j)[0:0], data...)
 	return nil
 }

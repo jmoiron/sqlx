@@ -74,7 +74,7 @@ func ConnectAll() {
 	if TestMysql {
 		mysqldb, err = Connect("mysql", mydsn)
 		if err != nil {
-			fmt.Printf("Disabling MySQL tests:\n    %v", err)
+			fmt.Printf("Disabling MySQL tests:\n    %v\n", err)
 			TestMysql = false
 		}
 	} else {
@@ -84,7 +84,7 @@ func ConnectAll() {
 	if TestSqlite {
 		sldb, err = Connect("sqlite3", sqdsn)
 		if err != nil {
-			fmt.Printf("Disabling SQLite:\n    %v", err)
+			fmt.Printf("Disabling SQLite:\n    %v\n", err)
 			TestSqlite = false
 		}
 	} else {
@@ -1728,6 +1728,46 @@ func TestEmbeddedLiterals(t *testing.T) {
 		}
 		if *target2.K != "one" {
 			t.Errorf("Expected target2.K to be `one`, got `%v`", target2.K)
+		}
+	})
+}
+
+// TestGet tests to ensure that Get behaves correctly for
+// single row and multi row results.
+func TestGet(t *testing.T) {
+	var schema = Schema{
+		create: `CREATE TABLE tst (v integer);`,
+		drop:   `drop table tst;`,
+	}
+
+	RunWithSchema(schema, t, func(db *DB, t *testing.T) {
+		for _, v := range []int{1, 2} {
+			_, err := db.Exec(db.Rebind("INSERT INTO tst (v) VALUES (?)"), v)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+
+		tests := []struct {
+			name string
+			val  int
+			err  bool
+		}{
+			{"multi-rows", 1, true},
+			{"single-row", 2, false},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				var v int
+				err := db.Get(&v, db.Rebind("SELECT v FROM tst WHERE v >= ?"), tc.val)
+				if tc.err {
+					if err == nil {
+						t.Error("expected error but got nil")
+					}
+				} else if err != nil {
+					t.Error("unexpected error:", err)
+				}
+			})
 		}
 	})
 }

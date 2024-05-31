@@ -636,6 +636,16 @@ func (r *Rows) StructScan(dest interface{}) error {
 	return r.Err()
 }
 
+// NextResultSet moves to the next resultset if available and resets the field cache.
+func (r *Rows) NextResultSet() bool {
+	if !r.Rows.NextResultSet() {
+		return false
+	}
+	// reset fields cache
+	r.started = false
+	return true
+}
+
 // Connect to a database and verify with a ping.
 func Connect(driverName, dataSourceName string) (*DB, error) {
 	db, err := Open(driverName, dataSourceName)

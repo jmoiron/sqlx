@@ -332,12 +332,21 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 	names = make([]string, 0, 10)
 	rebound := make([]byte, 0, len(qs))
 
+	isstring := false
 	inName := false
 	last := len(qs) - 1
 	currentVar := 1
 	name := make([]byte, 0, 10)
 
 	for i, b := range qs {
+		//ignore if in string
+		if b == '\'' && qs[i-1] != '\\'{
+			isstring = !isstring
+		}
+		if isstring{
+			rebound = append(rebound, b)
+			continue
+		}
 		// a ':' while we're in a name is an error
 		if b == ':' {
 			// if this is the second ':' in a '::' escape sequence, append a ':'

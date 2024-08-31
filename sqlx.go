@@ -77,6 +77,7 @@ type ColScanner interface {
 type Queryer interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	Queryx(query string, args ...interface{}) (*Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
 	QueryRowx(query string, args ...interface{}) *Row
 }
 
@@ -561,6 +562,10 @@ func (q *qStmt) Queryx(query string, args ...interface{}) (*Rows, error) {
 		return nil, err
 	}
 	return &Rows{Rows: r, unsafe: q.Stmt.unsafe, Mapper: q.Stmt.Mapper}, err
+}
+
+func (q *qStmt) QueryRow(query string, args ...interface{}) *sql.Row {
+	return q.Stmt.QueryRow(args...)
 }
 
 func (q *qStmt) QueryRowx(query string, args ...interface{}) *Row {

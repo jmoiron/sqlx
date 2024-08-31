@@ -26,6 +26,7 @@ func ConnectContext(ctx context.Context, driverName, dataSourceName string) (*DB
 type QueryerContext interface {
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 	QueryxContext(ctx context.Context, query string, args ...interface{}) (*Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 	QueryRowxContext(ctx context.Context, query string, args ...interface{}) *Row
 }
 
@@ -353,6 +354,12 @@ func (tx *Tx) QueryRowxContext(ctx context.Context, query string, args ...interf
 	return &Row{rows: rows, err: err, unsafe: tx.unsafe, Mapper: tx.Mapper}
 }
 
+// NamedQueryContext using this DB.
+// Any named placeholder parameters are replaced with fields from arg.
+func (tx *Tx) NamedQueryContext(ctx context.Context, query string, arg interface{}) (*Rows, error) {
+	return NamedQueryContext(ctx, tx, query, arg)
+}
+
 // NamedExecContext using this Tx.
 // Any named placeholder parameters are replaced with fields from arg.
 func (tx *Tx) NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error) {
@@ -403,6 +410,10 @@ func (q *qStmt) QueryxContext(ctx context.Context, query string, args ...interfa
 		return nil, err
 	}
 	return &Rows{Rows: r, unsafe: q.Stmt.unsafe, Mapper: q.Stmt.Mapper}, err
+}
+
+func (q *Stmt) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return q.Stmt.QueryRowContext(ctx, args...)
 }
 
 func (q *qStmt) QueryRowxContext(ctx context.Context, query string, args ...interface{}) *Row {

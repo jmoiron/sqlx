@@ -175,10 +175,6 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 
 			anySlices = true
 			flatArgsCount += meta[i].length
-
-			if meta[i].length == 0 {
-				return "", nil, errors.New("empty slice passed to 'in' query")
-			}
 		} else {
 			meta[i].i = arg
 			flatArgsCount++

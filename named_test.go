@@ -422,13 +422,19 @@ func TestFixBounds(t *testing.T) {
 	)`,
 			loop: 2,
 		},
+		{
+			name:   `clickhouse settings`,
+			query:  `INSERT INTO foo (a,b) settings async_insert=1, wait_for_async_insert=1 VALUES(:a, :b)`,
+			expect: `INSERT INTO foo (a,b) settings async_insert=1, wait_for_async_insert=1 VALUES(:a, :b),(:a, :b)`,
+			loop:   2,
+		},
 	}
 
 	for _, tc := range table {
 		t.Run(tc.name, func(t *testing.T) {
 			res := fixBound(tc.query, tc.loop)
 			if res != tc.expect {
-				t.Errorf("mismatched results")
+				t.Errorf("mismatched results got %v", res)
 			}
 		})
 	}

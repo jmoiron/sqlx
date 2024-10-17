@@ -207,8 +207,7 @@ func FieldByIndexes(v reflect.Value, indexes []int) reflect.Value {
 		v = reflect.Indirect(v).Field(i)
 		// if this is a pointer and it's nil, allocate a new value and set it
 		if v.Kind() == reflect.Ptr && v.IsNil() {
-			alloc := reflect.New(Deref(v.Type()))
-			v.Set(alloc)
+			v.Set(reflect.New(v.Type().Elem()))
 		}
 		if v.Kind() == reflect.Map && v.IsNil() {
 			v.Set(reflect.MakeMap(v.Type()))

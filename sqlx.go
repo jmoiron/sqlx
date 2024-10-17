@@ -624,7 +624,7 @@ func (r *Rows) StructScan(dest interface{}) error {
 		r.started = true
 	}
 
-	err := fieldsByTraversal(v, r.fields, r.values, true)
+	err := fieldsByTraversal(v, r.fields, r.values)
 	if err != nil {
 		return err
 	}
@@ -784,7 +784,7 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 	}
 	values := make([]interface{}, len(columns))
 
-	err = fieldsByTraversal(v, fields, values, true)
+	err = fieldsByTraversal(v, fields, values)
 	if err != nil {
 		return err
 	}
@@ -957,7 +957,7 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 			vp = reflect.New(base)
 			v = reflect.Indirect(vp)
 
-			err = fieldsByTraversal(v, fields, values, true)
+			err = fieldsByTraversal(v, fields, values)
 			if err != nil {
 				return err
 			}
@@ -1023,7 +1023,7 @@ func baseType(t reflect.Type, expected reflect.Kind) (reflect.Type, error) {
 // when iterating over many rows.  Empty traversals will get an interface pointer.
 // Because of the necessity of requesting ptrs or values, it's considered a bit too
 // specialized for inclusion in reflectx itself.
-func fieldsByTraversal(v reflect.Value, traversals [][]int, values []interface{}, ptrs bool) error {
+func fieldsByTraversal(v reflect.Value, traversals [][]int, values []interface{}) error {
 	v = reflect.Indirect(v)
 	if v.Kind() != reflect.Struct {
 		return errors.New("argument not a struct")
@@ -1032,23 +1032,38 @@ func fieldsByTraversal(v reflect.Value, traversals [][]int, values []interface{}
 	for i, traversal := range traversals {
 		if len(traversal) == 0 {
 			values[i] = new(interface{})
-			continue
-		}
-		f := reflectx.FieldByIndexes(v, traversal)
-		if ptrs {
-			values[i] = f.Addr().Interface()
+		} else if len(traversal) == 1 {
+			values[i] = reflectx.FieldByIndexes(v, traversal).Addr().Interface()
 		} else {
-			values[i] = f.Interface()
+			// reflectx.FieldByIndexes initializes pointer fields, including pointers to nested structs.
+			// Use optDest to delay it until the first non-NULL value is scanned into a field of a nested struct.
+			// That way we can support LEFT JOINs with optional nested structs.
+			traversal := traversal
+			values[i] = optDest(func() interface{} {
+				return reflectx.FieldByIndexes(v, traversal).Addr().Interface()
+			})
 		}
 	}
 	return nil
 }
 
-func missingFields(transversals [][]int) (field int, err error) {
-	for i, t := range transversals {
+func missingFields(traversals [][]int) (field int, err error) {
+	for i, t := range traversals {
 		if len(t) == 0 {
 			return i, errors.New("missing field")
 		}
 	}
 	return 0, nil
+}
+
+// optDest will only forward the Scan to the nested value if
+// the database value is not nil.
+type optDest func() interface{}
+
+// Scan implements sql.Scanner.
+func (dest optDest) Scan(src interface{}) error {
+	if src == nil {
+		return nil
+	}
+	return convertAssign(dest(), src)
 }

@@ -1504,6 +1504,14 @@ func TestIssue197(t *testing.T) {
 	})
 }
 
+type Valuer struct {
+	Val string
+}
+
+func (v Valuer) Value() (driver.Value, error) {
+	return v.Val, nil
+}
+
 func TestIn(t *testing.T) {
 	// some quite normal situations
 	type tr struct {
@@ -1537,6 +1545,24 @@ func TestIn(t *testing.T) {
 			t.Errorf("Expected %d bindVars, got %d", test.c, strings.Count(q, "?"))
 		}
 	}
+
+	// nil driver.Valuer
+	t.Run("with nil driver.Valuer", func(t *testing.T) {
+		query := `SELECT * FROM foo WHERE x = ? or y IN (?)`
+		_, _, err := In(query,
+			(*Valuer)(nil), // a non-inited pointer to valuer
+			[]interface{}{
+				"a",                 // a usual value
+				nil,                 // a nil value
+				Valuer{Val: "foo"},  // a Valuer
+				&Valuer{Val: "foo"}, // a pointer to valuer
+				(*Valuer)(nil),      // a non-inited pointer to valuer
+			},
+		)
+		if err != nil {
+			t.Error(err)
+		}
+	})
 
 	// too many bindVars, but no slices, so short circuits parsing
 	// i'm not sure if this is the right behavior;  this query/arg combo

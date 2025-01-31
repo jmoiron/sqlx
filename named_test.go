@@ -422,6 +422,30 @@ func TestFixBounds(t *testing.T) {
 	)`,
 			loop: 2,
 		},
+		{
+			name: "use of VALUES not for insert",
+			query: `
+UPDATE t
+SET
+  foo = u.foo,
+  bar = u.bar
+FROM (
+  VALUES (:id, :foo, :bar)
+) AS u(id, foo, bar)
+WHERE t.id = u.id
+`,
+			expect: `
+UPDATE t
+SET
+  foo = u.foo,
+  bar = u.bar
+FROM (
+  VALUES (:id, :foo, :bar),(:id, :foo, :bar)
+) AS u(id, foo, bar)
+WHERE t.id = u.id
+`,
+			loop: 2,
+		},
 	}
 
 	for _, tc := range table {

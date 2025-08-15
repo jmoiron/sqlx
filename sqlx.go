@@ -54,7 +54,7 @@ func mapper() *reflectx.Mapper {
 //   - it implements sql.Scanner
 //   - it has no exported fields
 func isScannable(t reflect.Type) bool {
-	if reflect.PtrTo(t).Implements(_scannerInterface) {
+	if reflect.PointerTo(t).Implements(_scannerInterface) {
 		return true
 	}
 	if t.Kind() != reflect.Struct {
@@ -870,7 +870,7 @@ type rowsi interface {
 // struct is expected but something else is given
 func structOnlyError(t reflect.Type) error {
 	isStruct := t.Kind() == reflect.Struct
-	isScanner := reflect.PtrTo(t).Implements(_scannerInterface)
+	isScanner := reflect.PointerTo(t).Implements(_scannerInterface)
 	if !isStruct {
 		return fmt.Errorf("expected %s but got %s", reflect.Struct, t.Kind())
 	}

@@ -93,11 +93,18 @@ type binder interface {
 }
 
 // Ext is a union interface which can bind, query, and exec, used by
-// NamedQuery and NamedExec.
+// NamedExec.
 type Ext interface {
 	binder
 	Queryer
 	Execer
+}
+
+// NamedQueryer is a union interface which can bind and query, used by
+// NamedQuery.
+type NamedQueryer interface {
+	binder
+	Queryer
 }
 
 // Preparer is an interface used by Preparex.

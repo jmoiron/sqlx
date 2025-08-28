@@ -111,9 +111,9 @@ func (n *NamedStmt) GetContext(ctx context.Context, dest interface{}, arg interf
 }
 
 // NamedQueryContext binds a named query and then runs Query on the result using the
-// provided Ext (sqlx.Tx, sqlx.Db).  It works with both structs and with
+// provided NamedQueryerContext (sqlx.Tx, sqlx.Db).  It works with both structs and with
 // map[string]interface{} types.
-func NamedQueryContext(ctx context.Context, e ExtContext, query string, arg interface{}) (*Rows, error) {
+func NamedQueryContext(ctx context.Context, e NamedQueryerContext, query string, arg interface{}) (*Rows, error) {
 	q, args, err := bindNamedMapper(BindType(e.DriverName()), query, arg, mapperFor(e))
 	if err != nil {
 		return nil, err

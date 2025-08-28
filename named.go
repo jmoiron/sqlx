@@ -436,9 +436,9 @@ func bindNamedMapper(bindType int, query string, arg interface{}, m *reflectx.Ma
 }
 
 // NamedQuery binds a named query and then runs Query on the result using the
-// provided Ext (sqlx.Tx, sqlx.Db).  It works with both structs and with
+// provided NamedQueryer (sqlx.Tx, sqlx.Db).  It works with both structs and with
 // map[string]interface{} types.
-func NamedQuery(e Ext, query string, arg interface{}) (*Rows, error) {
+func NamedQuery(e NamedQueryer, query string, arg interface{}) (*Rows, error) {
 	q, args, err := bindNamedMapper(BindType(e.DriverName()), query, arg, mapperFor(e))
 	if err != nil {
 		return nil, err

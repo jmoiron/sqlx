@@ -40,11 +40,18 @@ type ExecerContext interface {
 }
 
 // ExtContext is a union interface which can bind, query, and exec, with Context
-// used by NamedQueryContext and NamedExecContext.
+// used by NamedExecContext.
 type ExtContext interface {
 	binder
 	QueryerContext
 	ExecerContext
+}
+
+// NamedQueryerContext is a union interface which can bind and query, with Context
+// used by NamedQueryContext.
+type NamedQueryerContext interface {
+	binder
+	QueryerContext
 }
 
 // SelectContext executes a query using the provided Queryer, and StructScans

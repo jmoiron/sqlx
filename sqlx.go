@@ -483,7 +483,7 @@ func (tx *Tx) Stmtx(stmt interface{}) *Stmt {
 	default:
 		panic(fmt.Sprintf("non-statement type %v passed to Stmtx", reflect.ValueOf(stmt).Type()))
 	}
-	return &Stmt{Stmt: tx.Stmt(s), Mapper: tx.Mapper}
+	return &Stmt{Stmt: tx.Stmt(s), unsafe: tx.unsafe, Mapper: tx.Mapper}
 }
 
 // NamedStmt returns a version of the prepared statement which runs within a transaction.

@@ -1235,7 +1235,7 @@ func TestUsage(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		err = scanAll(rows, &sdest, false)
+		err = ScanAll(rows, &sdest, false)
 		if err != nil {
 			t.Error(err)
 		}
@@ -1920,6 +1920,412 @@ func TestSelectReset(t *testing.T) {
 		// non-nil slice.
 		if emptyDest != nil {
 			t.Error("Expected emptyDest to be nil")
+		}
+	})
+}
+
+func TestScanSingleRowStruct(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test scanning into a struct
+		rows, err := db.Queryx("SELECT first_name, last_name, email FROM person WHERE first_name = 'Jason'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+
+		if !rows.Next() {
+			t.Fatal("Expected at least one row")
+		}
+
+		var p Person
+		err = ScanSingleRow(rows, &p, false)
+		if err != nil {
+			t.Errorf("ScanSingleRow failed: %v", err)
+		}
+
+		if p.FirstName != "Jason" {
+			t.Errorf("Expected FirstName to be 'Jason', got '%s'", p.FirstName)
+		}
+		if p.LastName != "Moiron" {
+			t.Errorf("Expected LastName to be 'Moiron', got '%s'", p.LastName)
+		}
+		if p.Email != "jmoiron@jmoiron.net" {
+			t.Errorf("Expected Email to be 'jmoiron@jmoiron.net', got '%s'", p.Email)
+		}
+	})
+}
+
+func TestScanSingleRowScannableType(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test scanning into a scannable type (single column)
+		rows, err := db.Queryx("SELECT first_name FROM person WHERE first_name = 'Jason'")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !rows.Next() {
+			rows.Close()
+			t.Fatal("Expected at least one row")
+		}
+
+		var firstName string
+		err = ScanSingleRow(rows, &firstName, false)
+		rows.Close()
+		if err != nil {
+			t.Errorf("ScanSingleRow failed: %v", err)
+		}
+
+		if firstName != "Jason" {
+			t.Errorf("Expected firstName to be 'Jason', got '%s'", firstName)
+		}
+
+		// Test scanning another string column
+		rows2, err := db.Queryx("SELECT last_name FROM person WHERE first_name = 'Jason'")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !rows2.Next() {
+			rows2.Close()
+			t.Fatal("Expected at least one row")
+		}
+
+		var lastName string
+		err = ScanSingleRow(rows2, &lastName, false)
+		rows2.Close()
+		if err != nil {
+			t.Errorf("ScanSingleRow failed: %v", err)
+		}
+
+		if lastName != "Moiron" {
+			t.Errorf("Expected lastName to be 'Moiron', got '%s'", lastName)
+		}
+	})
+}
+
+func TestScanSingleRowErrors(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		rows, err := db.Queryx("SELECT first_name FROM person WHERE first_name = 'Jason'")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !rows.Next() {
+			rows.Close()
+			t.Fatal("Expected at least one row")
+		}
+
+		// Test non-pointer destination
+		var name string
+		err = ScanSingleRow(rows, name, false)
+		if err == nil {
+			t.Error("Expected error when passing non-pointer destination, but got nil")
+		}
+		if !strings.Contains(err.Error(), "must pass a pointer") {
+			t.Errorf("Expected error about non-pointer, got: %v", err)
+		}
+
+		// Test nil pointer destination
+		err = ScanSingleRow(rows, (*string)(nil), false)
+		rows.Close()
+		if err == nil {
+			t.Error("Expected error when passing nil pointer, but got nil")
+		}
+		if !strings.Contains(err.Error(), "nil pointer passed") {
+			t.Errorf("Expected error about nil pointer, got: %v", err)
+		}
+
+		// Test scannable type with multiple columns
+		rows2, err := db.Queryx("SELECT first_name, last_name FROM person WHERE first_name = 'Jason'")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !rows2.Next() {
+			rows2.Close()
+			t.Fatal("Expected at least one row")
+		}
+
+		var singleString string
+		err = ScanSingleRow(rows2, &singleString, false)
+		rows2.Close()
+		if err == nil {
+			t.Error("Expected error when scanning multiple columns into single scannable type, but got nil")
+		}
+		if !strings.Contains(err.Error(), "with >1 columns") {
+			t.Errorf("Expected error about multiple columns, got: %v", err)
+		}
+
+		// Test missing fields in struct (this may or may not error depending on unsafe mode)
+		type PartialPerson struct {
+			FirstName string `db:"first_name"`
+			// Missing last_name field
+		}
+
+		rows3, err := db.Queryx("SELECT first_name, last_name FROM person WHERE first_name = 'Jason'")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !rows3.Next() {
+			rows3.Close()
+			t.Fatal("Expected at least one row")
+		}
+
+		var pp PartialPerson
+		err = ScanSingleRow(rows3, &pp, false)
+		rows3.Close()
+		// This should work in unsafe mode, but may error in safe mode depending on implementation
+		// We'll just verify that if there's an error, it's about missing fields
+		if err != nil && !strings.Contains(err.Error(), "missing destination name") {
+			t.Errorf("Unexpected error type: %v", err)
+		}
+	})
+}
+
+func TestScanSingleRowStructOnly(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test structOnly=true with struct - should succeed
+		rows, err := db.Queryx("SELECT first_name, last_name FROM person WHERE first_name = 'Jason'")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !rows.Next() {
+			rows.Close()
+			t.Fatal("Expected at least one row")
+		}
+
+		var p Person
+		err = ScanSingleRow(rows, &p, true)
+		rows.Close()
+		if err != nil {
+			t.Errorf("ScanSingleRow with structOnly=true should work for struct, got error: %v", err)
+		}
+
+		if p.FirstName != "Jason" {
+			t.Errorf("Expected FirstName to be 'Jason', got '%s'", p.FirstName)
+		}
+
+		// Test structOnly=true with scannable type - should error
+		rows2, err := db.Queryx("SELECT first_name FROM person WHERE first_name = 'Jason'")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !rows2.Next() {
+			rows2.Close()
+			t.Fatal("Expected at least one row")
+		}
+
+		var name string
+		err = ScanSingleRow(rows2, &name, true)
+		rows2.Close()
+		if err == nil {
+			t.Error("Expected error when using structOnly=true with scannable type, but got nil")
+		}
+		// The error should be a structOnly error
+		if !strings.Contains(err.Error(), "expected struct but got") {
+			t.Errorf("Expected structOnly error, got: %v", err)
+		}
+
+		// Test structOnly=false with scannable type - should succeed
+		rows3, err := db.Queryx("SELECT first_name FROM person WHERE first_name = 'Jason'")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !rows3.Next() {
+			rows3.Close()
+			t.Fatal("Expected at least one row")
+		}
+
+		var name2 string
+		err = ScanSingleRow(rows3, &name2, false)
+		rows3.Close()
+		if err != nil {
+			t.Errorf("ScanSingleRow with structOnly=false should work for scannable type, got error: %v", err)
+		}
+
+		if name2 != "Jason" {
+			t.Errorf("Expected name2 to be 'Jason', got '%s'", name2)
+		}
+	})
+}
+
+func TestScanSingleRowWithQueryRowx(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test scanning into a struct using QueryRowx
+		row := db.QueryRowx("SELECT first_name, last_name, email FROM person WHERE first_name = 'Jason'")
+		
+		var p Person
+		err := ScanSingleRow(row, &p, false)
+		if err != nil {
+			t.Errorf("ScanSingleRow with QueryRowx failed: %v", err)
+		}
+
+		if p.FirstName != "Jason" {
+			t.Errorf("Expected FirstName to be 'Jason', got '%s'", p.FirstName)
+		}
+		if p.LastName != "Moiron" {
+			t.Errorf("Expected LastName to be 'Moiron', got '%s'", p.LastName)
+		}
+		if p.Email != "jmoiron@jmoiron.net" {
+			t.Errorf("Expected Email to be 'jmoiron@jmoiron.net', got '%s'", p.Email)
+		}
+
+		// Test scanning into a scannable type using QueryRowx
+		row2 := db.QueryRowx("SELECT first_name FROM person WHERE first_name = 'John'")
+		
+		var firstName string
+		err = ScanSingleRow(row2, &firstName, false)
+		if err != nil {
+			t.Errorf("ScanSingleRow with QueryRowx for scannable type failed: %v", err)
+		}
+
+		if firstName != "John" {
+			t.Errorf("Expected firstName to be 'John', got '%s'", firstName)
+		}
+	})
+}
+
+func TestScanSingleRowWithQueryRowxNonPointer(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test non-pointer destination with QueryRowx
+		row := db.QueryRowx("SELECT first_name FROM person WHERE first_name = 'Jason'")
+		
+		var name string
+		err := ScanSingleRow(row, name, false)
+		if err == nil {
+			t.Error("Expected error when passing non-pointer destination to QueryRowx ScanSingleRow, but got nil")
+		}
+		if !strings.Contains(err.Error(), "must pass a pointer") {
+			t.Errorf("Expected error about non-pointer with QueryRowx, got: %v", err)
+		}
+	})
+}
+
+func TestScanSingleRowWithQueryRowxNilPointer(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test nil pointer destination with QueryRowx
+		row := db.QueryRowx("SELECT first_name FROM person WHERE first_name = 'Jason'")
+		
+		err := ScanSingleRow(row, (*string)(nil), false)
+		if err == nil {
+			t.Error("Expected error when passing nil pointer to QueryRowx ScanSingleRow, but got nil")
+		}
+		if !strings.Contains(err.Error(), "nil pointer passed") {
+			t.Errorf("Expected error about nil pointer with QueryRowx, got: %v", err)
+		}
+	})
+}
+
+func TestScanSingleRowWithQueryRowxMultipleColumns(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test scannable type with multiple columns using QueryRowx
+		row := db.QueryRowx("SELECT first_name, last_name FROM person WHERE first_name = 'Jason'")
+		
+		var singleString string
+		err := ScanSingleRow(row, &singleString, false)
+		if err == nil {
+			t.Error("Expected error when scanning multiple columns into single scannable type with QueryRowx, but got nil")
+		}
+		if !strings.Contains(err.Error(), "with >1 columns") {
+			t.Errorf("Expected error about multiple columns with QueryRowx, got: %v", err)
+		}
+	})
+}
+
+func TestScanSingleRowWithQueryRowxStructOnlyTrue(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test structOnly=true with struct using QueryRowx - should succeed
+		row := db.QueryRowx("SELECT first_name, last_name FROM person WHERE first_name = 'Jason'")
+		
+		var p Person
+		err := ScanSingleRow(row, &p, true)
+		if err != nil {
+			t.Errorf("ScanSingleRow with QueryRowx and structOnly=true should work for struct, got error: %v", err)
+		}
+
+		if p.FirstName != "Jason" {
+			t.Errorf("Expected FirstName to be 'Jason', got '%s'", p.FirstName)
+		}
+		if p.LastName != "Moiron" {
+			t.Errorf("Expected LastName to be 'Moiron', got '%s'", p.LastName)
+		}
+	})
+}
+
+func TestScanSingleRowWithQueryRowxStructOnlyError(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test structOnly=true with scannable type using QueryRowx - should error
+		row := db.QueryRowx("SELECT first_name FROM person WHERE first_name = 'Jason'")
+		
+		var name string
+		err := ScanSingleRow(row, &name, true)
+		if err == nil {
+			t.Error("Expected error when using structOnly=true with scannable type and QueryRowx, but got nil")
+		}
+		// The error should be a structOnly error
+		if !strings.Contains(err.Error(), "expected struct but got") {
+			t.Errorf("Expected structOnly error with QueryRowx, got: %v", err)
+		}
+	})
+}
+
+func TestScanSingleRowWithQueryRowxStructOnlyFalse(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test structOnly=false with scannable type using QueryRowx - should succeed
+		row := db.QueryRowx("SELECT first_name FROM person WHERE first_name = 'John'")
+		
+		var name string
+		err := ScanSingleRow(row, &name, false)
+		if err != nil {
+			t.Errorf("ScanSingleRow with QueryRowx and structOnly=false should work for scannable type, got error: %v", err)
+		}
+
+		if name != "John" {
+			t.Errorf("Expected name to be 'John', got '%s'", name)
+		}
+	})
+}
+
+func TestScanSingleRowWithQueryRowxNoRows(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// Test QueryRowx with no matching rows - should return sql.ErrNoRows
+		row := db.QueryRowx("SELECT first_name FROM person WHERE first_name = 'NonExistent'")
+		
+		var name string
+		err := ScanSingleRow(row, &name, false)
+		if err == nil {
+			t.Error("Expected sql.ErrNoRows when no rows match QueryRowx, but got nil")
+		}
+		if err.Error() != "sql: no rows in result set" {
+			t.Errorf("Expected sql.ErrNoRows with QueryRowx, got: %v", err)
 		}
 	})
 }

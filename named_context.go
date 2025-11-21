@@ -100,7 +100,7 @@ func (n *NamedStmt) SelectContext(ctx context.Context, dest interface{}, arg int
 	}
 	// if something happens here, we want to make sure the rows are Closed
 	defer rows.Close()
-	return scanAll(rows, dest, false)
+	return ScanAll(rows, dest, false)
 }
 
 // GetContext using this NamedStmt

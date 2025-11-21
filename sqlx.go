@@ -680,7 +680,7 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	}
 	// if something happens here, we want to make sure the rows are Closed
 	defer rows.Close()
-	return scanAll(rows, dest, false)
+	return ScanAll(rows, dest, false)
 }
 
 // Get does a QueryRow using the provided Queryer, and scans the resulting row
@@ -746,7 +746,15 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 		return r.err
 	}
 	defer r.rows.Close()
+	return ScanSingleRow(r, dest, structOnly)
+}
 
+// ScanSingleRow scans a single Row into the dest.
+//
+// It assumes that r is positioned on a valid row.
+// If structOnly is true, an error will be returned if dest is a scannable type (for backwards compatibility with StructScan).
+// Callers are responsible for closing r.
+func ScanSingleRow(r ColScanner, dest interface{}, structOnly bool) error {
 	v := reflect.ValueOf(dest)
 	if v.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value, to StructScan destination")
@@ -775,11 +783,16 @@ func (r *Row) scanAny(dest interface{}, structOnly bool) error {
 		return r.Scan(dest)
 	}
 
-	m := r.Mapper
-
+	var m *reflectx.Mapper
+	switch rows := r.(type) {
+	case *Rows, *Row:
+		m = rows.Mapper
+	default:
+		m = mapper()
+	}
 	fields := m.TraversalsByName(v.Type(), columns)
 	// if we are not unsafe and are missing fields, return an error
-	if f, err := missingFields(fields); err != nil && !r.unsafe {
+	if f, err := missingFields(fields); err != nil && !isUnsafe(r) {
 		return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
 	}
 	values := make([]interface{}, len(columns))
@@ -880,7 +893,7 @@ func structOnlyError(t reflect.Type) error {
 	return fmt.Errorf("expected a struct, but struct %s has no exported fields", t.Name())
 }
 
-// scanAll scans all rows into a destination, which must be a slice of any
+// ScanAll scans all rows into a destination, which must be a slice of any
 // type.  It resets the slice length to zero before appending each element to
 // the slice.  If the destination slice type is a Struct, then StructScan will
 // be used on each row.  If the destination is some other kind of base type,
@@ -889,14 +902,10 @@ func structOnlyError(t reflect.Type) error {
 //
 //	rows, _ := db.Query("select id from people;")
 //	var ids []int
-//	scanAll(rows, &ids, false)
+//	ScanAll(rows, &ids, false)
 //
-// and ids will be a list of the id results.  I realize that this is a desirable
-// interface to expose to users, but for now it will only be exposed via changes
-// to `Get` and `Select`.  The reason that this has been implemented like this is
-// this is the only way to not duplicate reflect work in the new API while
-// maintaining backwards compatibility.
-func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
+// and ids will be a list of the id results.
+func ScanAll(rows rowsi, dest interface{}, structOnly bool) error {
 	var v, vp reflect.Value
 
 	value := reflect.ValueOf(dest)
@@ -1003,7 +1012,7 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 // allocate structs for the entire result, use Queryx and see sqlx.Rows.StructScan.
 // If rows is sqlx.Rows, it will use its mapper, otherwise it will use the default.
 func StructScan(rows rowsi, dest interface{}) error {
-	return scanAll(rows, dest, true)
+	return ScanAll(rows, dest, true)
 
 }
 

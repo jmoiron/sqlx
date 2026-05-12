@@ -136,6 +136,48 @@ func asSliceForIn(i interface{}) (v reflect.Value, ok bool) {
 	return v, true
 }
 
+// nextBindVar returns the index of the next '?' in s that is not inside a SQL
+// comment (-- line comment or /* block comment */) or a single-quoted string
+// literal. Returns -1 if none is found.
+func nextBindVar(s string) int {
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '-':
+			if i+1 < len(s) && s[i+1] == '-' {
+				// line comment: skip to end of line
+				for i < len(s) && s[i] != '\n' {
+					i++
+				}
+			}
+		case '/':
+			if i+1 < len(s) && s[i+1] == '*' {
+				// block comment: skip to */
+				i += 2
+				for i+1 < len(s) && !(s[i] == '*' && s[i+1] == '/') {
+					i++
+				}
+				i++ // skip the closing /
+			}
+		case '\'':
+			// single-quoted string: skip to the closing quote, handling ''
+			i++
+			for i < len(s) {
+				if s[i] == '\'' {
+					if i+1 < len(s) && s[i+1] == '\'' {
+						i++ // escaped quote
+					} else {
+						break
+					}
+				}
+				i++
+			}
+		case '?':
+			return i
+		}
+	}
+	return -1
+}
+
 // In expands slice values in args, returning the modified query string
 // and a new arg list that can be executed by a database. The `query` should
 // use the `?` bindVar.  The return value uses the `?` bindVar.
@@ -198,7 +240,7 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 
 	var arg, offset int
 
-	for i := strings.IndexByte(query[offset:], '?'); i != -1; i = strings.IndexByte(query[offset:], '?') {
+	for i := nextBindVar(query[offset:]); i != -1; i = nextBindVar(query[offset:]) {
 		if arg >= len(meta) {
 			// if an argument wasn't passed, lets return an error;  this is
 			// not actually how database/sql Exec/Query works, but since we are

@@ -53,6 +53,17 @@ func TestCompileQuery(t *testing.T) {
 			T: `SELECT @name := "name", @p1, @p2, @p3`,
 			V: []string{"age", "first", "last"},
 		},
+		// Postgres :: cast directly attached to a named parameter
+		// (see github.com/jmoiron/sqlx#983). The "::" must pass through
+		// to the rebound query instead of returning "unexpected ':'".
+		{
+			Q: `SELECT :boundary::jsonb, :id::text`,
+			R: `SELECT ?::jsonb, ?::text`,
+			D: `SELECT $1::jsonb, $2::text`,
+			N: `SELECT :boundary::jsonb, :id::text`,
+			T: `SELECT @p1::jsonb, @p2::text`,
+			V: []string{"boundary", "id"},
+		},
 		/* This unicode awareness test sadly fails, because of our byte-wise worldview.
 		 * We could certainly iterate by Rune instead, though it's a great deal slower,
 		 * it's probably the RightWay(tm)

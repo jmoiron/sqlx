@@ -39,10 +39,10 @@ func TestCompileQuery(t *testing.T) {
 		},
 		{
 			Q: `SELECT 'a::b::c' || first_name, '::::ABC::_::' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
-			R: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=? AND last_name=?`,
-			D: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=$1 AND last_name=$2`,
-			T: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=@p1 AND last_name=@p2`,
-			N: `SELECT 'a:b:c' || first_name, '::ABC:_:' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
+			R: `SELECT 'a::b::c' || first_name, '::ABC::_:' FROM person WHERE first_name=? AND last_name=?`,
+			D: `SELECT 'a::b::c' || first_name, '::ABC::_:' FROM person WHERE first_name=$1 AND last_name=$2`,
+			T: `SELECT 'a::b::c' || first_name, '::ABC::_:' FROM person WHERE first_name=@p1 AND last_name=@p2`,
+			N: `SELECT 'a::b::c' || first_name, '::ABC::_:' FROM person WHERE first_name=:first_name AND last_name=:last_name`,
 			V: []string{"first_name", "last_name"},
 		},
 		{

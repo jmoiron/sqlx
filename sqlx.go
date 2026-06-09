@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"iter"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -320,6 +321,10 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(db, dest, query, args...)
 }
 
+func (db *DB) SelectIter[T any](query string, args ...interface{}) iter.Seq2[*T, error] {
+	return SelectIter[T](db, query, args...)
+}
+
 // Get using this DB.
 // Any placeholder parameters are replaced with supplied args.
 // An error is returned if the result set is empty.
@@ -434,6 +439,12 @@ func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(tx, dest, query, args...)
 }
 
+// SelectIter within a transaction.
+// Any placeholder parameters are replaced with supplied args.
+func (tx *Tx) SelectIter[T any](query string, args ...interface{}) iter.Seq2[*T, error] {
+	return SelectIter[T](tx, query, args...)
+}
+
 // Queryx within a transaction.
 // Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
@@ -517,6 +528,12 @@ func (s *Stmt) Unsafe() *Stmt {
 // Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 	return Select(&qStmt{s}, dest, "", args...)
+}
+
+// SelectIter using the prepared statement.
+// Any placeholder parameters are replaced with supplied args.
+func (s *Stmt) SelectIter[T any](query string, args ...interface{}) iter.Seq2[*T, error] {
+	return SelectIter[T](&qStmt{s}, query, args...)
 }
 
 // Get using the prepared statement.
@@ -681,6 +698,52 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	// if something happens here, we want to make sure the rows are Closed
 	defer rows.Close()
 	return scanAll(rows, dest, false)
+}
+
+// SelectIter returns an iterator that executes the query and then starts
+// returning rows of the specific type one by one. When an error is returned
+// iteration stops.
+//
+// Example:
+//
+//	for u, err := range SelectIter[User](db, `SELECT * FROM users ORDER BY id`) {
+//	    if err != nil { ... }
+//	    ...
+//	}
+func SelectIter[T any](q Queryer, query string, args ...interface{}) iter.Seq2[*T, error] {
+	return func(yield func(*T, error) bool) {
+		rows, err := q.Queryx(query, args...)
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+		// We cannot use yield() inside defer, so we Close() the rows manually.
+
+		for rows.Next() {
+			var row T
+			if err := rows.StructScan(&row); err != nil {
+				yield(nil, err)
+
+				// We've already returned a single error, so ignoring Close()
+				// error here.
+				_ = rows.Close()
+				return
+			}
+
+			if !yield(&row, nil) {
+				// Cannot yield again after the iteration has stopped, so ignoring
+				// Close() error here.
+				_ = rows.Close()
+				return
+			}
+		}
+
+		// It's a common mistake to ignore rows.Close() error value, however
+		// it can still happen, so we need to handle it.
+		if err := rows.Close(); err != nil {
+			yield(nil, err)
+		}
+	}
 }
 
 // Get does a QueryRow using the provided Queryer, and scans the resulting row

@@ -1923,3 +1923,39 @@ func TestSelectReset(t *testing.T) {
 		}
 	})
 }
+
+func TestSelectIter(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		var people []*Person
+		const query = "SELECT * FROM person ORDER BY first_name"
+
+		err := db.Select(&people, query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := 2; len(people) != want {
+			t.Errorf("Expected %d first names, got %d", want, len(people))
+		}
+
+		var peopleIter []*Person
+		for p, err := range db.SelectIter[Person](query) {
+			if err != nil {
+				t.Fatalf("Iteration failed for %s: %v", query, err)
+			}
+
+			peopleIter = append(peopleIter, p)
+		}
+
+		if len(people) != len(peopleIter) {
+			t.Fatalf("SelectIter() returned %d rows, want %d", len(peopleIter), len(people))
+		}
+
+		for i, p := range people {
+			if !reflect.DeepEqual(p, peopleIter[i]) {
+				t.Errorf("SelectIter() %d result is wrong, got %+v, want %+v", i, peopleIter[i], p)
+			}
+		}
+	})
+}

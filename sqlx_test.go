@@ -1923,3 +1923,40 @@ func TestSelectReset(t *testing.T) {
 		}
 	})
 }
+
+func TestMapperForConn(t *testing.T) {
+	db := &DB{Mapper: mapper()}
+	conn := &Conn{Mapper: mapper()}
+
+	// mapperFor should return the Mapper for Conn and *Conn types
+	if m := mapperFor(conn); m == nil {
+		t.Error("mapperFor(*Conn) returned nil Mapper")
+	}
+	if m := mapperFor(&Conn{Mapper: mapper()}); m == nil {
+		t.Error("mapperFor(*Conn) returned nil Mapper for pointer")
+	}
+
+	// mapperFor should also work for DB types (existing behavior)
+	if m := mapperFor(db); m == nil {
+		t.Error("mapperFor(*DB) returned nil Mapper")
+	}
+
+	// Verify Mapper is the same instance
+	customMapper := reflectx.NewMapperFunc("db", strings.ToLower)
+	conn2 := &Conn{Mapper: customMapper}
+	if m := mapperFor(conn2); m != customMapper {
+		t.Error("mapperFor(*Conn) did not return the custom Mapper")
+	}
+}
+
+func TestIsUnsafeConn(t *testing.T) {
+	conn := &Conn{unsafe: true}
+	conn2 := &Conn{unsafe: false}
+
+	if !isUnsafe(conn) {
+		t.Error("isUnsafe(*Conn) should return true for unsafe=true")
+	}
+	if isUnsafe(conn2) {
+		t.Error("isUnsafe(*Conn) should return false for unsafe=false")
+	}
+}

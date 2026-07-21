@@ -48,6 +48,19 @@ will get major version number bumps.
 
     go get github.com/jmoiron/sqlx
 
+### Note: `sqlx.In` placeholders
+
+`sqlx.In` always expects `?` bindvars in the input query, **even for PostgreSQL**.
+Do not write `$1` in the string passed to `In` — expand first, then rebind:
+
+```go
+query, args, err := sqlx.In("SELECT * FROM users WHERE level IN (?)", levels)
+query = db.Rebind(query)
+err = db.Select(&users, query, args...)
+```
+
+Using `$1` with `In` commonly fails with `number of bindVars less than number arguments`.
+
 ## issues
 
 Row headers can be ambiguous (`SELECT 1 AS a, 2 AS a`), and the result of

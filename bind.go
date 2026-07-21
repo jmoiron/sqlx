@@ -139,6 +139,16 @@ func asSliceForIn(i interface{}) (v reflect.Value, ok bool) {
 // In expands slice values in args, returning the modified query string
 // and a new arg list that can be executed by a database. The `query` should
 // use the `?` bindVar.  The return value uses the `?` bindVar.
+//
+// Callers must write `?` placeholders even when the target database uses
+// `$1` (PostgreSQL), `@p1` (SQL Server), or named binds. Using `$1` in the
+// query passed to In will not expand correctly and commonly surfaces as
+// "number of bindVars less than number arguments". After In returns, rebind
+// for the driver, for example:
+//
+//	query, args, err := sqlx.In("SELECT * FROM users WHERE level IN (?)", levels)
+//	query = db.Rebind(query)
+//	err = db.Select(&users, query, args...)
 func In(query string, args ...interface{}) (string, []interface{}, error) {
 	// argMeta stores reflect.Value and length for slices and
 	// the value itself for non-slice arguments

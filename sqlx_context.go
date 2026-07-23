@@ -62,6 +62,16 @@ func SelectContext(ctx context.Context, q QueryerContext, dest interface{}, quer
 	return scanAll(rows, dest, false)
 }
 
+// SelectKeyedContext is the context variant of SelectKeyed.
+func SelectKeyedContext(ctx context.Context, q QueryerContext, dest interface{}, key string, query string, args ...interface{}) error {
+	rows, err := q.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	return scanAllKeyed(rows, dest, key)
+}
+
 // PreparexContext prepares a statement.
 //
 // The provided context is used for the preparation of the statement, not for
@@ -139,6 +149,11 @@ func (db *DB) NamedExecContext(ctx context.Context, query string, arg interface{
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
 	return SelectContext(ctx, db, dest, query, args...)
+}
+
+// SelectKeyedContext using this DB. See SelectKeyed.
+func (db *DB) SelectKeyedContext(ctx context.Context, dest interface{}, key string, query string, args ...interface{}) error {
+	return SelectKeyedContext(ctx, db, dest, key, query, args...)
 }
 
 // GetContext using this DB.
@@ -240,6 +255,11 @@ func (c *Conn) SelectContext(ctx context.Context, dest interface{}, query string
 	return SelectContext(ctx, c, dest, query, args...)
 }
 
+// SelectKeyedContext using this Conn. See SelectKeyed.
+func (c *Conn) SelectKeyedContext(ctx context.Context, dest interface{}, key string, query string, args ...interface{}) error {
+	return SelectKeyedContext(ctx, c, dest, key, query, args...)
+}
+
 // GetContext using this Conn.
 // Any placeholder parameters are replaced with supplied args.
 // An error is returned if the result set is empty.
@@ -339,6 +359,11 @@ func (tx *Tx) SelectContext(ctx context.Context, dest interface{}, query string,
 	return SelectContext(ctx, tx, dest, query, args...)
 }
 
+// SelectKeyedContext within a transaction and context. See SelectKeyed.
+func (tx *Tx) SelectKeyedContext(ctx context.Context, dest interface{}, key string, query string, args ...interface{}) error {
+	return SelectKeyedContext(ctx, tx, dest, key, query, args...)
+}
+
 // GetContext within a transaction and context.
 // Any placeholder parameters are replaced with supplied args.
 // An error is returned if the result set is empty.
@@ -363,6 +388,11 @@ func (tx *Tx) NamedExecContext(ctx context.Context, query string, arg interface{
 // Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) SelectContext(ctx context.Context, dest interface{}, args ...interface{}) error {
 	return SelectContext(ctx, &qStmt{s}, dest, "", args...)
+}
+
+// SelectKeyedContext using the prepared statement. See SelectKeyed.
+func (s *Stmt) SelectKeyedContext(ctx context.Context, dest interface{}, key string, args ...interface{}) error {
+	return SelectKeyedContext(ctx, &qStmt{s}, dest, key, "", args...)
 }
 
 // GetContext using the prepared statement.

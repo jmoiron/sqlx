@@ -320,6 +320,11 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(db, dest, query, args...)
 }
 
+// SelectKeyed using this DB. See SelectKeyed.
+func (db *DB) SelectKeyed(dest interface{}, key string, query string, args ...interface{}) error {
+	return SelectKeyed(db, dest, key, query, args...)
+}
+
 // Get using this DB.
 // Any placeholder parameters are replaced with supplied args.
 // An error is returned if the result set is empty.
@@ -434,6 +439,11 @@ func (tx *Tx) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(tx, dest, query, args...)
 }
 
+// SelectKeyed within a transaction. See SelectKeyed.
+func (tx *Tx) SelectKeyed(dest interface{}, key string, query string, args ...interface{}) error {
+	return SelectKeyed(tx, dest, key, query, args...)
+}
+
 // Queryx within a transaction.
 // Any placeholder parameters are replaced with supplied args.
 func (tx *Tx) Queryx(query string, args ...interface{}) (*Rows, error) {
@@ -517,6 +527,12 @@ func (s *Stmt) Unsafe() *Stmt {
 // Any placeholder parameters are replaced with supplied args.
 func (s *Stmt) Select(dest interface{}, args ...interface{}) error {
 	return Select(&qStmt{s}, dest, "", args...)
+}
+
+// SelectKeyed using the prepared statement. See SelectKeyed.
+// Note that the query portion of errors will be blank; Stmt does not expose its query.
+func (s *Stmt) SelectKeyed(dest interface{}, key string, args ...interface{}) error {
+	return SelectKeyed(&qStmt{s}, dest, key, "", args...)
 }
 
 // Get using the prepared statement.
@@ -681,6 +697,30 @@ func Select(q Queryer, dest interface{}, query string, args ...interface{}) erro
 	// if something happens here, we want to make sure the rows are Closed
 	defer rows.Close()
 	return scanAll(rows, dest, false)
+}
+
+// SelectKeyed executes a query and StructScans each row into dest, which must
+// be a non-nil pointer to a map. The map is keyed by the column (or db-tagged
+// field) named by key. Map values must be structs or pointers to structs that
+// are StructScan-compatible. Scannable (non-struct) map values are not
+// supported.
+//
+// The destination map is replaced with a new empty map before scanning. When
+// multiple rows share the same key, later rows overwrite earlier ones.
+//
+// Example:
+//
+//	people := map[string]Person{}
+//	err := sqlx.SelectKeyed(db, &people, "email", `SELECT * FROM person`)
+//
+// See also SelectKeyedContext.
+func SelectKeyed(q Queryer, dest interface{}, key string, query string, args ...interface{}) error {
+	rows, err := q.Queryx(query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	return scanAllKeyed(rows, dest, key)
 }
 
 // Get does a QueryRow using the provided Queryer, and scans the resulting row
@@ -1005,6 +1045,91 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 func StructScan(rows rowsi, dest interface{}) error {
 	return scanAll(rows, dest, true)
 
+}
+
+// scanAllKeyed scans all rows into a map destination keyed by column/field name key.
+func scanAllKeyed(rows rowsi, dest interface{}, key string) error {
+	if key == "" {
+		return errors.New("SelectKeyed: key must be non-empty")
+	}
+
+	value := reflect.ValueOf(dest)
+	if value.Kind() != reflect.Ptr {
+		return errors.New("must pass a pointer, not a value, to SelectKeyed destination")
+	}
+	if value.IsNil() {
+		return errors.New("nil pointer passed to SelectKeyed destination")
+	}
+	direct := reflect.Indirect(value)
+	if direct.Kind() != reflect.Map {
+		return fmt.Errorf("expected a map, got %s", direct.Kind())
+	}
+
+	mapType := direct.Type()
+	keyType := mapType.Key()
+	elemType := mapType.Elem()
+	isPtr := elemType.Kind() == reflect.Ptr
+	base := reflectx.Deref(elemType)
+
+	if isScannable(base) {
+		return fmt.Errorf("SelectKeyed: map value type %s must be a struct (or *struct), not scannable", base)
+	}
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	var m *reflectx.Mapper
+	switch rows := rows.(type) {
+	case *Rows:
+		m = rows.Mapper
+	default:
+		m = mapper()
+	}
+
+	fields := m.TraversalsByName(base, columns)
+	if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
+		return fmt.Errorf("missing destination name %s in %s", columns[f], base)
+	}
+
+	keyTravs := m.TraversalsByName(base, []string{key})
+	if len(keyTravs) == 0 || len(keyTravs[0]) == 0 {
+		return fmt.Errorf("SelectKeyed: key %q not found in %s", key, base)
+	}
+	keyTraversal := keyTravs[0]
+
+	// Replace with a fresh map (mirrors Select resetting slice length).
+	direct.Set(reflect.MakeMap(mapType))
+
+	values := make([]interface{}, len(columns))
+	for rows.Next() {
+		vp := reflect.New(base)
+		v := reflect.Indirect(vp)
+
+		if err := fieldsByTraversal(v, fields, values, true); err != nil {
+			return err
+		}
+		if err := rows.Scan(values...); err != nil {
+			return err
+		}
+
+		keyField := reflectx.FieldByIndexes(v, keyTraversal)
+		mapKey := keyField
+		if !mapKey.Type().AssignableTo(keyType) {
+			if !mapKey.Type().ConvertibleTo(keyType) {
+				return fmt.Errorf("SelectKeyed: cannot use field type %s as map key type %s", mapKey.Type(), keyType)
+			}
+			mapKey = mapKey.Convert(keyType)
+		}
+
+		if isPtr {
+			direct.SetMapIndex(mapKey, vp)
+		} else {
+			direct.SetMapIndex(mapKey, v)
+		}
+	}
+	return rows.Err()
 }
 
 // reflect helpers

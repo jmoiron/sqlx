@@ -1923,3 +1923,74 @@ func TestSelectReset(t *testing.T) {
 		}
 	})
 }
+
+func TestSelectKeyed(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, now string) {
+		loadDefaultFixture(db, t)
+
+		// map[string]Person keyed by email
+		var byEmail map[string]Person
+		err := db.SelectKeyed(&byEmail, "email", "SELECT first_name, last_name, email FROM person")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(byEmail) != 2 {
+			t.Fatalf("expected 2 people, got %d", len(byEmail))
+		}
+		if p, ok := byEmail["jmoiron@jmoiron.net"]; !ok || p.FirstName != "Jason" {
+			t.Fatalf("Jason by email: ok=%v person=%+v", ok, p)
+		}
+		if p, ok := byEmail["johndoeDNE@gmail.net"]; !ok || p.FirstName != "John" {
+			t.Fatalf("John by email: ok=%v person=%+v", ok, p)
+		}
+
+		// map[string]*Person
+		var byEmailPtr map[string]*Person
+		err = db.SelectKeyed(&byEmailPtr, "email", "SELECT first_name, last_name, email FROM person")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p := byEmailPtr["jmoiron@jmoiron.net"]; p == nil || p.LastName != "Moiron" {
+			t.Fatalf("ptr map: %+v", p)
+		}
+
+		// map[int]Place keyed by telcode
+		var byCode map[int]Place
+		err = db.SelectKeyed(&byCode, "telcode", "SELECT country, city, telcode FROM place")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(byCode) != 3 {
+			t.Fatalf("expected 3 places, got %d", len(byCode))
+		}
+		if byCode[1].Country != "United States" {
+			t.Fatalf("telcode 1: %+v", byCode[1])
+		}
+
+		// missing key field
+		err = db.SelectKeyed(&byEmail, "no_such_col", "SELECT first_name, last_name, email FROM person")
+		if err == nil {
+			t.Fatal("expected error for missing key field")
+		}
+
+		// empty key name
+		err = db.SelectKeyed(&byEmail, "", "SELECT first_name FROM person")
+		if err == nil {
+			t.Fatal("expected error for empty key")
+		}
+
+		// non-map dest
+		var people []Person
+		err = db.SelectKeyed(&people, "email", "SELECT first_name, last_name, email FROM person")
+		if err == nil {
+			t.Fatal("expected error for non-map dest")
+		}
+
+		// package-level helper
+		var again map[string]Person
+		err = SelectKeyed(db, &again, "email", "SELECT first_name, last_name, email FROM person")
+		if err != nil || len(again) != 2 {
+			t.Fatalf("package SelectKeyed: err=%v len=%d", err, len(again))
+		}
+	})
+}

@@ -139,6 +139,19 @@ func asSliceForIn(i interface{}) (v reflect.Value, ok bool) {
 // In expands slice values in args, returning the modified query string
 // and a new arg list that can be executed by a database. The `query` should
 // use the `?` bindVar.  The return value uses the `?` bindVar.
+//
+// Single-column IN lists expand as usual:
+//
+//	In("SELECT * FROM t WHERE id IN (?)", []int{1, 2, 3})
+//	// "SELECT * FROM t WHERE id IN (?, ?, ?)", []interface{}{1, 2, 3}
+//
+// Multi-column (tuple) IN lists are expanded when a slice element is itself
+// a slice or array (other than []byte), matching issue #294:
+//
+//	In("SELECT * FROM t WHERE (id, typ) IN (?)", [][]interface{}{{1, "a"}, {2, "b"}})
+//	// "SELECT * FROM t WHERE (id, typ) IN ((?, ?), (?, ?))", []interface{}{1, "a", 2, "b"}
+//
+// All tuple rows must have the same width.
 func In(query string, args ...interface{}) (string, []interface{}, error) {
 	// argMeta stores reflect.Value and length for slices and
 	// the value itself for non-slice arguments
@@ -146,6 +159,7 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 		v      reflect.Value
 		i      interface{}
 		length int
+		width  int // >0 means each element is a tuple of this width
 	}
 
 	var flatArgsCount int
@@ -174,10 +188,20 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 			meta[i].v = v
 
 			anySlices = true
-			flatArgsCount += meta[i].length
 
 			if meta[i].length == 0 {
 				return "", nil, errors.New("empty slice passed to 'in' query")
+			}
+
+			width, err := tupleWidth(v)
+			if err != nil {
+				return "", nil, err
+			}
+			meta[i].width = width
+			if width > 0 {
+				flatArgsCount += meta[i].length * width
+			} else {
+				flatArgsCount += meta[i].length
 			}
 		} else {
 			meta[i].i = arg
@@ -219,14 +243,37 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 			continue
 		}
 
-		// write everything up to and including our ? character
-		buf.WriteString(query[:offset+i+1])
+		if argMeta.width > 0 {
+			// Multi-column: replace "?" with "(?, ?), (?, ?), ..."
+			buf.WriteString(query[:offset+i])
+			for row := 0; row < argMeta.length; row++ {
+				if row > 0 {
+					buf.WriteString(", ")
+				}
+				buf.WriteByte('(')
+				for c := 0; c < argMeta.width; c++ {
+					if c > 0 {
+						buf.WriteString(", ")
+					}
+					buf.WriteByte('?')
+				}
+				buf.WriteByte(')')
+			}
+			var err error
+			newArgs, err = appendReflectTuples(newArgs, argMeta.v, argMeta.length, argMeta.width)
+			if err != nil {
+				return "", nil, err
+			}
+		} else {
+			// write everything up to and including our ? character
+			buf.WriteString(query[:offset+i+1])
 
-		for si := 1; si < argMeta.length; si++ {
-			buf.WriteString(", ?")
+			for si := 1; si < argMeta.length; si++ {
+				buf.WriteString(", ?")
+			}
+
+			newArgs = appendReflectSlice(newArgs, argMeta.v, argMeta.length)
 		}
-
-		newArgs = appendReflectSlice(newArgs, argMeta.v, argMeta.length)
 
 		// slice the query and reset the offset. this avoids some bookkeeping for
 		// the write after the loop
@@ -241,6 +288,57 @@ func In(query string, args ...interface{}) (string, []interface{}, error) {
 	}
 
 	return buf.String(), newArgs, nil
+}
+
+// tupleWidth reports whether v is a slice of fixed-width tuples (slice/array
+// elements). Returns 0 when elements are scalar values for a single-column IN.
+func tupleWidth(v reflect.Value) (int, error) {
+	if v.Len() == 0 {
+		return 0, nil
+	}
+	first, ok := derefInValue(v.Index(0))
+	if !ok {
+		return 0, nil
+	}
+	switch first.Kind() {
+	case reflect.Array:
+		return first.Len(), nil
+	case reflect.Slice:
+		// []byte is a driver.Value / single bind value, not a tuple row.
+		if first.Type() == reflect.TypeOf([]byte{}) {
+			return 0, nil
+		}
+		w := first.Len()
+		if w == 0 {
+			return 0, errors.New("empty tuple passed to 'in' query")
+		}
+		// Validate remaining rows share the same width.
+		for i := 1; i < v.Len(); i++ {
+			el, ok := derefInValue(v.Index(i))
+			if !ok || (el.Kind() != reflect.Slice && el.Kind() != reflect.Array) {
+				return 0, errors.New("mixed tuple/non-tuple values in 'in' query")
+			}
+			if el.Type() == reflect.TypeOf([]byte{}) {
+				return 0, errors.New("mixed tuple/non-tuple values in 'in' query")
+			}
+			if el.Len() != w {
+				return 0, errors.New("tuple width mismatch in 'in' query")
+			}
+		}
+		return w, nil
+	default:
+		return 0, nil
+	}
+}
+
+func derefInValue(v reflect.Value) (reflect.Value, bool) {
+	for v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return reflect.Value{}, false
+		}
+		v = v.Elem()
+	}
+	return v, true
 }
 
 func appendReflectSlice(args []interface{}, v reflect.Value, vlen int) []interface{} {
@@ -262,4 +360,23 @@ func appendReflectSlice(args []interface{}, v reflect.Value, vlen int) []interfa
 	}
 
 	return args
+}
+
+func appendReflectTuples(args []interface{}, v reflect.Value, rows, width int) ([]interface{}, error) {
+	for i := 0; i < rows; i++ {
+		el, ok := derefInValue(v.Index(i))
+		if !ok {
+			return nil, errors.New("nil tuple in 'in' query")
+		}
+		if el.Kind() != reflect.Slice && el.Kind() != reflect.Array {
+			return nil, errors.New("expected tuple row in 'in' query")
+		}
+		if el.Len() != width {
+			return nil, errors.New("tuple width mismatch in 'in' query")
+		}
+		for c := 0; c < width; c++ {
+			args = append(args, el.Index(c).Interface())
+		}
+	}
+	return args, nil
 }

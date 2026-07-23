@@ -1604,6 +1604,70 @@ func TestIn(t *testing.T) {
 	})
 }
 
+func TestInMultiColumn(t *testing.T) {
+	q, args, err := In(
+		"SELECT * FROM t WHERE (id, typ) IN (?)",
+		[][]interface{}{{1, "a"}, {2, "b"}, {3, "c"}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantQ := "SELECT * FROM t WHERE (id, typ) IN ((?, ?), (?, ?), (?, ?))"
+	if q != wantQ {
+		t.Fatalf("query=\n%q\nwant\n%q", q, wantQ)
+	}
+	if len(args) != 6 {
+		t.Fatalf("args=%v", args)
+	}
+	if args[0] != 1 || args[1] != "a" || args[5] != "c" {
+		t.Fatalf("args=%v", args)
+	}
+
+	// fixed-size array rows
+	q, args, err = In("WHERE (a, b) IN (?)", [][2]int{{1, 2}, {3, 4}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q != "WHERE (a, b) IN ((?, ?), (?, ?))" {
+		t.Fatalf("q=%q", q)
+	}
+	if len(args) != 4 || args[0] != 1 || args[3] != 4 {
+		t.Fatalf("args=%v", args)
+	}
+
+	// single-column [][]byte still expands as scalar bind values, not tuples
+	q, args, err = In("WHERE b IN (?)", [][]byte{[]byte("x"), []byte("y")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q != "WHERE b IN (?, ?)" {
+		t.Fatalf("[][]byte should be single-column, got %q", q)
+	}
+
+	// width mismatch
+	_, _, err = In("WHERE (a, b) IN (?)", [][]interface{}{{1, 2}, {3}})
+	if err == nil {
+		t.Fatal("expected width mismatch error")
+	}
+
+	// mixed with other bind vars
+	q, args, err = In(
+		"SELECT * FROM t WHERE x = ? AND (id, typ) IN (?) AND y = ?",
+		"pre",
+		[][]interface{}{{9, "z"}},
+		"post",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q != "SELECT * FROM t WHERE x = ? AND (id, typ) IN ((?, ?)) AND y = ?" {
+		t.Fatalf("q=%q", q)
+	}
+	if len(args) != 4 || args[0] != "pre" || args[3] != "post" {
+		t.Fatalf("args=%v", args)
+	}
+}
+
 func TestBindStruct(t *testing.T) {
 	var err error
 

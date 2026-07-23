@@ -53,16 +53,24 @@ func TestCompileQuery(t *testing.T) {
 			T: `SELECT @name := "name", @p1, @p2, @p3`,
 			V: []string{"age", "first", "last"},
 		},
-		/* This unicode awareness test sadly fails, because of our byte-wise worldview.
-		 * We could certainly iterate by Rune instead, though it's a great deal slower,
-		 * it's probably the RightWay(tm)
+		// multi-byte Unicode parameter names
 		{
 			Q: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
 			R: `INSERT INTO foo (a,b,c,d) VALUES (?, ?, ?, ?)`,
 			D: `INSERT INTO foo (a,b,c,d) VALUES ($1, $2, $3, $4)`,
-			N: []string{"name", "age", "first", "last"},
+			T: `INSERT INTO foo (a,b,c,d) VALUES (@p1, @p2, @p3, @p4)`,
+			N: `INSERT INTO foo (a,b,c,d) VALUES (:あ, :b, :キコ, :名前)`,
+			V: []string{"あ", "b", "キコ", "名前"},
 		},
-		*/
+		// PostgreSQL cast immediately after a named parameter
+		{
+			Q: `SELECT :id::int, :name::text`,
+			R: `SELECT ?::int, ?::text`,
+			D: `SELECT $1::int, $2::text`,
+			T: `SELECT @p1::int, @p2::text`,
+			N: `SELECT :id::int, :name::text`,
+			V: []string{"id", "name"},
+		},
 	}
 
 	for _, test := range table {

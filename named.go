@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"strconv"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/jmoiron/sqlx/reflectx"
 )
@@ -319,86 +320,126 @@ func bindMap(bindType int, query string, args map[string]interface{}) (string, [
 // digits and numbers, where '5' is a digit but '五' is not.
 var allowedBindRunes = []*unicode.RangeTable{unicode.Letter, unicode.Digit}
 
-// FIXME: this function isn't safe for unicode named params, as a failing test
-// can testify.  This is not a regression but a failure of the original code
-// as well.  It should be modified to range over runes in a string rather than
-// bytes, even though this is less convenient and slower.  Hopefully the
-// addition of the prepared NamedStmt (which will only do this once) will make
-// up for the slightly slower ad-hoc NamedExec/NamedQuery.
-
 // compile a NamedQuery into an unbound query (using the '?' bindvar) and
 // a list of names.
+//
+// Named parameters are parsed rune-wise so multi-byte Unicode letters (e.g.
+// :名前) work. A colon that starts a PostgreSQL cast immediately after a
+// named parameter (:id::int) ends the name and emits the cast literally.
 func compileNamedQuery(qs []byte, bindType int) (query string, names []string, err error) {
 	names = make([]string, 0, 10)
 	rebound := make([]byte, 0, len(qs))
 
 	inName := false
-	last := len(qs) - 1
 	currentVar := 1
 	name := make([]byte, 0, 10)
 
-	for i, b := range qs {
-		// a ':' while we're in a name is an error
+	appendBind := func() {
+		names = append(names, string(name))
+		switch bindType {
+		// oracle only supports named type bind vars even for positional
+		case NAMED:
+			rebound = append(rebound, ':')
+			rebound = append(rebound, name...)
+		case QUESTION, UNKNOWN:
+			rebound = append(rebound, '?')
+		case DOLLAR:
+			rebound = append(rebound, '$')
+			rebound = append(rebound, strconv.Itoa(currentVar)...)
+			currentVar++
+		case AT:
+			rebound = append(rebound, '@', 'p')
+			rebound = append(rebound, strconv.Itoa(currentVar)...)
+			currentVar++
+		}
+	}
+
+	isNameRune := func(r rune) bool {
+		return unicode.IsOneOf(allowedBindRunes, r) || r == '_' || r == '.'
+	}
+
+	for i := 0; i < len(qs); {
+		r, size := utf8.DecodeRune(qs[i:])
+		if r == utf8.RuneError && size == 1 {
+			// invalid UTF-8: treat as a single raw byte
+			r = rune(qs[i])
+			size = 1
+		}
+		b := qs[i] // first byte; only meaningful for ASCII checks below
+
 		if b == ':' {
-			// if this is the second ':' in a '::' escape sequence, append a ':'
+			// second ':' of a '::' escape while already in a (possibly empty) name
 			if inName && i > 0 && qs[i-1] == ':' {
 				rebound = append(rebound, ':')
 				inName = false
+				i++
 				continue
-			} else if inName {
+			}
+			// PostgreSQL cast after a named param: :name::type
+			if inName && i+1 < len(qs) && qs[i+1] == ':' {
+				if len(name) == 0 {
+					err = errors.New("unexpected `:` while reading named param at " + strconv.Itoa(i))
+					return query, names, err
+				}
+				appendBind()
+				inName = false
+				// emit both cast colons so the second is not parsed as a new name
+				rebound = append(rebound, ':', ':')
+				i += 2
+				continue
+			}
+			if inName {
 				err = errors.New("unexpected `:` while reading named param at " + strconv.Itoa(i))
 				return query, names, err
 			}
 			inName = true
-			name = []byte{}
-		} else if inName && i > 0 && b == '=' && len(name) == 0 {
+			name = name[:0]
+			i++
+			continue
+		}
+
+		if inName && b == '=' && len(name) == 0 {
 			rebound = append(rebound, ':', '=')
 			inName = false
+			i++
 			continue
-			// if we're in a name, and this is an allowed character, continue
-		} else if inName && (unicode.IsOneOf(allowedBindRunes, rune(b)) || b == '_' || b == '.') && i != last {
-			// append the byte to the name if we are in a name and not on the last byte
-			name = append(name, b)
-			// if we're in a name and it's not an allowed character, the name is done
-		} else if inName {
+		}
+
+		if inName && isNameRune(r) {
+			// peek whether this is the last rune of the query
+			if i+size >= len(qs) {
+				name = append(name, qs[i:i+size]...)
+				appendBind()
+				inName = false
+				i += size
+				continue
+			}
+			name = append(name, qs[i:i+size]...)
+			i += size
+			continue
+		}
+
+		if inName {
+			// name terminator (non-name rune, not end-of-string name char)
+			appendBind()
 			inName = false
-			// if this is the final byte of the string and it is part of the name, then
-			// make sure to add it to the name
-			if i == last && unicode.IsOneOf(allowedBindRunes, rune(b)) {
-				name = append(name, b)
-			}
-			// add the string representation to the names list
-			names = append(names, string(name))
-			// add a proper bindvar for the bindType
-			switch bindType {
-			// oracle only supports named type bind vars even for positional
-			case NAMED:
-				rebound = append(rebound, ':')
-				rebound = append(rebound, name...)
-			case QUESTION, UNKNOWN:
-				rebound = append(rebound, '?')
-			case DOLLAR:
-				rebound = append(rebound, '$')
-				for _, b := range strconv.Itoa(currentVar) {
-					rebound = append(rebound, byte(b))
-				}
-				currentVar++
-			case AT:
-				rebound = append(rebound, '@', 'p')
-				for _, b := range strconv.Itoa(currentVar) {
-					rebound = append(rebound, byte(b))
-				}
-				currentVar++
-			}
-			// add this byte to string unless it was not part of the name
-			if i != last {
-				rebound = append(rebound, b)
-			} else if !unicode.IsOneOf(allowedBindRunes, rune(b)) {
-				rebound = append(rebound, b)
-			}
+			rebound = append(rebound, qs[i:i+size]...)
+			i += size
+			continue
+		}
+
+		// normal text
+		rebound = append(rebound, qs[i:i+size]...)
+		i += size
+	}
+
+	// if the query ended while still collecting a name, flush it
+	if inName {
+		if len(name) == 0 {
+			// trailing lone ':' — keep as literal
+			rebound = append(rebound, ':')
 		} else {
-			// this is a normal byte and should just go onto the rebound query
-			rebound = append(rebound, b)
+			appendBind()
 		}
 	}
 

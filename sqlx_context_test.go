@@ -1425,3 +1425,32 @@ func TestConn(t *testing.T) {
 		}
 	})
 }
+
+func TestTxNamedQueryContextMethod(t *testing.T) {
+	// Compile-time check that *Tx exposes NamedQueryContext (issue #447).
+	var _ interface {
+		NamedQueryContext(ctx context.Context, query string, arg interface{}) (*Rows, error)
+	} = (*Tx)(nil)
+
+	// Runtime path with in-memory schema when a driver is available.
+	RunWithSchemaContext(context.Background(), defaultSchema, t, func(ctx context.Context, db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		tx, err := db.BeginTxx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback()
+
+		type p struct {
+			FirstName string `db:"first_name"`
+		}
+		rows, err := tx.NamedQueryContext(ctx, "SELECT first_name FROM person WHERE first_name=:first_name", p{FirstName: "Jason"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		if !rows.Next() {
+			t.Fatal("expected a row")
+		}
+	})
+}

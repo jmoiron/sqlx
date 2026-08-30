@@ -53,6 +53,23 @@ func TestCompileQuery(t *testing.T) {
 			T: `SELECT @name := "name", @p1, @p2, @p3`,
 			V: []string{"age", "first", "last"},
 		},
+		// PostgreSQL type cast immediately after a named parameter (#983)
+		{
+			Q: `SELECT :boundary::jsonb AS boundary`,
+			R: `SELECT ?::jsonb AS boundary`,
+			D: `SELECT $1::jsonb AS boundary`,
+			T: `SELECT @p1::jsonb AS boundary`,
+			N: `SELECT :boundary::jsonb AS boundary`,
+			V: []string{"boundary"},
+		},
+		{
+			Q: `SELECT :a::uuid, :b::text`,
+			R: `SELECT ?::uuid, ?::text`,
+			D: `SELECT $1::uuid, $2::text`,
+			T: `SELECT @p1::uuid, @p2::text`,
+			N: `SELECT :a::uuid, :b::text`,
+			V: []string{"a", "b"},
+		},
 		/* This unicode awareness test sadly fails, because of our byte-wise worldview.
 		 * We could certainly iterate by Rune instead, though it's a great deal slower,
 		 * it's probably the RightWay(tm)
@@ -118,6 +135,36 @@ func (t Test) Errorf(err error, format string, args ...interface{}) {
 	t.t.Helper()
 	if err != nil {
 		t.t.Errorf(format, args...)
+	}
+}
+
+func TestNamedPostgresTypeCast(t *testing.T) {
+	q, args, err := Named(
+		`SELECT :boundary::jsonb AS boundary, :id::int AS id`,
+		map[string]interface{}{
+			"boundary": `{"type":"Polygon"}`,
+			"id":       7,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `SELECT ?::jsonb AS boundary, ?::int AS id`
+	if q != want {
+		t.Errorf("query:\n got: %s\nwant: %s", q, want)
+	}
+	if len(args) != 2 {
+		t.Fatalf("got %d args, want 2: %#v", len(args), args)
+	}
+	if args[0] != `{"type":"Polygon"}` || args[1] != 7 {
+		t.Errorf("args: %#v", args)
+	}
+}
+
+func TestNamedParamSingleColonStillErrors(t *testing.T) {
+	_, _, err := compileNamedQuery([]byte("SELECT :first:name"), QUESTION)
+	if err == nil {
+		t.Fatal("expected error for a single colon inside a named param")
 	}
 }
 

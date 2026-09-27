@@ -137,8 +137,13 @@ func asSliceForIn(i interface{}) (v reflect.Value, ok bool) {
 }
 
 // In expands slice values in args, returning the modified query string
-// and a new arg list that can be executed by a database. The `query` should
-// use the `?` bindVar.  The return value uses the `?` bindVar.
+// and a new arg list that can be executed by a database.
+//
+// The query must use the `?` bindVar (not `$1`, `@p1`, etc.), even when
+// targeting PostgreSQL or other drivers that normally use a different
+// placeholder style. In always returns a query that still uses `?`; call
+// db.Rebind on the result before Query/Exec so the placeholders match the
+// driver.
 func In(query string, args ...interface{}) (string, []interface{}, error) {
 	// argMeta stores reflect.Value and length for slices and
 	// the value itself for non-slice arguments

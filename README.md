@@ -18,6 +18,9 @@ In addition to the [godoc API documentation](http://godoc.org/github.com/jmoiron
 there is also some [user documentation](http://jmoiron.github.io/sqlx/) that
 explains how to use `database/sql` along with sqlx.
 
+`sqlx.In` always expands with `?` placeholders. Even on PostgreSQL, write
+`IN (?)` (not `IN ($1)`), then `db.Rebind` the query before running it.
+
 ## Recent Changes
 
 1.3.0:

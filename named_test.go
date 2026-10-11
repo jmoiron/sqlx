@@ -53,6 +53,31 @@ func TestCompileQuery(t *testing.T) {
 			T: `SELECT @name := "name", @p1, @p2, @p3`,
 			V: []string{"age", "first", "last"},
 		},
+		// PostgreSQL :: cast immediately following a named parameter (#983)
+		{
+			Q: `SELECT :boundary::jsonb AS boundary`,
+			R: `SELECT ?::jsonb AS boundary`,
+			D: `SELECT $1::jsonb AS boundary`,
+			T: `SELECT @p1::jsonb AS boundary`,
+			N: `SELECT :boundary::jsonb AS boundary`,
+			V: []string{"boundary"},
+		},
+		{
+			Q: `SELECT :boundary::jsonb, :id::text`,
+			R: `SELECT ?::jsonb, ?::text`,
+			D: `SELECT $1::jsonb, $2::text`,
+			T: `SELECT @p1::jsonb, @p2::text`,
+			N: `SELECT :boundary::jsonb, :id::text`,
+			V: []string{"boundary", "id"},
+		},
+		{
+			Q: `SELECT * FROM person WHERE id=:id::int AND email=:email AND role=:role::varchar`,
+			R: `SELECT * FROM person WHERE id=?::int AND email=? AND role=?::varchar`,
+			D: `SELECT * FROM person WHERE id=$1::int AND email=$2 AND role=$3::varchar`,
+			T: `SELECT * FROM person WHERE id=@p1::int AND email=@p2 AND role=@p3::varchar`,
+			N: `SELECT * FROM person WHERE id=:id::int AND email=:email AND role=:role::varchar`,
+			V: []string{"id", "email", "role"},
+		},
 		/* This unicode awareness test sadly fails, because of our byte-wise worldview.
 		 * We could certainly iterate by Rune instead, though it's a great deal slower,
 		 * it's probably the RightWay(tm)
@@ -118,6 +143,70 @@ func (t Test) Errorf(err error, format string, args ...interface{}) {
 	t.t.Helper()
 	if err != nil {
 		t.t.Errorf(format, args...)
+	}
+}
+
+func TestNamedPostgresCast(t *testing.T) {
+	query := `SELECT :boundary::jsonb AS boundary, '2026-05-01'::timestamptz AS starts_at, :id::int AS id`
+	args := map[string]interface{}{
+		"boundary": `{"type":"Polygon"}`,
+		"id":       101,
+	}
+	q, boundArgs, err := Named(query, args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedQuery := `SELECT ?::jsonb AS boundary, '2026-05-01':timestamptz AS starts_at, ?::int AS id`
+	if q != expectedQuery {
+		t.Errorf("expected query %q, got %q", expectedQuery, q)
+	}
+	if len(boundArgs) != 2 {
+		t.Fatalf("expected 2 bound args, got %d: %#v", len(boundArgs), boundArgs)
+	}
+	if boundArgs[0] != `{"type":"Polygon"}` || boundArgs[1] != 101 {
+		t.Errorf("unexpected bound args: %#v", boundArgs)
+	}
+}
+
+func TestBindNamedPostgresCast(t *testing.T) {
+	type PersonArg struct {
+		ID   int    `db:"id"`
+		UUID string `db:"uuid"`
+	}
+	query := `SELECT * FROM person WHERE id = :id::int AND uuid = :uuid::uuid`
+	arg := PersonArg{ID: 1, UUID: "abc-123"}
+
+	// PostgreSQL format (DOLLAR)
+	qPg, argsPg, err := BindNamed(DOLLAR, query, arg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedPg := `SELECT * FROM person WHERE id = $1::int AND uuid = $2::uuid`
+	if qPg != expectedPg {
+		t.Errorf("expected pg query %q, got %q", expectedPg, qPg)
+	}
+	if len(argsPg) != 2 || argsPg[0] != 1 || argsPg[1] != "abc-123" {
+		t.Errorf("unexpected pg args: %#v", argsPg)
+	}
+
+	// MySQL format (QUESTION)
+	qMy, argsMy, err := BindNamed(QUESTION, query, arg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedMy := `SELECT * FROM person WHERE id = ?::int AND uuid = ?::uuid`
+	if qMy != expectedMy {
+		t.Errorf("expected mysql query %q, got %q", expectedMy, qMy)
+	}
+	if len(argsMy) != 2 || argsMy[0] != 1 || argsMy[1] != "abc-123" {
+		t.Errorf("unexpected mysql args: %#v", argsMy)
+	}
+}
+
+func TestNamedSingleColonErrors(t *testing.T) {
+	_, _, err := compileNamedQuery([]byte("SELECT * FROM person WHERE id = :id:invalid"), QUESTION)
+	if err == nil {
+		t.Fatal("expected error for single colon inside named parameter identifier")
 	}
 }
 

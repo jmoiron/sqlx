@@ -337,9 +337,47 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 	currentVar := 1
 	name := make([]byte, 0, 10)
 
+	skipNext := false
+
+	emitNamedBind := func() {
+		names = append(names, string(name))
+		switch bindType {
+		// oracle only supports named type bind vars even for positional
+		case NAMED:
+			rebound = append(rebound, ':')
+			rebound = append(rebound, name...)
+		case QUESTION, UNKNOWN:
+			rebound = append(rebound, '?')
+		case DOLLAR:
+			rebound = append(rebound, '$')
+			for _, b := range strconv.Itoa(currentVar) {
+				rebound = append(rebound, byte(b))
+			}
+			currentVar++
+		case AT:
+			rebound = append(rebound, '@', 'p')
+			for _, b := range strconv.Itoa(currentVar) {
+				rebound = append(rebound, byte(b))
+			}
+			currentVar++
+		}
+	}
+
 	for i, b := range qs {
-		// a ':' while we're in a name is an error
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		// a ':' while we're in a name is an error, except PostgreSQL casts
 		if b == ':' {
+			// :name::type is a named param followed by a PostgreSQL type cast
+			if inName && len(name) > 0 && i < last && qs[i+1] == ':' {
+				emitNamedBind()
+				rebound = append(rebound, ':', ':')
+				inName = false
+				skipNext = true
+				continue
+			}
 			// if this is the second ':' in a '::' escape sequence, append a ':'
 			if inName && i > 0 && qs[i-1] == ':' {
 				rebound = append(rebound, ':')
@@ -367,29 +405,7 @@ func compileNamedQuery(qs []byte, bindType int) (query string, names []string, e
 			if i == last && unicode.IsOneOf(allowedBindRunes, rune(b)) {
 				name = append(name, b)
 			}
-			// add the string representation to the names list
-			names = append(names, string(name))
-			// add a proper bindvar for the bindType
-			switch bindType {
-			// oracle only supports named type bind vars even for positional
-			case NAMED:
-				rebound = append(rebound, ':')
-				rebound = append(rebound, name...)
-			case QUESTION, UNKNOWN:
-				rebound = append(rebound, '?')
-			case DOLLAR:
-				rebound = append(rebound, '$')
-				for _, b := range strconv.Itoa(currentVar) {
-					rebound = append(rebound, byte(b))
-				}
-				currentVar++
-			case AT:
-				rebound = append(rebound, '@', 'p')
-				for _, b := range strconv.Itoa(currentVar) {
-					rebound = append(rebound, byte(b))
-				}
-				currentVar++
-			}
+			emitNamedBind()
 			// add this byte to string unless it was not part of the name
 			if i != last {
 				rebound = append(rebound, b)

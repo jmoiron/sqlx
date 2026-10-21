@@ -908,6 +908,59 @@ func TestMultiInsert(t *testing.T) {
 	})
 }
 
+func TestGetRawBytesRejected(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, _ string) {
+		loadDefaultFixture(db, t)
+		for _, name := range []string{"Jason", "Foobar"} {
+			t.Run(name, func(t *testing.T) {
+				var got struct {
+					FirstName sql.RawBytes `db:"first_name"`
+				}
+				err := db.Get(&got, db.Rebind("SELECT first_name FROM person WHERE first_name=?"), name)
+				if err == nil || err.Error() != "sql: RawBytes isn't allowed on Row.Scan" {
+					t.Fatalf("expected RawBytes rejection, got %v", err)
+				}
+			})
+		}
+	})
+}
+
+func TestGetNoRowsDoesNotAllocatePointerFields(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T, _ string) {
+		loadDefaultFixture(db, t)
+		type personPointers struct {
+			FirstName *string `db:"first_name"`
+			LastName  *string `db:"last_name"`
+			Email     *string `db:"email"`
+		}
+
+		t.Run("no_rows_preserves_nil_pointers", func(t *testing.T) {
+			var got personPointers
+			err := db.Get(&got, db.Rebind("SELECT first_name, last_name, email FROM person WHERE first_name=?"), "Foobar")
+			if err != sql.ErrNoRows {
+				t.Fatalf("expected sql.ErrNoRows, got %v", err)
+			}
+			if got.FirstName != nil || got.LastName != nil || got.Email != nil {
+				t.Errorf("expected pointer fields to remain nil, got %#v", got)
+			}
+		})
+
+		t.Run("valid_row_scans_pointer_fields", func(t *testing.T) {
+			var got personPointers
+			err := db.Get(&got, db.Rebind("SELECT first_name, last_name, email FROM person WHERE first_name=?"), "Jason")
+			if err != nil {
+				t.Fatalf("expected valid row, got %v", err)
+			}
+			if got.FirstName == nil || got.LastName == nil || got.Email == nil {
+				t.Fatalf("expected pointer fields to be populated, got %#v", got)
+			}
+			if *got.FirstName != "Jason" || *got.LastName != "Moiron" || *got.Email != "jmoiron@jmoiron.net" {
+				t.Errorf("unexpected row: %#v", got)
+			}
+		})
+	})
+}
+
 // FIXME: this function is kinda big but it slows things down to be constantly
 // loading and reloading the schema..
 

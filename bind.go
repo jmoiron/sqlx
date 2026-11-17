@@ -133,6 +133,15 @@ func asSliceForIn(i interface{}) (v reflect.Value, ok bool) {
 
 	}
 
+	// The type check above accepts a pointer to a slice. Expand the slice
+	// value, not the pointer. A nil pointer remains a scalar SQL NULL.
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return reflect.Value{}, false
+		}
+		v = v.Elem()
+	}
+
 	return v, true
 }
 
